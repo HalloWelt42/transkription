@@ -216,6 +216,27 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 angelegt.remove(tid)
                 assert (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).status_code == 404
 
+                # Unterordner: Aufnahme dort hochgeladen, ihr Transkript im selben Unterordner von Transkripte, gefunden in
+                # Liste und Suche, auch nach dem vollständigen Abgleich
+                unter = f"Unter {secrets.token_hex(2)}"
+                r = await c.post("/api/v1/aufnahmen", params={"name": f"{name} unten.mp3", "ordner": f"../{unter}"},
+                                 content=ton.read_bytes(), headers={**h, "Content-Type": "audio/mpeg"})
+                assert r.status_code == 201 and r.json()["pfad"].endswith(f"/Aufnahmen/{unter}/{name} unten.mp3"), r.text
+                unten = r.json()
+                angelegt.append(unten["id"])
+                a = await warten(c, h, (await c.post("/api/v1/transkribieren", headers=h, json={"quelle_id": unten["id"]})).json()["id"])
+                assert a["zustand"] == "fertig", a.get("fehler")
+                assert f"/Transkripte/{unter}/" in a["ergebnis"]["pfad"]
+                angelegt.append(a["ergebnis"]["transkript_id"])
+                im_verzeichnis = lambda seite: a["ergebnis"]["transkript_id"] in [e["id"] for e in seite["eintraege"]]  # noqa: E731
+                assert im_verzeichnis((await c.get("/api/v1/transkripte", headers=h, params={"anzahl": 100})).json())
+                await app.state.teile.abgleich.vollstaendig()
+                assert im_verzeichnis((await c.get("/api/v1/transkripte", headers=h, params={"anzahl": 100})).json())
+                for ordnerpfad in (unten["pfad"].rpartition("/")[0], a["ergebnis"]["pfad"].rpartition("/")[0]):
+                    k = await g.kellerwolke.finden(ordnerpfad)
+                    if k is not None:
+                        angelegt.append(str(k.id))
+
                 # Eine Aufnahme lesen (mit Markern und Transkripten), ihr Ton als Abspielfassung
                 eine = (await c.get(f"/api/v1/aufnahmen/{aufnahme['id']}", headers=h)).json()
                 assert eine["stand"] == "transkribiert" and [(m["zeit"], m["titel"]) for m in eine["marker"]] == [(4.5, "Wichtig")]

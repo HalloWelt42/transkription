@@ -58,3 +58,18 @@ def dateiname(name: str, zusatz: int = 0) -> str:
     sauber = _UNERLAUBT.sub(" ", name).strip(" .") or "Transkript"
     sauber = re.sub(r"\s+", " ", sauber)[:150]
     return f"{sauber} ({zusatz}){ENDUNG}" if zusatz > 1 else f"{sauber}{ENDUNG}"
+
+
+def unterordner(pfad: str) -> str:
+    """Ein relativer Unterordner (etwa "Besprechungen/2026"), jeder Teil wie ein Dateiname bereinigt; leer bleibt leer."""
+    teile = [_UNERLAUBT.sub(" ", t).strip(" .") for t in pfad.replace("\\", "/").split("/")]
+    teile = [re.sub(r"\s+", " ", t)[:120] for t in teile if t and t not in (".", "..")]
+    return "/".join(teile)
+
+
+def unterordner_der_aufnahme(zweig: str, aufnahme_pfad: str) -> str:
+    """Der Unterordner einer Aufnahme unter Aufnahmen ("" direkt dort oder außerhalb des Zweigs, etwa freigegeben)."""
+    oben = ort(zweig, AUFNAHMEN) + "/"
+    if not aufnahme_pfad.startswith(oben):
+        return ""
+    return aufnahme_pfad[len(oben):].rpartition("/")[0]

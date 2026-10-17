@@ -137,11 +137,14 @@ def router(teile: Teile) -> APIRouter:
                               zahlen=zahlen, eintraege=gefiltert[ab:ab + anzahl])
 
     @r.post("/aufnahmen", status_code=201, response_model=Aufnahme)
-    async def hochladen(request: Request, name: str = Query(min_length=1, max_length=200)) -> Aufnahme:
-        """Körper ist der Inhalt (roh, gestreamt) in den eigenen Ordner Aufnahmen; ein belegter Name bekommt eine
-        Zahl angehängt."""
+    async def hochladen(request: Request, name: str = Query(min_length=1, max_length=200),
+                        ordner: str = Query("", max_length=300, description="Unterordner von Aufnahmen, etwa Besprechungen")) -> Aufnahme:
+        """Körper ist der Inhalt (roh, gestreamt) in den eigenen Ordner Aufnahmen (oder einen Unterordner davon, der bei
+        Bedarf entsteht); ein belegter Name bekommt eine Zahl angehängt."""
         kw = zugang(lambda: g.kellerwolke)
         ort = await eigener_ordner()
+        if unter := orte.unterordner(ordner):
+            ort = await kw.ordner(orte.ort(ort.pfad, unter))
         sauber = orte.dateiname(name).removesuffix(orte.ENDUNG)
         stamm, punkt, endung = sauber.rpartition(".")
         stamm, endung = (stamm, f".{endung}") if punkt else (sauber, "")

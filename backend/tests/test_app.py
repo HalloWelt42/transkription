@@ -56,3 +56,12 @@ async def test_einrichten_anmelden_und_schutz(client):
     assert hoeren["stand"].startswith("Leitstelle noch nicht eingerichtet")
     assert (await client.post("/api/v1/transkribieren", headers=h, json={"quelle_id": "x"})).status_code == 422
     assert (await client.get("/api/v1/aufnahmen", headers=h)).status_code == 404          # Schein kennt keine Ablage
+
+
+def test_unterordner_sicher():
+    from app.ablage import orte
+    assert orte.unterordner("../Besprechungen//2026 ") == "Besprechungen/2026"
+    assert orte.unterordner("a:b/./c") == "a b/c" and orte.unterordner("") == ""
+    assert orte.unterordner_der_aufnahme("Apps/T", "Apps/T/Aufnahmen/x.wav") == ""
+    assert orte.unterordner_der_aufnahme("Apps/T", "Apps/T/Aufnahmen/A/B/x.wav") == "A/B"
+    assert orte.unterordner_der_aufnahme("Apps/T", "Freigabe/Musik/x.wav") == ""

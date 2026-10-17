@@ -15,7 +15,7 @@ from uuid import UUID
 from pydantic import ValidationError
 
 from appkern.app import Begleiter, Geruest
-from appkern.kellerwolke import KellerwolkeFehler, NichtGefunden
+from appkern.kellerwolke import Knoten, KellerwolkeFehler, NichtGefunden
 
 from .ablage import orte
 from .ablage.transkripte import KeineKellerwolke, Transkripte
@@ -70,7 +70,7 @@ class Abgleich(Begleiter):
                 await self.vollstaendig()
             else:
                 for knoten_id in dict.fromkeys(e.knoten_id for e in stand.eintraege):
-                    await self.nachlesen(knoten_id, ordner.id)
+                    await self.nachlesen(knoten_id, ordner)
             await self.index.abgleich_merken(ordner.id, stand.bis)
 
     async def _journal_ende(self, ordner_id: UUID) -> int:
@@ -92,14 +92,15 @@ class Abgleich(Begleiter):
         for tid in set(bekannt) - gesehen:
             await self.index.entfernen(tid)
 
-    async def nachlesen(self, knoten_id: UUID, ordner_id: UUID) -> None:
-        """Eine geänderte Stelle: liegt dort (noch) ein Transkript, kommt es in den Index, sonst heraus."""
+    async def nachlesen(self, knoten_id: UUID, ordner: Knoten) -> None:
+        """Eine geänderte Stelle: liegt dort (noch) ein Transkript irgendwo unter Transkripte, kommt es in den Index,
+        sonst heraus."""
         try:
             knoten = await self.transkripte.kw.knoten(knoten_id)
         except NichtGefunden:
             await self.index.entfernen(knoten_id)
             return
-        if knoten.parent_id != ordner_id or not orte.ist_transkript(knoten):
+        if not knoten.pfad.startswith(ordner.pfad + "/") or not orte.ist_transkript(knoten):
             await self.index.entfernen(knoten_id)
             return
         if (await self.index.staende()).get(str(knoten_id)) != knoten.etag:

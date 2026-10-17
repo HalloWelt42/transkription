@@ -49,9 +49,12 @@ class Transkripte:
         return await kw.ordner(orte.ort((await kw.ich()).zweig, orte.TRANSKRIPTE))
 
     async def anlegen(self, t: Transkript, quelle: Knoten | None = None) -> Knoten:
-        """Neue Datei mit eindeutigem Namen; mit `quelle` auch die Herkunft und das Suchfeld zur Aufnahme."""
+        """Neue Datei mit eindeutigem Namen; mit `quelle` auch die Herkunft und das Suchfeld zur Aufnahme. Liegt die
+        Aufnahme in einem Unterordner von Aufnahmen, kommt das Transkript in denselben Unterordner von Transkripte."""
         kw = self.kw
         ordner = await self.ordner()
+        if quelle is not None and (unter := orte.unterordner_der_aufnahme((await kw.ich()).zweig, quelle.pfad)):
+            ordner = await kw.ordner(orte.ort(ordner.pfad, unter))
         zusatz = 0
         while True:
             zusatz += 1
@@ -100,8 +103,12 @@ class Transkripte:
         return await self.kw.suchen({FELD_ART: "transkript", FELD_QUELLE: str(quelle_id)}, anzahl=20)
 
     async def alle(self) -> AsyncIterator[Knoten]:
+        """Alle Transkripte im Zweig Transkripte, auch in Unterordnern."""
         kw = self.kw
-        ordner = await self.ordner()
-        async for k in kw.alle_kinder(ordner.id):
-            if orte.ist_transkript(k):
-                yield k
+        offen = [(await self.ordner()).id]
+        while offen:
+            async for k in kw.alle_kinder(offen.pop()):
+                if k.ist_ordner:
+                    offen.append(k.id)
+                elif orte.ist_transkript(k):
+                    yield k
