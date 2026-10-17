@@ -94,7 +94,7 @@ def router(teile: Teile) -> APIRouter:
                     if groesse > HOEREN_HOECHSTENS_BYTES:
                         raise HTTPException(413, "Zu groß für kurzes Hören; als Aufnahme transkribieren")
                     ziel.write(daten)
-            wav = await teile.ton.wandeln(roh, ordner / "ton.wav")
+            wav = await teile.ton.wandeln(roh, ordner / "ton.wav", HOEREN)
             dauer = await teile.ton.dauer(wav)
             if dauer > HOEREN_HOECHSTENS_S:
                 raise HTTPException(413, f"Höchstens {HOEREN_HOECHSTENS_S} s; Längeres als Aufnahme transkribieren")

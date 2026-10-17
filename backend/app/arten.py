@@ -41,6 +41,8 @@ from .fassung import FASSUNG
 from .modell.transkript import Aenderung, ErzeugtMit, Marker, Quelle, Segment, Transkript
 from .sprechererkennung import erkennen
 from .teile import Teile
+from appkern.ton import HOEREN
+
 from .ton import Abschnitt, abschnitte_planen
 
 T = TypeVar("T")
@@ -140,7 +142,7 @@ def arten(teile: Teile) -> list[Art]:
         await k.fortschritt(None, f"Ton holen ({quelle.name})")
         await kw.herunterladen(quelle.id, roh)
         await k.fortschritt(None, "Ton wandeln")
-        wav = await teile.ton.wandeln(roh, ordner / "ton.wav")
+        wav = await teile.ton.wandeln(roh, ordner / "ton.wav", HOEREN)
         await k.fortschritt(None, "Abspielfassung erzeugen")
         await teile.abspielen.aus_datei(quelle, roh)
         roh.unlink(missing_ok=True)
@@ -210,7 +212,7 @@ def arten(teile: Teile) -> list[Art]:
                     continue
                 await k.pruefen()
                 await k.fortschritt(len(fertig) / len(plan), f"Abschnitt {a.nummer} von {len(plan)}")
-                stueck = await teile.ton.ausschneiden(wav, a, ordner / f"abschnitt-{a.nummer}.wav")
+                stueck = await teile.ton.ausschneiden(wav, a.start, a.ende, ordner / f"abschnitt-{a.nummer}.wav")
                 titel = f"{name}, Abschnitt {a.nummer} von {len(plan)}"
                 erg = await geduldig(k, lambda: teile.klangwerk.hoeren(stueck, sprache, versatz=a.start, titel=titel,
                                                                         prioritaet="hintergrund"), "Hören")
@@ -374,7 +376,7 @@ def arten(teile: Teile) -> list[Art]:
                 await k.fortschritt(len(gesammelt) / len(plan), f"Stimmabdrücke, Abschnitt {a.nummer} von {len(plan)}",
                                     phase="abdruecke")
                 drin = [s for s in t.segmente if a.start <= s.start < a.ende]
-                stueck = await teile.ton.ausschneiden(wav, a, ordner / f"abschnitt-{a.nummer}.wav")
+                stueck = await teile.ton.ausschneiden(wav, a.start, a.ende, ordner / f"abschnitt-{a.nummer}.wav")
                 zeiten = [(round(max(0.0, s.start - a.start), 3), round(min(a.ende, s.ende) - a.start, 3)) for s in drin]
                 gesammelt[str(a.nummer)] = await geduldig(
                     k, lambda: teile.klangwerk.abdruecke(stueck, zeiten, titel=f"{t.name}, Sprecher", prioritaet="hintergrund"),

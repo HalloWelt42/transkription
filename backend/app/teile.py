@@ -17,13 +17,12 @@ from appkern.kellerwolke import Kellerwolke, Knoten
 from .ablage.transkripte import Transkripte, zugang
 from . import altbestand
 from .abgleich import Abgleich
-from .abspielen import Abspielfassungen
 from .dienste import Klangwerk
 from .einstellungen import AppEinstellungen
 from .modell.transkript import Transkript
 from .sprechererkennung import Schwellen
 from .suchindex import Suchindex
-from .ton import Ton, TonFehler, programm
+from appkern.ton import Abspielfassungen, Ton, TonFehler, programm
 from .vorschlaege import Vorschlaege
 
 

@@ -12,7 +12,7 @@ import httpx
 import pytest
 
 from app.main import app_bauen
-from app.ton import programm
+from appkern.ton import programm
 from tests.hilfen import HAT_KELLERWOLKE, W, aktionen_zurueckziehen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))

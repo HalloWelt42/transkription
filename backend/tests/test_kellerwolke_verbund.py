@@ -18,7 +18,7 @@ import pytest
 
 from app.main import app_bauen
 from app.modell.transkript import Aenderung, Quelle, Segment, Transkript
-from app.ton import programm
+from appkern.ton import programm
 from tests.hilfen import HAT_KELLERWOLKE, W, aktionen_zurueckziehen
 from tests.test_verbund import Weiche, warten
 

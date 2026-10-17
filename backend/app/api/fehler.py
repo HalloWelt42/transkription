@@ -10,7 +10,7 @@ from appkern.leitstelle import LeitstellenFehler
 
 from ..ablage.transkripte import KeineKellerwolke, Unlesbar
 from ..dienste import KeineLeitstelle
-from ..ton import TonFehler
+from appkern.ton import TonFehler
 
 
 class Konflikt(Exception):

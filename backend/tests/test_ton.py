@@ -1,11 +1,13 @@
-"""Tonvorbereitung mit dem echten ffmpeg: wandeln (auch aus Video), Dauer, Pausen, Abschnitte planen und ausschneiden."""
+"""Hörabschnitte planen, mit dem echten ffmpeg aus `appkern.ton` (dessen eigene Tests prüfen Wandeln und Formate)."""
 
 import asyncio
 from pathlib import Path
 
 import pytest
 
-from app.ton import Abschnitt, Pause, Ton, TonFehler, abschnitte_planen, programm
+from appkern.ton import HOEREN, Pause, Ton, TonFehler, programm
+
+from app.ton import Abschnitt, abschnitte_planen
 
 
 async def erzeugen(ziel: Path, *argumente: str) -> Path:
@@ -23,7 +25,7 @@ async def mit_pausen(tmp_path: Path) -> Path:
 
 async def test_wandeln_dauer_pausen_ausschneiden(mit_pausen: Path, tmp_path: Path):
     ton = Ton()
-    wav = await ton.wandeln(mit_pausen, tmp_path / "probe.wav")
+    wav = await ton.wandeln(mit_pausen, tmp_path / "probe.wav", HOEREN)
     assert wav.read_bytes()[:4] == b"RIFF" and not list(tmp_path.glob(".*teil*"))
     assert await ton.dauer(wav) == pytest.approx(20.0, abs=0.1)
     pausen = await ton.pausen(wav)
@@ -32,7 +34,7 @@ async def test_wandeln_dauer_pausen_ausschneiden(mit_pausen: Path, tmp_path: Pat
     abschnitte = abschnitte_planen(await ton.dauer(wav), pausen, hoechstens_s=7, mindestens_s=2)
     # Pausen alle 4 s, höchstens 7 s: geschnitten wird je in der Mitte der Pause
     assert [a.ende for a in abschnitte] == pytest.approx([3.5, 7.5, 11.5, 15.5, 20.0], abs=0.1)
-    stueck = await ton.ausschneiden(wav, abschnitte[1], tmp_path / "stueck.wav")
+    stueck = await ton.ausschneiden(wav, abschnitte[1].start, abschnitte[1].ende, tmp_path / "stueck.wav")
     assert await ton.dauer(stueck) == pytest.approx(abschnitte[1].ende - abschnitte[1].start, abs=0.05)
     welle = await ton.wellenform(wav, punkte=40)
     # fester Maßstab in Dezibel: der Prüfton (halbe Aussteuerung, -6 dB) steht bei etwa 90, Pausen sind leer
@@ -45,7 +47,7 @@ async def test_wandeln_dauer_pausen_ausschneiden(mit_pausen: Path, tmp_path: Pat
 async def test_video_nur_tonspur(tmp_path: Path):
     video = await erzeugen(tmp_path / "v.mp4", "-f", "lavfi", "-i", "testsrc=size=64x64:rate=5:duration=2",
                            "-f", "lavfi", "-i", "sine=f=300:d=2", "-shortest", "-c:v", "libx264", "-c:a", "aac")
-    wav = await Ton().wandeln(video, tmp_path / "v.wav")
+    wav = await Ton().wandeln(video, tmp_path / "v.wav", HOEREN)
     assert await Ton().dauer(wav) == pytest.approx(2.0, abs=0.15)
 
 
@@ -53,7 +55,7 @@ async def test_kaputte_datei(tmp_path: Path):
     kaputt = tmp_path / "kaputt.wav"
     kaputt.write_bytes(b"kein Ton")
     with pytest.raises(TonFehler):
-        await Ton().wandeln(kaputt, tmp_path / "x.wav")
+        await Ton().wandeln(kaputt, tmp_path / "x.wav", HOEREN)
     with pytest.raises(TonFehler):
         programm("ffmpeg-gibt-es-nicht")
 
@@ -64,5 +66,5 @@ def test_planen_ohne_pausen_und_kurz():
     hart = abschnitte_planen(1500, [], hoechstens_s=600)
     assert [(a.start, a.ende) for a in hart] == [(0.0, 600.0), (600.0, 1200.0), (1200.0, 1500.0)]
     # lieber die längere Pause im späten Fenster als die letzte kurze
-    pausen = [Pause(400, 400.5), Pause(500, 503), Pause(590, 590.4)]
+    pausen = [Pause(start=400, ende=400.5), Pause(start=500, ende=503), Pause(start=590, ende=590.4)]
     assert abschnitte_planen(1000, pausen, hoechstens_s=600)[0].ende == 501.5

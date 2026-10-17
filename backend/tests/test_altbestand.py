@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 from app import altbestand
 from app.main import app_bauen
 from app.modell.transkript import Quelle
-from app.ton import programm
+from appkern.ton import programm
 from tests.hilfen import HAT_KELLERWOLKE, W
 from tests.test_verbund import Weiche, warten
 
