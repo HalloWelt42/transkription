@@ -76,7 +76,6 @@
     void machen(() => api.profilLoeschen(id)).then(() => kennung && gehe("sprecher"));
   }
 
-  const komma = (w: number | null) => (w == null ? "" : w.toFixed(2).replace(".", ","));
   const anfang = (n: string) => n.trim().charAt(0).toUpperCase() || "?";
 </script>
 
@@ -102,8 +101,8 @@
   </div>
   <div class="abschnitt">Erkennung</div>
   <dl class="werte">
-    <dt>Sicher ab</dt><dd>{komma(sicher)} Ähnlichkeit (Einstellung)</dd>
-    <dt>Vorschlag ab</dt><dd>{komma(vorschlag)}, du bestätigst</dd>
+    <dt>Sicher ab</dt><dd>{sicher ?? ""} % Ähnlichkeit (Einstellung)</dd>
+    <dt>Vorschlag ab</dt><dd>{vorschlag ?? ""} %, du bestätigst</dd>
     <dt>Proben</dt><dd>{p.proben}, zuletzt {wann(p.geaendert_am)}</dd>
   </dl>
   <div class="knopfzeile" style="margin-top:20px">
