@@ -16,6 +16,8 @@ services:
     volumes:
       - ./daten:/app/daten
       - ./zertifikate:/zertifikate:ro
+      # Ortszeit des Pi (sonst UTC): Zeiten ohne Zone, etwa aus dem Altbestand, gelten als Ortszeit
+      - /etc/localtime:/etc/localtime:ro
       - /usr/bin/ffmpeg:/host/usr/bin/ffmpeg:ro
       - /usr/bin/ffprobe:/host/usr/bin/ffprobe:ro
       - /usr/lib/aarch64-linux-gnu:/host/usr/lib/aarch64-linux-gnu:ro

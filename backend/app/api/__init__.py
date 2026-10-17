@@ -4,10 +4,10 @@ einer anderen App); Inhalte für `<audio>` und Downloads unter /api/v1/inhalt au
 from fastapi import FastAPI
 
 from ..teile import Teile
-from . import aufnahmen, fehler, inhalt, sprecher, transkripte
+from . import altbestand, aufnahmen, fehler, inhalt, sprecher, transkripte
 
 
 def einbinden(app: FastAPI, teile: Teile) -> None:
     fehler.behandeln(app)
-    for modul in (aufnahmen, transkripte, sprecher, inhalt):
+    for modul in (aufnahmen, transkripte, sprecher, inhalt, altbestand):
         app.include_router(modul.router(teile))

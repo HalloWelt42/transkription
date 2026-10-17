@@ -12,6 +12,7 @@ HOEREN = {"gruppe": "Hören"}
 SPRECHER = {"gruppe": "Sprecher"}
 KI = {"gruppe": "KI"}
 TECHNIK = {"gruppe": "Technik"}
+ALTBESTAND = {"gruppe": "Altbestand"}
 
 SPRACHEN = {"de": "Deutsch", "en": "Englisch", "fr": "Französisch", "es": "Spanisch", "it": "Italienisch",
             "nl": "Niederländisch", "auto": "Erkennen"}
@@ -63,6 +64,9 @@ class AppEinstellungen(Grundeinstellungen):
                                      description="Der Spieler nutzt eine gewandelte Fassung jeder Aufnahme (dadurch ohne Versatz "
                                                  "zum Text). Wird es mehr, gehen die am längsten nicht gespielten zuerst; sie "
                                                  "entstehen bei Bedarf neu.")
+    altbestand_adresse: str = Field("", title="Alte App", json_schema_extra=ALTBESTAND,
+                                    description="Die alte Sprachwerkstatt im Heimnetz, aus der du einzelne eigene Aufnahmen "
+                                                "samt Transkripten von Hand übernimmst. Leer: kein Altbestand.")
     ffmpeg_ordner: str = Field("", title="Ordner von ffmpeg", json_schema_extra=TECHNIK,
                                description="ffmpeg wandelt und schneidet den Ton. Ohne Eintrag wird es im Suchpfad und an den "
                                            "üblichen Orten gesucht.")

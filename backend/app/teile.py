@@ -6,11 +6,14 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import UUID
 
+import httpx
+
 from appkern.app import Begleiter, Geruest
 from appkern.einstellungen import Angebot, Option
 
 from .ablage.profile import Sprecherprofile
 from .ablage.transkripte import Transkripte
+from . import altbestand
 from .abgleich import Abgleich
 from .abspielen import Abspielfassungen
 from .dienste import Klangwerk
@@ -74,6 +77,24 @@ class Teile(Begleiter):
             return Angebot(optionen=optionen, stand=f"gefunden: {pfad}")
 
         g.einstellungen.anbieten("ffmpeg_ordner", ffmpeg)
+
+        async def alte_app() -> Angebot:
+            """Sucht im Heimnetz (je /24 von Kellerwolke und Leitstelle) nach der alten App und zählt ihren Altbestand."""
+            e = g.einstellungen.stand
+            optionen = [Option(wert="", titel="Kein Altbestand")]
+            async with httpx.AsyncClient() as client:
+                gefunden = await altbestand.suchen([e.kellerwolke_adresse, e.leitstelle_adresse], client)
+                for adresse in gefunden:
+                    try:
+                        zahl = len(await altbestand.AlteApp(adresse, client).aufnahmen())
+                        hinweis = f"{zahl} eigene Aufnahmen"
+                    except altbestand.AltFehler as f:
+                        hinweis = str(f)
+                    optionen.append(Option(wert=adresse, titel=f"Alte App auf {httpx.URL(adresse).host}", hinweis=hinweis))
+            stand = f"gefunden: {', '.join(gefunden)}" if gefunden else "im Heimnetz nicht gefunden; eigene Adresse eintragen"
+            return Angebot(optionen=optionen, eigener_wert=True, stand=stand)
+
+        g.einstellungen.anbieten("altbestand_adresse", alte_app)
 
     async def transkript_wegraeumen(self, transkript_id: UUID | str, wer: str) -> None:
         """In den Papierkorb der Kellerwolke, aus Verzeichnis und Vorschlägen, mit Eintrag im Protokoll."""

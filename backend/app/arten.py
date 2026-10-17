@@ -21,13 +21,14 @@ from pathlib import Path, PurePosixPath
 from typing import Literal, TypeVar
 from uuid import UUID
 
+import httpx
 from pydantic import BaseModel, Field
 
 from appkern.auftraege import Art, Kontext, Phase
 from appkern.kellerwolke import KellerwolkeFehler, StandVeraltet
 from appkern.leitstelle import DienstFehler, DienstWeg, Halt, NichtErreichbar, NichtGefunden
 
-from . import auswertung, export, korrektur
+from . import altbestand, auswertung, export, korrektur
 from .ablage import orte
 from .ablage.transkripte import zugang
 from .dienste import KeineLeitstelle, Wechsel
@@ -50,10 +51,26 @@ class TranskribierenAnfrage(BaseModel):
     sprecher: SprecherWeg | None = Field(None, description="ohne, Stimmen gruppieren oder mit Sprechertrennung; leer: Vorgabe "
                                                             "aus den Einstellungen (ab Werk ohne)")
     anzahl: int | None = Field(None, ge=1, le=20, description="bekannte Zahl der Sprecher")
+    ziel_id: UUID | None = Field(None, description="statt eines neuen Transkripts eine neue Version dieses (etwa nach "
+                                                  "einer Übernahme); die bisherigen Stände bleiben als Versionen")
 
 
 class TranskribierenEingabe(TranskribierenAnfrage):
     von: str | None = Field(None, description="wer den Auftrag gab (Konto, bei anderen Apps auch die App)")
+
+
+class UebernehmenAnfrage(BaseModel):
+    schluessel: str = Field(min_length=8, max_length=64, description="Eintrag des Altbestands (aus GET /altbestand)")
+    zielordner: str = Field("", max_length=300, description="Unterordner von Aufnahmen, entsteht bei Bedarf; leer: direkt dort")
+    name: str = Field(min_length=1, max_length=200, description="Name der Aufnahme ohne Endung (und ihres Transkripts)")
+    neu_transkribieren: bool = Field(False, description="danach neu transkribieren; das wird die jüngste Version")
+    sprache: Sprache | None = None
+    sprecher: SprecherWeg | None = None
+    anzahl: int | None = Field(None, ge=1, le=20)
+
+
+class UebernehmenEingabe(UebernehmenAnfrage):
+    von: str | None = None
 
 
 class SprecherEingabe(BaseModel):
@@ -221,11 +238,93 @@ def arten(teile: Teile) -> list[Art]:
                            sprecher=sprecher, segmente=segmente, wellenform=wellenform,
                            erzeugt_mit=ErzeugtMit(dienst=einst.dienst_hoeren, modell=modell, app=FASSUNG),
                            aenderung=Aenderung(was="erzeugt", wer=e.von))
-            knoten = await teile.transkripte.anlegen(t, quelle)
+            if e.ziel_id:
+                bisher, stand = await teile.transkripte.lesen(e.ziel_id)
+                t, knoten = await teile.transkripte.schreiben(
+                    e.ziel_id, t.model_copy(update={"name": bisher.name, "erstellt_am": bisher.erstellt_am}), stand.etag or "",
+                    Aenderung(was="neu transkribiert", wer=e.von))
+            else:
+                knoten = await teile.transkripte.anlegen(t, quelle)
             await k.merken(transkript_id=str(knoten.id))
             await teile.index.eintragen(t, knoten)
             return {"transkript_id": str(knoten.id), "name": t.name, "pfad": knoten.pfad, "segmente": len(segmente),
                     "sprecher": len(sprecher), "dauer_s": t.dauer_s}
+        finally:
+            shutil.rmtree(ordner, ignore_errors=True)
+
+    # --- uebernehmen (Altbestand der alten App) -------------------------------------------------------------------
+
+    async def uebernehmen(k: Kontext) -> dict:
+        """Original mit Prüfsumme holen, in Aufnahmen (Unterordner) ablegen, die alten Stände als Versionen eines
+        Transkripts im selben Unterordner, auf Wunsch neu transkribieren (jüngste Version). Fortsetzbar: hochgeladen
+        wird höchstens einmal, kein Stand doppelt."""
+        e: UebernehmenEingabe = k.eingabe
+        adresse = teile.einstellungen.altbestand_adresse
+        if not adresse:
+            raise ValueError("Keine alte App eingetragen (Einstellungen, Altbestand)")
+        kw = zugang(lambda: g.kellerwolke)
+        ordner = teile.arbeit / k.auftrag_id
+        ordner.mkdir(parents=True, exist_ok=True)
+        try:
+            async with httpx.AsyncClient() as client:
+                alte = altbestand.AlteApp(adresse, client)
+                await k.fortschritt(None, "Altbestand lesen", phase="lesen")
+                eintrag = next((a for a in await alte.aufnahmen() if a.schluessel == e.schluessel), None)
+                if eintrag is None:
+                    raise ValueError("Diese Aufnahme gibt es in der alten App nicht (mehr)")
+                if "aufnahme_id" in k.zwischenstand:
+                    quelle = await kw.knoten(k.zwischenstand["aufnahme_id"])
+                else:
+                    if schon := await kw.suchen({altbestand.FELD_ALTBESTAND: eintrag.quelle}, 1):
+                        raise ValueError(f"Schon übernommen: {schon[0].pfad}")
+                    await k.fortschritt(None, f"Original laden ({eintrag.name})", phase="laden")
+                    roh = ordner / f"original{eintrag.endung}"
+                    await alte.original(eintrag.staende[-1].id, roh)
+                    dauer = await teile.ton.dauer(roh)
+                    await k.pruefen()
+                    await k.fortschritt(None, "In der Kellerwolke ablegen", phase="ablegen")
+                    zweig = (await kw.ich()).zweig
+                    unter = orte.unterordner(e.zielordner)
+                    ziel = await kw.ordner(orte.ort(zweig, orte.AUFNAHMEN, *([unter] if unter else [])))
+                    stamm = orte.dateiname(e.name).removesuffix(orte.ENDUNG)
+                    n = 1
+                    while await kw.finden(orte.ort(ziel.pfad, f"{stamm}{f' ({n})' if n > 1 else ''}{eintrag.endung}")) is not None:
+                        n += 1
+                    quelle = await kw.schreiben(orte.ort(ziel.pfad, f"{stamm}{f' ({n})' if n > 1 else ''}{eintrag.endung}"), roh,
+                                                nur_neu=True)
+                    quelle = await kw.felder_setzen(quelle.id, {altbestand.FELD_ALTBESTAND: eintrag.quelle,
+                                                                orte.FELD_DAUER: round(dauer, 3)})
+                    roh.unlink(missing_ok=True)
+                    await k.merken(aufnahme_id=str(quelle.id))
+                tid: str | None = k.zwischenstand.get("transkript_id")
+                fertig = int(k.zwischenstand.get("staende_fertig", 0))
+                t = knoten = None
+                for nummer, stand in enumerate(eintrag.staende):
+                    if nummer < fertig:
+                        continue
+                    await k.fortschritt(nummer / len(eintrag.staende), f"Stand {nummer + 1} von {len(eintrag.staende)} übernehmen",
+                                        phase="staende")
+                    t = altbestand.in_transkript(await alte.transkript(stand.id), e.name,
+                                                 Quelle(knoten_id=quelle.id, pfad=quelle.pfad, etag=quelle.etag),
+                                                 float(quelle.felder.get(orte.FELD_DAUER) or eintrag.dauer_s))
+                    if tid is None:
+                        knoten = await teile.transkripte.anlegen(t, quelle)
+                        tid = str(knoten.id)
+                    else:
+                        _, bisher = await teile.transkripte.lesen(tid)
+                        t, knoten = await teile.transkripte.schreiben(tid, t, bisher.etag or "", t.aenderung)
+                    await k.merken(transkript_id=tid, staende_fertig=nummer + 1)
+                if t is not None and knoten is not None:
+                    await teile.index.eintragen(t, knoten)
+            await g.protokoll.eintragen("altbestand.uebernommen", f"{eintrag.name} nach {quelle.pfad} ({len(eintrag.staende)} Stände)",
+                                        bezug_art="aufnahme", bezug_name=e.von)
+            folge = None
+            if e.neu_transkribieren and tid:
+                folge = await g.auftraege.einreihen("transkribieren", TranskribierenEingabe(
+                    quelle_id=quelle.id, name=e.name, sprache=e.sprache, sprecher=e.sprecher, anzahl=e.anzahl,
+                    ziel_id=UUID(tid), von=e.von), titel=f"{e.name}: neu transkribieren")
+            return {"aufnahme_id": str(quelle.id), "transkript_id": tid, "pfad": quelle.pfad, "staende": len(eintrag.staende),
+                    "folgeauftrag": folge.id if folge else None}
         finally:
             shutil.rmtree(ordner, ignore_errors=True)
 
@@ -347,8 +446,14 @@ def arten(teile: Teile) -> list[Art]:
             phasen=[Phase(schluessel="korrigieren", titel="Korrigieren", symbol="wand-magic-sparkles")]),
         Art("auswerten", "Auswertung", auswerten, eingabe=AuswertenEingabe, nach_neustart="fortsetzen",
             phasen=[Phase(schluessel="auswerten", titel="Auswerten", symbol="list-ul"), speichern]),
+        Art("uebernehmen", "Übernehmen", uebernehmen, eingabe=UebernehmenEingabe, fortsetzbar=True, nach_neustart="fortsetzen",
+            phasen=[Phase(schluessel="lesen", titel="Altbestand lesen", symbol="box-archive"),
+                    Phase(schluessel="laden", titel="Original laden", symbol="download"),
+                    Phase(schluessel="ablegen", titel="Ablegen", symbol="cloud-arrow-up"),
+                    Phase(schluessel="staende", titel="Stände übernehmen", symbol="clock-rotate-left")]),
     ]
 
 
 __all__ = ["AuswertenEingabe", "KorrigierenEingabe", "SprecherEingabe", "TranskribierenAnfrage", "TranskribierenEingabe",
+           "UebernehmenAnfrage", "UebernehmenEingabe",
            "arten", "geduldig"]
