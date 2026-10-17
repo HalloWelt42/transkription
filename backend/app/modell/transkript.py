@@ -58,6 +58,7 @@ class Sprecher(_Teil):
     aehnlichkeit: float | None = Field(None, description="Ähnlichkeit zum bestätigten Profil")
     vorschlag_id: UUID | None = Field(None, description="Profil, das ähnlich klingt, aber noch nicht bestätigt ist")
     vorschlag_aehnlichkeit: float | None = None
+    abdruck: list[float] | None = Field(None, description="gemittelter Stimmabdruck dieses Sprechers in der Aufnahme")
 
 
 class Marker(_Teil):
