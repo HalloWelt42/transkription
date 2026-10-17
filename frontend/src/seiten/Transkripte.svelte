@@ -1,6 +1,7 @@
 <script lang="ts">
   // Transkripte: Verzeichnis mit Volltextsuche (Treffer mit Zeit, Klick springt in den Ton), Filter nach Sprache und
-  // Sprecher, seitenweise; mit einer Kennung in der Adresse (/transkripte/<kennung>[/<sekunden>]) das Transkript selbst.
+  // Sprecher, seitenweise; mit einer Kennung in der Adresse (/transkripte/<kennung>[/<sekunden>]) das Transkript selbst,
+  // aus der Kellerwolke geöffnet mit ihrer Anfrage (/transkripte/<kennung>/anfrage/<anfrage>).
   // Entwurf: mockups/transkription.html (2) und transkription-mobil.html (4).
   import { onMount } from "svelte";
   import { Auswahl, gehe, geraet, navigation, wann } from "appkern-oberflaeche";
@@ -20,6 +21,7 @@
 
   const kennung = $derived(navigation.seite === "transkripte" ? navigation.teile[0] ?? null : null);
   const beginn = $derived(navigation.teile[1] != null && !Number.isNaN(Number(navigation.teile[1])) ? Number(navigation.teile[1]) : null);
+  const anfrage = $derived(navigation.teile[1] === "anfrage" ? navigation.teile[2] ?? null : null);
 
   async function laden(anhaengen = false) {
     fehler = "";
@@ -66,7 +68,7 @@
 {#snippet ausschnitt(text: string)}{#each markiert(text) as x, i (i)}{#if x.treffer}<mark>{x.t}</mark>{:else}{x.t}{/if}{/each}{/snippet}
 
 {#if kennung}
-  {#key kennung}<TranskriptAnsicht id={kennung} {beginn} />{/key}
+  {#key `${kennung}/${anfrage}`}<TranskriptAnsicht id={kennung} {beginn} {anfrage} />{/key}
 {:else if geraet.mobil}
   <label class="suche" style="display:flex; color:var(--text); height:44px"><i class="fa-solid fa-magnifying-glass" style="color:var(--text-3)"></i>
     <input class="eingabe-roh" placeholder="In allen Transkripten suchen" bind:value={suche} oninput={suchen} />

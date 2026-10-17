@@ -13,7 +13,7 @@ from appkern.kellerwolke import Kellerwolke, StandVeraltet
 
 from app.abgleich import Abgleich
 from app.ablage.profile import Sprecherprofile
-from app.ablage.transkripte import Transkripte
+from app.ablage.transkripte import Transkripte, Unlesbar
 from app.modell.sprecherprofil import Profil
 from app.modell.transkript import Aenderung, Segment, Sprecher, Transkript
 from app.suchindex import Suchindex
@@ -79,6 +79,16 @@ async def test_ein_transkript_je_aufnahme_mit_versionen(umgebung):
     _, k4 = await transkripte.zurueckholen(k1.id, versionen[2].id, k3.etag, "chef")
     t4, _ = await transkripte.lesen(k1.id)
     assert t4.segmente[0].text == "Erster Text" and "zurückgeholt" in t4.aenderung.was and k4.etag != k3.etag
+
+
+async def test_unlesbares_transkript_meldet_sich(umgebung):
+    """Von Hand oder von einer anderen App beschädigt: eine klare Meldung statt eines Serverfehlers."""
+    kw, transkripte, *_, angelegt = umgebung
+    aufnahme = await _aufnahme(kw, angelegt, f"Probe {secrets.token_hex(3)}")
+    kaputt = await kw.begleiter_schreiben(aufnahme.id, "transkript", ".transkript.json", b'{"format": "transkript/1"}',
+                                          inhaltstyp="application/json")
+    with pytest.raises(Unlesbar, match="kein lesbares Transkript"):
+        await transkripte.lesen(kaputt.id)
 
 
 async def test_abgleich_folgt_der_kellerwolke(umgebung):

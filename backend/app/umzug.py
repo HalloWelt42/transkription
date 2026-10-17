@@ -8,7 +8,9 @@ Begleiter neben seiner Aufnahme. Der Plan zeigt vorher, was wohin kommt (Vorscha
 - weitere Transkripte derselben Aufnahme (früher entstand bei jedem Transkribieren ein neues) kommen als eigene
   Dateien neben die Aufnahme;
 - Transkripte ohne lebende Aufnahme kommen in den gleichen Unterordner unter Aufnahmen;
-- der dann leere Ordner Transkripte geht in den Papierkorb der Kellerwolke.
+- der dann leere Ordner Transkripte geht in den Papierkorb der Kellerwolke; liegen dort noch andere Dateien, bleibt er.
+
+Nötig ist das Zusammenführen, solange dort Transkripte liegen oder der Ordner leer im Weg steht.
 """
 
 from __future__ import annotations
@@ -91,8 +93,10 @@ async def planen(teile: Teile) -> Plan:
     aufnahmen = await teile.transkripte.ordner()
     je_aufnahme: dict[UUID, list[tuple[Knoten, Knoten]]] = {}
     ohne: list[Knoten] = []
+    andere = 0                                         # Dateien dort, die keine Transkripte sind: bleiben, Ordner auch
     async for t in _dateien(kw, alt):
         if not orte.ist_transkript(t):
+            andere += 1
             continue
         a = await _aufnahme(kw, await _quelle(teile, kw, t))
         if a is None:
@@ -115,9 +119,10 @@ async def planen(teile: Teile) -> Plan:
         unter = _unter(alt, t.pfad)
         schritte.append(Schritt(art="ohne_aufnahme", knoten_id=t.id, von=t.pfad,
                                 nach=orte.ort(aufnahmen.pfad, *([unter] if unter else []), t.name)))
-    schritte.append(Schritt(art="ordner", knoten_id=alt.id, von=alt.pfad, nach="Papierkorb (wenn leer)"))
+    if not andere:
+        schritte.append(Schritt(art="ordner", knoten_id=alt.id, von=alt.pfad, nach="Papierkorb"))
     zahlen = {art: sum(s.art == art for s in schritte) for art in ("begleiter", "daneben", "ohne_aufnahme")}
-    return Plan(noetig=True, schritte=schritte, zahlen=zahlen)
+    return Plan(noetig=bool(schritte), schritte=schritte, zahlen=zahlen)
 
 
 async def _frei(kw: Kellerwolke, ordner_pfad: str, name: str) -> str:

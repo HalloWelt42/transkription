@@ -14,6 +14,8 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Callable
 from uuid import UUID
 
+from pydantic import ValidationError
+
 from appkern.kellerwolke import Kellerwolke, Knoten, Version
 
 from ..modell.transkript import Aenderung, Transkript, jetzt
@@ -22,6 +24,18 @@ from . import orte
 
 class KeineKellerwolke(Exception):
     """Die App ist noch nicht mit einer Kellerwolke verbunden."""
+
+
+class Unlesbar(Exception):
+    """Die Datei ist kein lesbares Transkript (etwa von Hand oder von einer anderen App geändert)."""
+
+
+def _transkript(inhalt: bytes, name: str) -> Transkript:
+    try:
+        return Transkript.model_validate_json(inhalt)
+    except ValidationError as f:
+        raise Unlesbar(f"{name} ist kein lesbares Transkript ({f.errors()[0]['msg']} bei "
+                       f"{'.'.join(str(x) for x in f.errors()[0]['loc']) or 'Inhalt'})") from None
 
 
 def zugang(liefern: Callable[[], Kellerwolke | None]) -> Kellerwolke:
@@ -78,7 +92,7 @@ class Transkripte:
         kw = self.kw
         vorhanden = await self.zur_quelle(quelle.id)
         if vorhanden is not None:
-            bisher = Transkript.model_validate_json(await kw.lesen_ganz(vorhanden.id))
+            bisher = _transkript(await kw.lesen_ganz(vorhanden.id), vorhanden.name)
             t = t.model_copy(update={"name": bisher.name, "erstellt_am": bisher.erstellt_am})
             aenderung = erneut or aenderung
         t = t.model_copy(update={"geaendert_am": jetzt(), "aenderung": aenderung})
@@ -90,7 +104,7 @@ class Transkripte:
     async def lesen(self, transkript_id: UUID | str) -> tuple[Transkript, Knoten]:
         kw = self.kw
         knoten = await kw.knoten(transkript_id)
-        return Transkript.model_validate_json(await kw.lesen_ganz(transkript_id)), knoten
+        return _transkript(await kw.lesen_ganz(transkript_id), knoten.name), knoten
 
     async def schreiben(self, transkript_id: UUID | str, t: Transkript, stand: str,
                         aenderung: Aenderung) -> tuple[Transkript, Knoten]:
@@ -102,7 +116,7 @@ class Transkripte:
         return await self.kw.versionen(transkript_id)
 
     async def version(self, transkript_id: UUID | str, version_id: UUID | str) -> Transkript:
-        return Transkript.model_validate_json(await self.kw.version_ganz(transkript_id, version_id))
+        return _transkript(await self.kw.version_ganz(transkript_id, version_id), "Diese Version")
 
     async def zurueckholen(self, transkript_id: UUID | str, version_id: UUID | str, stand: str, wer: str | None,
                            app: str | None = None) -> tuple[Transkript, Knoten]:

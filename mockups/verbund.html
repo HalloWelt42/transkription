@@ -5,22 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Transkription - Kellerwolke und eine Ablage</title>
     <link rel="stylesheet" href="kopf.css" />
-    <style>
-      /* neu (kommt nach der Freigabe in transkription.css) */
-      .hinweis-band { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 12px; border-radius: var(--r2, 10px);
-                      background: var(--akzent-weich); color: var(--text); font-size: var(--klein); }
-      .hinweis-band > i { color: var(--akzent); }
-      .hinweis-band b { font-weight: 600; }
-      .hinweis-band .knopfzeile { margin-left: auto; flex: none; }
-      .zeile.nicht-waehlbar { opacity: .55; cursor: default; }
-      .umzug-liste { margin: 0 0 14px; border-radius: 10px; background: var(--flaeche); overflow: hidden; }
-      .umzug-liste .u-zeile { display: grid; grid-template-columns: 22px minmax(0, 1fr) 24px minmax(0, 1fr) auto; gap: 10px; align-items: center;
-                              padding: 9px 14px; font-size: var(--klein); border-bottom: 1px solid var(--rand); }
-      .umzug-liste .u-zeile:last-child { border-bottom: 0; }
-      .umzug-liste .u-zeile code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .umzug-liste .u-zeile .fa-arrow-right { color: var(--text-3); }
-      .umzug-liste .u-kopf { font-weight: 600; color: var(--text-2); background: var(--flaeche-2, var(--hg)); }
-    </style>
   </head>
   <body>
     <!-- Kopf, Navigation und Aufträge kommen aus der Schale des Appkerns (freigegeben). Hier nur, was neu ist. -->

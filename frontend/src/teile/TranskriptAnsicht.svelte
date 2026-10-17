@@ -13,9 +13,18 @@
   import { farbe, marke } from "../lib/zeit";
   import Beitrag from "./Beitrag.svelte";
   import Spieler from "./Spieler.svelte";
+  import { zurueckZurKellerwolke } from "../lib/herkunft";
+  import AnfrageBand from "./AnfrageBand.svelte";
   import TranskriptLeiste from "./TranskriptLeiste.svelte";
 
-  let { id, beginn = null }: { id: string; beginn?: number | null } = $props();
+  // `anfrage`: aus der Kellerwolke geöffnet (Datei außerhalb der App); alles geht dann mit dem Recht dieser Anfrage.
+  let { id, beginn = null, anfrage = null }: { id: string; beginn?: number | null; anfrage?: string | null } = $props();
+
+  function zurueck() {
+    if (anfrage) zurueckZurKellerwolke(antwort ? herkunft(antwort) : "");
+    else gehe("transkripte");
+  }
+  const herkunft = (a: TranskriptAntwort) => a.transkript.quelle?.pfad ?? a.pfad;
 
   let antwort = $state<TranskriptAntwort | null>(null);
   let fehler = $state("");
@@ -98,11 +107,11 @@
     fehler = "";
     konflikt = false;
     try {
-      antwort = await api.transkript(id);
+      antwort = await api.transkript(id, anfrage);
       navigation.titel = antwort.transkript.name;
       // die Wellenform kommt aus dem Ton selbst (gleich für alte und neue Transkripte); bis dahin die gespeicherte
       const quelle = antwort.transkript.quelle?.knoten_id;
-      if (quelle) void api.wellenform(quelle).then((w) => (welle = w)).catch(() => {});
+      if (quelle) void api.wellenform(quelle, anfrage).then((w) => (welle = w)).catch(() => {});
       vorschlaege = await api.vorschlaege(id);
     } catch (f) {
       fehler = (f as Error).message;
@@ -208,7 +217,7 @@
       return;
     }
     if (!antwort) return;
-    antwort = await api.aendern(id, { stand: antwort.stand, marker: liste });
+    antwort = await api.aendern(id, { stand: antwort.stand, marker: liste }, anfrage);
   }
 
   function vorschlagIndex(v: Vorschlag): number {
@@ -342,7 +351,7 @@
         marker: markerGeaendert ? ($state.snapshot(entwurf.marker) as Marker[]) : undefined,
         sprecher: sprecherGeaendert ? entwurf.sprecher.map(({ kennung, name }) => ({ kennung, name })) : undefined,
         vorschlaege: Object.entries(entscheidungen).map(([vid, zustand]) => ({ id: vid, zustand })),
-      });
+      }, anfrage);
       vorschlaege = await api.vorschlaege(id);
       entwurf = structuredClone($state.snapshot(antwort.transkript)) as Transkript;
       entscheidungen = {};
@@ -420,12 +429,13 @@
 
 {#if !antwort}
   {#if fehler}
-    <div class="seiten-kopf"><button class="knopf still" onclick={() => gehe("transkripte")}><i class="fa-solid fa-chevron-left"></i> Transkripte</button></div>
+    <div class="seiten-kopf"><button class="knopf still" onclick={zurueck}><i class="fa-solid fa-chevron-left"></i> {anfrage ? "Kellerwolke" : "Transkripte"}</button></div>
     <div class="rollfeld"><div class="fehlertext">{fehler}</div></div>
   {:else}<div class="leer">Lädt ...</div>{/if}
 {:else if geraet.mobil}
   <!-- über die ganze Höhe: der Spieler steht immer unten über den Reitern, auch bei wenig Text -->
   <div class="t-ansicht">
+  {#if anfrage}<AnfrageBand {anfrage} pfad={herkunft(antwort)} />{/if}
   <div class="knopfzeile" style="margin-bottom:8px">
     <label class="suche" style="flex:1; min-width:0"><i class="fa-solid fa-magnifying-glass"></i>
       <input class="eingabe-roh" placeholder="Im Text suchen" bind:value={suche} onkeydown={(e) => e.key === "Enter" && weiterSuchen()} /></label>
@@ -433,20 +443,20 @@
   </div>
   {#if mehr}
     <div class="karte" style="padding:0; margin-bottom:10px">
-      <TranskriptLeiste {antwort} {zeit} onspringen={springen} onneu={(a) => (antwort = a)} onmarker={markerSpeichern}
+      <TranskriptLeiste {antwort} {anfrage} {zeit} onspringen={springen} onneu={(a) => (antwort = a)} onmarker={markerSpeichern}
                         onvorschlaege={() => api.vorschlaege(id).then((v) => (vorschlaege = v))} onansehen={() => {}} />
     </div>
   {/if}
   {#if fehler}<div class="fehlertext">{fehler}</div>{/if}
   <div bind:this={rollfeld} ontouchmove={selbstGerollt} onwheel={selbstGerollt} role="region" aria-label="Text">{@render text()}</div>
-  <Spieler bind:this={spieler} src={api.tonAdresse(id)} dauer={antwort.transkript.dauer_s} wellenform={welle ?? antwort.transkript.wellenform}
+  <Spieler bind:this={spieler} src={api.tonAdresse(id, anfrage)} dauer={antwort.transkript.dauer_s} wellenform={welle ?? antwort.transkript.wellenform}
            {spur} marker={antwort.transkript.marker.map((m) => m.zeit)} bind:zeit bind:laeuft kompakt />
   </div>
 {:else}
   <div class="geruest-innen">
     <section class="seite">
       <div class="seiten-kopf">
-        <button class="knopf still" style="padding:0 6px" onclick={() => gehe("transkripte")}><i class="fa-solid fa-chevron-left"></i> Transkripte</button>
+        <button class="knopf still" style="padding:0 6px" onclick={zurueck}><i class="fa-solid fa-chevron-left"></i> {anfrage ? "Kellerwolke" : "Transkripte"}</button>
         <h1 class="titel-lang" title={antwort.transkript.name}>{antwort.transkript.name}</h1>
         {#if zuordnen}
           <span style="margin-left:auto; display:flex; gap:8px">
@@ -469,7 +479,8 @@
         <button class="knopf nur-schmal" title="Sprecher, Marker, Export, KI, Versionen" onclick={leisteOeffnen}>
           <i class="fa-solid fa-table-columns"></i> Leiste</button>
       </div>
-      <Spieler bind:this={spieler} src={api.tonAdresse(id)} dauer={antwort.transkript.dauer_s} wellenform={welle ?? antwort.transkript.wellenform}
+      {#if anfrage}<div style="padding:0 22px"><AnfrageBand {anfrage} pfad={herkunft(antwort)} /></div>{/if}
+      <Spieler bind:this={spieler} src={api.tonAdresse(id, anfrage)} dauer={antwort.transkript.dauer_s} wellenform={welle ?? antwort.transkript.wellenform}
                {spur} marker={(t?.marker ?? []).map((m) => m.zeit)} bind:zeit bind:laeuft
                stoppBei={bearbeiten && nurBeitrag && offen != null ? segmente[offen]?.ende ?? null : zuordnen ? spielBis : null} />
       {#if bearbeiten}
@@ -524,7 +535,7 @@
       </div>
     </section>
     <Leiste>
-      <TranskriptLeiste {antwort} {zeit} {bearbeiten} vorschlaege={bearbeiten ? 0 : offeneVorschlaege.length} onspringen={springen}
+      <TranskriptLeiste {antwort} {anfrage} {zeit} {bearbeiten} vorschlaege={bearbeiten ? 0 : offeneVorschlaege.length} onspringen={springen}
                         entwurf={zuordnen ? entwurf : null} {ungespeichert} onzuordnen={zuordnenBeginnen}
                         zuordnung={zuordnen ? { neu: neuerSprecher, umbenennen: sprecherUmbenennen, zusammenfuehren } : null}
                         onneu={(a) => { antwort = a; if (bearbeiten || zuordnen) entwurf = structuredClone($state.snapshot(a.transkript)) as Transkript; }}

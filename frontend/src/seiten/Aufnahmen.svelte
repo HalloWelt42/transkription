@@ -1,9 +1,10 @@
 <script lang="ts">
   // Aufnahmen: Ton- und Videodateien in Aufnahmen und in freigegebenen Ordnern, mit Stand; Hochladen (Knopf oder
   // Ziehen), Aufnehmen im Browser, Auswahl transkribieren. Am Telefon: großer Aufnahmeknopf, Datei wählen, die letzten.
-  // Entwurf: mockups/transkription.html (1) und transkription-mobil.html (1, 2).
+  // Als Quelle auch alle Dateien der Kellerwolke (/aufnahmen/kellerwolke[/<ordner>]), jede Datei einzeln per Anfrage.
+  // Entwurf: mockups/transkription.html (1), transkription-mobil.html (1, 2) und verbund.html (6a, 6b, 6e).
   import { onMount } from "svelte";
-  import { Auswahl, beiAuftrag, gehe, geraet, hole, json, navigation, sitzung, wann } from "appkern-oberflaeche";
+  import { Auswahl, beiAuftrag, gehe, geraet, hole, json, navigation, wann, type WahlSeite } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import { alsDatei, aufnahme, geraeteLaden, gespeicherte, quelleWechseln, starten as aufnehmen, verwerfen, type Gespeichert } from "../lib/aufnahme.svelte";
@@ -12,8 +13,10 @@
   import { groesse, marke, SPRACHEN } from "../lib/zeit";
   import Altbestand from "../teile/Altbestand.svelte";
   import AufnahmeAnsicht from "../teile/AufnahmeAnsicht.svelte";
+  import KellerwolkeQuelle from "../teile/KellerwolkeQuelle.svelte";
   import Rekorder from "../teile/Rekorder.svelte";
   import Rueckfrage from "../teile/Rueckfrage.svelte";
+  import Zusammenfuehren from "../teile/Zusammenfuehren.svelte";
 
   type Filter = "alle" | "ohne" | "transkribiert";
   const SEITE = 50;
@@ -23,6 +26,9 @@
   let stapel = $state<Ordner[]>([]);           // Unterordner, in die man hineingegangen ist
   // der Altbestand der alten App erscheint als Quelle unter Ordner (am Rechner), sobald ihre Adresse eingetragen ist
   const ALTBESTAND = "altbestand";
+  // alle Dateien der Kellerwolke: ein eigener Weg, damit Zurück aus einer dort geöffneten Datei hierher führt
+  const KELLERWOLKE = "kellerwolke";
+  let kette = $state<WahlSeite["kette"]>([]);  // vom Konto bis zum gezeigten Ordner der Kellerwolke
   let alteApp = $state("");
   let filter = $state<Filter>("alle");
   let suche = $state("");
@@ -39,7 +45,6 @@
   let eingabe: HTMLInputElement;
   let loeschenFuer = $state<string | null>(null);
   let loescht = $state(false);
-  let mobilOrdner = $state(false);
 
   const aktuellerOrdner = $derived(stapel.at(-1)?.id ?? ordner);
 
@@ -107,6 +112,11 @@
   }
 
   function ordnerWaehlen(id: string | null) {
+    if (id === KELLERWOLKE) {
+      gehe(`aufnahmen/${KELLERWOLKE}`);
+      return;
+    }
+    if (kellerwolke !== undefined) gehe("aufnahmen");
     ordner = id;
     stapel = [];
     ab = 0;
@@ -125,8 +135,13 @@
     void laden();
   }
 
-  // /aufnahmen/<id>: die Aufnahme zum Anhören (auch ohne Transkript), sonst die Liste
-  const kennung = $derived(navigation.seite === "aufnahmen" ? navigation.teile[0] ?? null : null);
+  // /aufnahmen/<id>[/anfrage/<anfrage>]: die Aufnahme zum Anhören (auch ohne Transkript, auch aus der Kellerwolke);
+  // /aufnahmen/kellerwolke[/<ordner>]: blättern in allen Dateien (`kellerwolke`: der Ordner, null für "Meine Dateien",
+  // undefined außerhalb); sonst die Liste
+  const weg = $derived(navigation.seite === "aufnahmen" ? navigation.teile : []);
+  const kennung = $derived(weg[0] && weg[0] !== KELLERWOLKE ? weg[0] : null);
+  const anfrage = $derived(weg[1] === "anfrage" ? weg[2] ?? null : null);
+  const kellerwolke = $derived(weg[0] === KELLERWOLKE ? weg[1] ?? null : undefined);
 
   // zurück aus einer Aufnahme: die Liste neu holen (sie kann gelöscht, transkribiert oder umbenannt sein)
   let warOffen = false;
@@ -223,8 +238,11 @@
     if (e.dataTransfer?.files.length) void dateienSenden(e.dataTransfer.files);
   }
 
-  const ordnerOptionen = $derived([...ordnerListe.map((o) => ({ wert: o.id as string | null, titel: o.pfad, hinweis: undefined as string | undefined })),
-    ...(alteApp && !geraet.mobil ? [{ wert: ALTBESTAND as string | null, titel: "Altbestand der alten App", hinweis: "nur lesen, übernehmen von Hand" }] : [])]);
+  const ordnerOptionen = $derived([
+    ...ordnerListe.map((o) => ({ wert: o.id as string | null, titel: o.pfad, hinweis: o.eigen ? "Aufnahmen der App, Transkripte daneben" : undefined })),
+    ...(alteApp && !geraet.mobil ? [{ wert: ALTBESTAND as string | null, titel: "Altbestand der alten App", hinweis: "nur lesen, übernehmen von Hand" }] : []),
+    { wert: KELLERWOLKE as string | null, titel: "Alle deine Dateien in der Kellerwolke", hinweis: "jede Datei einzeln, nur für den Auftrag" },
+  ]);
   const sprachOptionen = Object.entries(SPRACHEN).map(([wert, titel]) => ({ wert, titel }));
   const ART = { ton: "fa-file-audio", video: "fa-file-video" };
 
@@ -296,7 +314,9 @@
 {/snippet}
 
 {#if kennung}
-  {#key kennung}<AufnahmeAnsicht id={kennung} />{/key}
+  {#key `${kennung}/${anfrage}`}<AufnahmeAnsicht id={kennung} {anfrage} />{/key}
+{:else if kellerwolke !== undefined && geraet.mobil}
+  {#key kellerwolke}<KellerwolkeQuelle ordner={kellerwolke ?? null} {suche} bind:kette />{/key}
 {:else if geraet.mobil}
   {#if aufnahme.laeuft}
     <!-- über die ganze Höhe: die Aufnahmeleiste steht unten über den Reitern wie der Spieler -->
@@ -317,30 +337,15 @@
     {#if aufnahme.fehler}<div class="fehlertext">{aufnahme.fehler}</div>{/if}
     <div class="t-zweit">
       <button class="knopf" onclick={() => eingabe.click()}><i class="fa-solid fa-file-audio"></i> Datei wählen</button>
-      <button class="knopf" class:zweit={mobilOrdner} onclick={() => (mobilOrdner = !mobilOrdner)}>
+      <button class="knopf" onclick={() => gehe(`aufnahmen/${KELLERWOLKE}`)}>
         <i class="fa-solid fa-folder-open"></i> Aus der Kellerwolke</button>
     </div>
     {#if meldung}<p class="leer" style="padding:10px 4px">{meldung}</p>{/if}
     {@render uploadListe()}
     {#if fehler}<div class="fehlertext">{fehler}</div>{/if}
-    {#if mobilOrdner}
-      <div class="t-gruppe knopfzeile">
-        <Auswahl bind:wert={ordner} optionen={ordnerOptionen} symbol="fa-folder" onwahl={ordnerWaehlen} />
-        {#if stapel.length}<button class="knopf still" onclick={hoch}><i class="fa-solid fa-arrow-up"></i> {stapel.at(-1)?.name}</button>{/if}
-      </div>
-      {#if seite?.unterordner.length}
-        <div class="t-liste" style="margin-bottom:10px">
-          {#each seite.unterordner as o (o.id)}
-            <button class="t-zeile" onclick={() => hinein(o)}><i class="fa-solid fa-folder"></i>
-              <span class="t-text"><span class="t-name">{o.name}</span></span><i class="fa-solid fa-chevron-right" style="color:var(--text-3)"></i></button>
-          {/each}
-        </div>
-      {/if}
-    {:else}
-      <div class="t-gruppe">Zuletzt</div>
-    {/if}
+    <div class="t-gruppe">Zuletzt</div>
     <div class="t-liste">
-      {#each seite?.eintraege.slice(0, mobilOrdner ? SEITE : 15) ?? [] as a (a.id)}
+      {#each seite?.eintraege.slice(0, 15) ?? [] as a (a.id)}
         <button class="t-zeile" onclick={() => oeffnen(a)}>
           <i class="fa-solid {a.stand === 'transkribiert' ? 'fa-file-lines' : ART[a.art]}"></i>
           <span class="t-text"><span class="t-name">{a.name}</span><span class="t-meta">{standText(a)}</span></span>
@@ -358,7 +363,7 @@
 {:else}
   <div class="seiten-kopf">
     <h1>Aufnahmen</h1>
-    {#if ordner !== ALTBESTAND}
+    {#if ordner !== ALTBESTAND && kellerwolke === undefined}
     <span class="segment">
       <button class:aktiv={filter === "alle"} onclick={() => filtern("alle")}>Alle {seite?.zahlen.alle ?? ""}</button>
       <button class:aktiv={filter === "ohne"} onclick={() => filtern("ohne")}>Ohne Transkript {seite?.zahlen.ohne ?? ""}</button>
@@ -367,7 +372,7 @@
     {/if}
     <label class="suche" style="min-width:200px"><i class="fa-solid fa-magnifying-glass"></i>
       <input class="eingabe-roh" placeholder="Name suchen" bind:value={suche} oninput={suchen} /></label>
-    {#if ordner !== ALTBESTAND}
+    {#if ordner !== ALTBESTAND && kellerwolke === undefined}
     <span class="knopfzeile" style="margin-left:auto">
       <button class="knopf" onclick={aufnehmen} disabled={aufnahme.laeuft || !!aufnahme.danach}><i class="fa-solid fa-circle-dot" style="color:var(--gefahr)"></i> Aufnehmen</button>
       <button class="knopf primaer" onclick={() => eingabe.click()}><i class="fa-solid fa-upload"></i> Hochladen</button>
@@ -380,21 +385,27 @@
     {#if aufnahme.fehler}<div class="fehlertext" style="margin-bottom:12px">{aufnahme.fehler}</div>{/if}
     {@render liegendeListe()}
     <div class="ordnerzeile">
-      Ordner <Auswahl bind:wert={ordner} optionen={ordnerOptionen} symbol="fa-folder" onwahl={ordnerWaehlen}
-                      titel="Ordner, die du der App in der Kellerwolke freigegeben hast" />
+      Ordner <Auswahl wert={kellerwolke !== undefined ? KELLERWOLKE : ordner} optionen={ordnerOptionen}
+                      symbol={kellerwolke !== undefined ? "fa-cloud" : "fa-folder"} onwahl={ordnerWaehlen}
+                      titel="Woher die Aufnahmen kommen: Ordner der App oder alle deine Dateien in der Kellerwolke" />
       {#if ordner === ALTBESTAND}
         <span style="font-size:var(--klein); color:var(--text-3)">alte App auf {(() => { try { return new URL(alteApp).host; } catch { return alteApp; } })()}, nur lesen</span>
       {/if}
-      {#each stapel as o (o.id)}<span class="chip"><i class="fa-solid fa-folder-open"></i>{o.name}</span>{/each}
-      {#if stapel.length}<button class="knopf still" onclick={hoch}><i class="fa-solid fa-arrow-up"></i> Hoch</button>{/if}
-      {#if sitzung.app?.kellerwolke && ordner !== ALTBESTAND}
-        <a class="knopf still" href="{sitzung.app.kellerwolke}/einstellungen/zugaenge" target="_blank" rel="noopener"
-           title="In der Kellerwolke unter Zugänge der App weitere Ordner freigeben"><i class="fa-solid fa-folder-plus"></i> Ordner freigeben</a>
+      {#if kellerwolke !== undefined}
+        {#each kette.slice(1) as o (o.id)}<span class="chip"><i class="fa-solid fa-folder-open"></i>{o.name}</span>{/each}
+        {#if kette.length > 1}<button class="knopf still" onclick={() => gehe(["aufnahmen", KELLERWOLKE, kette.at(-2)?.id ?? ""].filter(Boolean).join("/"))}>
+          <i class="fa-solid fa-arrow-up"></i> Hoch</button>{/if}
+      {:else}
+        {#each stapel as o (o.id)}<span class="chip"><i class="fa-solid fa-folder-open"></i>{o.name}</span>{/each}
+        {#if stapel.length}<button class="knopf still" onclick={hoch}><i class="fa-solid fa-arrow-up"></i> Hoch</button>{/if}
       {/if}
     </div>
-    {#if ordner === ALTBESTAND}
+    {#if kellerwolke !== undefined}
+      {#key kellerwolke}<KellerwolkeQuelle ordner={kellerwolke ?? null} {suche} bind:kette />{/key}
+    {:else if ordner === ALTBESTAND}
       <Altbestand {suche} />
     {:else}
+    <Zusammenfuehren onfertig={laden} />
     <div class="ablage" class:ueber><i class="fa-solid fa-cloud-arrow-up"></i> Dateien hierher ziehen: Ton (WAV, MP3, M4A, OGG,
       FLAC) oder Video (MP4, MOV, MKV).</div>
     {@render uploadListe()}

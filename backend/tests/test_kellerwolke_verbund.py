@@ -19,7 +19,7 @@ import pytest
 from app.main import app_bauen
 from app.modell.transkript import Aenderung, Quelle, Segment, Transkript
 from app.ton import programm
-from tests.hilfen import HAT_KELLERWOLKE, W
+from tests.hilfen import HAT_KELLERWOLKE, W, aktionen_zurueckziehen
 from tests.test_verbund import Weiche, warten
 
 pytestmark = pytest.mark.skipif(not (HAT_KELLERWOLKE and W.get("KELLERWOLKE_KENNUNG")),
@@ -56,7 +56,8 @@ async def verbund(tmp_path: Path):
     r = await c.patch("/api/v1/einstellungen", headers=h, json={"werte": {
         "leitstelle_adresse": "http://ls.test", "leitstelle_schluessel": "ls_probe", "abschnitt_min": 2}})
     assert r.status_code == 200, r.text
-    await c.get("/api/v1/ich", headers=h)            # wie beim ersten Öffnen: die App trägt ihre Adresse ein (für Öffnen)
+    # wie die Oberfläche nach der Anmeldung: die App trägt ihre Adresse ein (für Öffnen aus der Kellerwolke)
+    assert (await c.post("/api/v1/adresse", headers=h, json={"adresse": "http://t"})).status_code == 200
     angelegt: list[str] = []
     try:
         yield app, g, c, h, kw_client, konto, fremd, ton, angelegt
@@ -72,6 +73,7 @@ async def verbund(tmp_path: Path):
         await kw_client.aclose()
         await c.aclose()
         await g.stoppen()
+        await aktionen_zurueckziehen()
 
 
 async def _hochladen_fremd(kw_client, konto, fremd, name: str, inhalt: bytes) -> dict:
@@ -133,6 +135,10 @@ async def test_waehlen_mit_optionen_und_oeffnen(verbund):
     erledigt = next(x for x in (await kw_client.get("/api/v1/anfragen", headers=konto)).json() if x["ergebnis_id"] == tid)
     assert erledigt["zustand"] == "fertig"
     assert (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).status_code == 404
+    # in der Wahl steht das Transkript als Begleiter der Datei (die Oberfläche zeigt daran "transkribiert")
+    seite = (await c.get("/api/v1/kellerwolke/wahl", params={"ordner": fremd["id"]}, headers=h)).json()
+    begleiter = next(e for e in seite["eintraege"] if e["id"] == tid)
+    assert (begleiter["haupt_id"], begleiter["rolle"]) == (datei["id"], "transkript")
 
     # öffnen: eine Anfrage zum Öffnen, die App nimmt sie an und zeigt Ton und Transkript mit ihrem Recht
     for _ in range(100):                              # die Adresse der App ist gemeldet, Öffnen wird angeboten
@@ -144,6 +150,8 @@ async def test_waehlen_mit_optionen_und_oeffnen(verbund):
     gewaehlt = r.json()
     anfrage = gewaehlt["anfrage"]["id"]
     assert (await c.post(f"/api/v1/kellerwolke/anfragen/{anfrage}/oeffnen", headers=h)).json()["zustand"] == "laeuft"
+    stand = (await c.get(f"/api/v1/kellerwolke/anfragen/{anfrage}", headers=h)).json()
+    assert stand["art"] == "oeffnen" and stand["knoten_id"] == datei["id"] and stand["gueltig_bis"]
     aufnahme = (await c.get(f"/api/v1/aufnahmen/{datei['id']}", params={"anfrage": anfrage}, headers=h)).json()
     assert aufnahme["stand"] == "transkribiert" and aufnahme["transkripte"][0]["id"] == tid
     r = await c.get(f"/api/v1/inhalt/aufnahmen/{datei['id']}/ton", params={"anfrage": anfrage}, headers={**h, "Range": "bytes=0-43"})
@@ -152,6 +160,9 @@ async def test_waehlen_mit_optionen_und_oeffnen(verbund):
     r = await c.patch(f"/api/v1/transkripte/{tid}", params={"anfrage": anfrage}, headers=h,
                       json={"stand": t["stand"], "name": "Interview Schulleitung"})
     assert r.status_code == 200 and r.json()["transkript"]["name"] == "Interview Schulleitung"
+    # auch außerhalb des eigenen Baums sagen die Versionen, was geschah
+    versionen = (await c.get(f"/api/v1/transkripte/{tid}/versionen", params={"anfrage": anfrage}, headers=h)).json()
+    assert versionen[0]["notiz"]["was"] and versionen[-1]["notiz"]["was"] == "erzeugt"
     # ein Auftrag mit dem Recht der geöffneten Datei schließt die Anfrage nicht
     a = await warten(c, h, (await c.post(f"/api/v1/transkripte/{tid}/korrigieren", params={"anfrage": anfrage}, headers=h)).json()["id"])
     assert a["zustand"] == "fertig", a.get("fehler")
@@ -180,12 +191,14 @@ async def test_zusammenfuehren_der_frueheren_ablage(verbund):
     await asyncio.sleep(1.1)
     neuster = await kw.schreiben(f"{alt.pfad}/Runde.transkript.json", transkript("Runde neuer", aufnahme.id), nur_neu=True)
     waise = await kw.schreiben(f"{alt.pfad}/Ohne Ton.transkript.json", transkript("Ohne Ton", None), nur_neu=True)
-    angelegt += [str(neuer.id), str(neuster.id), str(waise.id)]
+    notiz = await kw.schreiben(f"{alt.pfad}/Notiz.txt", b"bleibt", nur_neu=True, inhaltstyp="text/plain")
+    angelegt += [str(neuer.id), str(neuster.id), str(waise.id), str(notiz.id)]
 
     plan = (await c.get("/api/v1/ablage/zusammenfuehren", headers=h)).json()
     eigene = {s["knoten_id"]: s for s in plan["schritte"]}
     assert plan["noetig"] and eigene[str(neuster.id)]["art"] == "begleiter" and eigene[str(neuer.id)]["art"] == "daneben"
     assert eigene[str(waise.id)]["art"] == "ohne_aufnahme" and eigene[str(waise.id)]["nach"].endswith(f"/Aufnahmen/{lauf}/Ohne Ton.transkript.json")
+    assert str(notiz.id) not in eigene and not any(s["art"] == "ordner" for s in plan["schritte"])   # andere Dateien bleiben
 
     a = await warten(c, h, (await c.post("/api/v1/ablage/zusammenfuehren", headers=h)).json()["id"])
     assert a["zustand"] == "fertig", a.get("fehler")
@@ -193,5 +206,6 @@ async def test_zusammenfuehren_der_frueheren_ablage(verbund):
     assert [(b.id, b.name, b.rolle) for b in begleiter] == [(neuster.id, "Runde.transkript.json", "transkript")]
     assert (await kw.knoten(neuer.id)).pfad.endswith(f"/Aufnahmen/{lauf}/Runde (2).transkript.json")
     assert (await kw.knoten(waise.id)).pfad.endswith(f"/Aufnahmen/{lauf}/Ohne Ton.transkript.json")
-    assert (await c.get("/api/v1/ablage/zusammenfuehren", headers=h)).json()["noetig"] in (False, True)
+    assert (await kw.knoten(notiz.id)).pfad == f"{alt.pfad}/Notiz.txt"
+    assert (await c.get("/api/v1/ablage/zusammenfuehren", headers=h)).json()["noetig"] is False   # nur noch die Notiz dort
     angelegt += [str((await kw.pfad(f"{zweig}/Aufnahmen/{lauf}")).id)]

@@ -124,6 +124,13 @@ def _bedingung(begriffe: list[str]) -> tuple[str, list[str]]:
     return " AND ".join("text LIKE ? ESCAPE '\\'" for _ in begriffe), [_like(b) for b in begriffe]
 
 
+def _notiz(v: sqlite3.Connection, t: Transkript, knoten: Knoten) -> None:
+    if t.aenderung is not None and knoten.etag:
+        a = t.aenderung
+        v.execute("INSERT OR REPLACE INTO version_notiz (transkript_id, version_id, was, wer, app, zeit) "
+                  "VALUES (?,?,?,?,?,?)", (str(knoten.id), knoten.etag, a.was, a.wer, a.app, a.zeit.isoformat()))
+
+
 class Suchindex:
     def __init__(self, db: Datenbank) -> None:
         self.db = db
@@ -156,12 +163,14 @@ class Suchindex:
             v.executemany("INSERT INTO fundstelle (text, transkript_id, zeit, art) VALUES (?,?,?,?)",
                           [(s.text, tid, s.start, "text") for s in t.segmente if s.text.strip()]
                           + [(m.titel, tid, m.zeit, "marker") for m in t.marker])
-            if t.aenderung is not None and knoten.etag:
-                a = t.aenderung
-                v.execute("INSERT OR REPLACE INTO version_notiz (transkript_id, version_id, was, wer, app, zeit) "
-                          "VALUES (?,?,?,?,?,?)", (tid, knoten.etag, a.was, a.wer, a.app, a.zeit.isoformat()))
+            _notiz(v, t, knoten)
 
         await self.db.transaktion(arbeit)
+
+    async def notiz_merken(self, t: Transkript, knoten: Knoten) -> None:
+        """Nur die Notiz zur neuen Version (was, wer), für Transkripte außerhalb des eigenen Baums: sie stehen nicht im
+        Verzeichnis, ihre Versionen sollen trotzdem sagen, was geschah."""
+        await self.db.transaktion(lambda v: _notiz(v, t, knoten))
 
     async def entfernen(self, transkript_id: UUID | str) -> None:
         tid = str(transkript_id)

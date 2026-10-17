@@ -13,7 +13,7 @@ import pytest
 
 from app.main import app_bauen
 from app.ton import programm
-from tests.hilfen import HAT_KELLERWOLKE, W
+from tests.hilfen import HAT_KELLERWOLKE, W, aktionen_zurueckziehen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 from leitstelle_schein import antworten  # noqa: E402
@@ -282,3 +282,4 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 if angelegt:
                     await asyncio.sleep(0.5)
         await g.stoppen()
+        await aktionen_zurueckziehen()

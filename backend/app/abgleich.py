@@ -12,13 +12,11 @@ import asyncio
 import logging
 from uuid import UUID
 
-from pydantic import ValidationError
-
 from appkern.app import Begleiter, Geruest
 from appkern.kellerwolke import Knoten, KellerwolkeFehler, NichtGefunden
 
 from .ablage import orte
-from .ablage.transkripte import KeineKellerwolke, Transkripte
+from .ablage.transkripte import KeineKellerwolke, Transkripte, Unlesbar
 from .suchindex import Suchindex
 
 logger = logging.getLogger("transkription.abgleich")
@@ -112,7 +110,7 @@ class Abgleich(Begleiter):
         except NichtGefunden:
             await self.index.entfernen(knoten_id)
             return
-        except ValidationError as f:
-            logger.warning("Transkript %s ist nicht lesbar und bleibt aus dem Index: %s", knoten_id, f.errors()[:1])
+        except Unlesbar as f:
+            logger.warning("Transkript %s bleibt aus dem Index: %s", knoten_id, f)
             return
         await self.index.eintragen(t, knoten)

@@ -15,7 +15,7 @@ Pinnwand und morf-gpt sind ihre Kunden).
 | Transkript in der Datenbank, Master-Datei daneben, beide liefen auseinander (Korrektur nur in der DB) | Eine Wahrheit: die Transkriptdatei in der Kellerwolke; die Datenbank ist nur Verzeichnis und Suchindex |
 | Keine Versionen; Korrektur überschreibt | Jede Änderung ist eine neue Version der Datei (die Kellerwolke hält sie), Zurückholen geht |
 | Wortzeiten gespeichert, aber nie gezeigt; Text nicht bearbeitbar | Mitlesen Wort für Wort, Klick auf ein Wort springt hin; Text, Sprecher und Zeiten bearbeitbar |
-| Vier Exporte je Lauf automatisch (5678 Dateien) | Exporte erst auf Wunsch, als Download oder auf Wunsch als Datei neben dem Transkript |
+| Vier Exporte je Lauf automatisch (5678 Dateien) | Exporte erst auf Wunsch, als Download oder auf Wunsch als Datei neben der Aufnahme |
 | Abbruch löscht alles; lange Aufnahmen nur am Stück | Abschnitte an Sprechpausen; nach Abbruch oder Neustart geht es beim nächsten Abschnitt weiter |
 | Marker nur in der Master-Datei, Suche fand sie nicht | Marker im Transkript und im Suchindex |
 | Fremde Programme ohne Schlüssel (CORS `*`) | Jeder Zugriff mit Anmeldung oder App-Schlüssel |
@@ -26,9 +26,13 @@ Pinnwand und morf-gpt sind ihre Kunden).
 
 | Ort | Inhalt |
 |---|---|
-| `Aufnahmen/` | hochgeladene oder aufgenommene Ton- und Videodateien (weitere Ordner gibt der Nutzer der App frei); beim Aufnehmen gesetzte Marker hängen als Feld `marker` an der Aufnahme |
-| `Transkripte/<Name>.transkript.json` | das Transkript (Format unten); Herkunftsbezug `transkript_zu` auf die Aufnahme |
-| `Transkripte/<Name> (Auswertung).md` | KI-Auswertung, Herkunft `abgeleitet_von` |
+| `Aufnahmen/` | hochgeladene oder aufgenommene Ton- und Videodateien, auch in Unterordnern; beim Aufnehmen gesetzte Marker hängen als Feld `marker` an der Aufnahme |
+| `Aufnahmen/<Stamm>.transkript.json` | das Transkript (Format unten), Begleitdatei der Aufnahme (Rolle `transkript`), eines je Aufnahme; neu transkribiert wird eine neue Version |
+| `Aufnahmen/<Stamm>.protokoll.md`, `<Stamm>.srt` und weitere | Auswertung und abgelegte Exporte, ebenfalls Begleiter der Aufnahme (Rollen `protokoll`, `untertitel`, `text`, ...) |
+
+Dateien außerhalb des Zweigs (alle Dateien der Kellerwolke) liest die App nur mit einer Anfrage: der Mensch wählt sie in
+der App oder im Dateimenü der Kellerwolke, die App darf dann genau diese Datei lesen und ihre Begleiter schreiben, bis der
+Auftrag fertig ist (beim Öffnen 12 Stunden). Das Transkript liegt auch dort neben der Datei.
 | `Sprecher/profile.json` | Sprecherprofile: Name, gemittelter Stimmabdruck, Zahl der Proben |
 
 **Transkriptdatei** (eine Datei je Transkript, versioniert durch die Kellerwolke):
@@ -81,7 +85,7 @@ Abschnitten; das Bisherige bleibt als Zwischenstand.
 | `GET /transkripte/{id}` | das Transkript (Datei aus der Kellerwolke) |
 | `PATCH /transkripte/{id}` | Änderungen an Text, Sprechern, Zeiten, Markern; nur mit dem zuletzt gelesenen Stand (sonst 409) |
 | `GET /transkripte/{id}/versionen`, `POST .../versionen/{v}/zurueck` | Versionen aus der Kellerwolke |
-| `GET /inhalt/transkripte/{id}/export?format=txt\|md\|srt\|vtt\|json\|docx`, `POST /transkripte/{id}/export` | Export als Download oder als Datei neben dem Transkript |
+| `GET /inhalt/transkripte/{id}/export?format=txt\|md\|srt\|vtt\|json\|docx`, `POST /transkripte/{id}/export` | Export als Download oder als Datei neben der Aufnahme |
 | `GET /inhalt/transkripte/{id}/ton`, `GET /inhalt/aufnahmen/{id}` | Ton zum Mitlesen und Anhören (aus der Kellerwolke durchgereicht, mit Bereichen; auch mit dem Inhalts-Cookie) |
 | `GET /transkripte/{id}/vorschlaege` | offene Vorschläge der KI-Korrektur; übernommen und verworfen wird beim Speichern (`PATCH`, Feld `vorschlaege`) |
 | `POST /transkripte/{id}/sprecher/{kennung}/profil` | Sprecher einem Profil zuordnen oder ein neues anlegen; der Abdruck schärft das Profil |

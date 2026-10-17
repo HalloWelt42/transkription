@@ -9,24 +9,29 @@ Auswertung), Anmeldung mit dem Kellerwolke-Konto, gestartet vom Stellwerk.
 
 | Bereich | Inhalt |
 |---|---|
-| Aufnahmen | Ton- und Videodateien aus `Aufnahmen` und aus Ordnern, die du der App in der Kellerwolke freigibst, mit Dauer und Format; Hochladen (auch Ziehen und Ablegen), Aufnehmen im Browser (Mikrofon wählbar, auch während der Aufnahme; jedes Stück landet sofort im Gerätespeicher und übersteht ein Neuladen), Marker beim Aufnehmen, Live-Mitschrift während der Aufnahme; danach entscheidest du: transkribieren, Live-Text als Transkript speichern oder nur speichern |
+| Aufnahmen | Ton- und Videodateien aus `Aufnahmen`, mit Dauer und Format; Hochladen (auch Ziehen und Ablegen), Aufnehmen im Browser (Mikrofon wählbar, auch während der Aufnahme; jedes Stück landet sofort im Gerätespeicher und übersteht ein Neuladen), Marker beim Aufnehmen, Live-Mitschrift während der Aufnahme; danach entscheidest du: transkribieren, Live-Text als Transkript speichern oder nur speichern |
+| Kellerwolke | alle deine Dateien als Quelle: blättern, Ton und Video wählen und transkribieren; die App liest jede Datei nur für ihren Auftrag (eine Anfrage je Datei), das Transkript liegt danach neben der Datei. Im Dateimenü der Kellerwolke stehen "Transkribieren" und "In Transkription öffnen"; geöffnet zeigt die App, woher die Datei kommt und bis wann sie sie bearbeiten darf |
 | Transkribieren | als Auftrag in Abschnitten an Sprechpausen (Länge einstellbar); nach Abbruch oder Neustart geht es beim nächsten Abschnitt weiter; Sprache wählbar oder erkennen |
 | Sprecher | nur auf deine Wahl (ab Werk ohne): je Aufnahme ohne, Stimmen gruppieren oder mit Sprechertrennung, später jederzeit neu erkennen; von Hand zuordnen (Beiträge wählen, auch als Bereich, dann Sprecher per Knopf oder Ziffertaste, neuer Sprecher, Umbenennen, Zusammenführen; Speichern legt eine Version an); Abgleich mit Sprecherprofilen (sicher oder als Vorschlag zum Bestätigen); ein Profil entsteht, wenn du einem Sprecher einen Namen als Profil gibst |
 | Lesen | Spieler mit Wellenform, Sprecherspur und Markern; Mitlesen Wort für Wort, Klick auf ein Wort springt hin; Suche im Text |
 | Bearbeiten | Text, Sprecher, Zeiten, Teilen, Zusammenführen, Marker; die Wortzeiten gleichen sich dem geänderten Text an; Speichern legt eine neue Version an, nur mit dem zuletzt gelesenen Stand |
-| KI | Korrektur als Vorschläge je Beitrag (übernommen wird nur, was du bestätigst), Auswertung nach Vorlage (Protokoll, Zusammenfassung, Aufgaben) als Markdown-Datei neben dem Transkript |
+| KI | Korrektur als Vorschläge je Beitrag (übernommen wird nur, was du bestätigst), Auswertung nach Vorlage (Protokoll, Zusammenfassung, Aufgaben) als Markdown-Datei neben der Aufnahme |
 | Suchen | Volltext über alle Transkripte und Marker, auch Wortteile ("kosten" findet "Nebenkostenabrechnung"), Treffer mit Zeit |
 | Versionen | jede Änderung ist eine Version der Datei in der Kellerwolke, mit Notiz; Zurückholen legt eine neue Version an |
-| Export | Text, Markdown, SRT, WebVTT, DOCX, JSON; als Download oder zusätzlich als Datei neben dem Transkript |
-| Telefon | eigene Ansicht: Aufnehmen, Hochladen, Ordner der Kellerwolke, Lesen mit Mitlesen, Suche |
+| Export | Text, Markdown, SRT, WebVTT, DOCX, JSON; als Download oder zusätzlich als Datei neben der Aufnahme |
+| Telefon | eigene Ansicht: Aufnehmen, Hochladen, alle Dateien der Kellerwolke, Lesen mit Mitlesen, Suche |
 
 Alles, was die Oberfläche kann, geht auch über die Schnittstelle (`/docs`). Andere Apps melden sich mit ihrem
 App-Schlüssel der Kellerwolke an (`Authorization: Bearer kw_app_...`); die Einstellungen bleiben Menschen vorbehalten.
 
 ## Daten
 
-Die einzige Wahrheit ist die Transkriptdatei in der Kellerwolke (`Transkripte/<Name>.transkript.json`, Format
-`transkript/1`, beschrieben in [docs/ENTWURF.md](docs/ENTWURF.md)); die SQLite-Datei der App hält nur Verzeichnis,
+Die einzige Wahrheit ist die Transkriptdatei in der Kellerwolke, eine je Aufnahme als ihre Begleitdatei
+(`Aufnahmen/Runde.wav` und daneben `Aufnahmen/Runde.transkript.json`, Format `transkript/1`, beschrieben in
+[docs/ENTWURF.md](docs/ENTWURF.md)); neu transkribiert wird eine neue Version. Exporte und Auswertungen liegen ebenso
+neben der Aufnahme, und Verschieben, Umbenennen und Papierkorb nehmen alles mit. Aus der früheren getrennten Ablage
+`Transkripte/` führt "Zusammenführen" unter Aufnahmen alles einmal zusammen, mit Vorschau; gelöscht wird nichts. Die
+SQLite-Datei der App hält nur Verzeichnis,
 Suchindex, Aufträge, Vorschläge und Protokoll und folgt der Kellerwolke über ihren Ereignisstrom. Sprecherprofile liegen
 in `Sprecher/profile.json`.
 
@@ -76,7 +81,9 @@ und Sprachmodell). ffmpeg muss auf dem Rechner sein.
 
 Die Verbundtests (`test_ablage_verbund.py`, `test_verbund.py`) sprechen mit einer echten Kellerwolke und brauchen
 `backend/.env.test` (nicht im Repo) mit `KELLERWOLKE_ADRESSE`, `KELLERWOLKE_SCHLUESSEL`, `KELLERWOLKE_KENNUNG`,
-`KELLERWOLKE_PASSWORT`; die Leitstelle ist dabei zum Schein. Ohne die Datei werden sie übersprungen.
+`KELLERWOLKE_PASSWORT`; die Leitstelle ist dabei zum Schein. Ohne die Datei werden sie übersprungen. Der Schlüssel
+gehört einem eigenen Zugang nur für die Tests, nie dem der Entwicklungsinstanz: ein Testlauf meldet die Aktionen seines
+Zugangs neu und zieht sie am Ende zurück.
 
 ## Aufbau
 

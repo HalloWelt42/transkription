@@ -3,6 +3,8 @@
 import os
 from pathlib import Path
 
+from appkern.kellerwolke import Kellerwolke
+
 
 def werte() -> dict[str, str]:
     alle = dict(os.environ)
@@ -16,3 +18,13 @@ def werte() -> dict[str, str]:
 
 W = werte()
 HAT_KELLERWOLKE = bool(W.get("KELLERWOLKE_ADRESSE") and W.get("KELLERWOLKE_SCHLUESSEL"))
+
+
+async def aktionen_zurueckziehen() -> None:
+    """Am Ende eines Laufs mit gestarteter App: die Aktionen des Testzugangs zurückziehen, damit das Dateimenü der
+    Kellerwolke nur die Aktionen echter Apps zeigt (eine App selbst zieht beim Beenden nichts zurück, Anfragen warten)."""
+    kw = Kellerwolke(W["KELLERWOLKE_ADRESSE"], W["KELLERWOLKE_SCHLUESSEL"])
+    try:
+        await kw.aktionen_melden([])
+    finally:
+        await kw.schliessen()

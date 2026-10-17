@@ -189,3 +189,18 @@ export interface AltbestandSeite {
   adresse: string;
   eintraege: AltEintrag[];
 }
+
+// Zusammenführen der früheren getrennten Ablage (Vorschau): was wohin kommt; nichts wird gelöscht.
+export interface Umzugsschritt {
+  art: "begleiter" | "daneben" | "ohne_aufnahme" | "ordner";
+  knoten_id: string;
+  von: string;
+  nach: string;
+  aufnahme_id: string | null;
+}
+
+export interface Umzugsplan {
+  noetig: boolean;
+  schritte: Umzugsschritt[];
+  zahlen: Record<string, number>;
+}

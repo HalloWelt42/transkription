@@ -248,8 +248,7 @@ def arten(teile: Teile) -> list[Art]:
             t, knoten = await transkripte.speichern(t, quelle, Aenderung(was="erzeugt", wer=e.von),
                                                     erneut=Aenderung(was="neu transkribiert", wer=e.von))
             await k.merken(transkript_id=str(knoten.id))
-            if e.anfrage_id is None:                    # nur der eigene Baum steht im Verzeichnis der App
-                await teile.index.eintragen(t, knoten)
+            await teile.geschrieben(t, knoten, e.anfrage_id)
             return {"transkript_id": str(knoten.id), "ergebnis_id": str(knoten.id), "name": t.name, "pfad": knoten.pfad,
                     "segmente": len(segmente), "sprecher": len(sprecher), "dauer_s": t.dauer_s}
         finally:
@@ -387,8 +386,7 @@ def arten(teile: Teile) -> list[Art]:
                                                           Aenderung(was="Sprecher neu erkannt", wer=e.von))
             except StandVeraltet as f:
                 raise RuntimeError("Das Transkript wurde inzwischen geändert; bitte die Erkennung neu starten") from f
-            if e.anfrage_id is None:
-                await teile.index.eintragen(neu, knoten)
+            await teile.geschrieben(neu, knoten, e.anfrage_id)
             return {"transkript_id": str(e.transkript_id), "sprecher": len(sprecher)}
         finally:
             shutil.rmtree(ordner, ignore_errors=True)

@@ -12,7 +12,7 @@ from appkern.app import Begleiter, Geruest
 from appkern.einstellungen import Angebot, Option
 
 from .ablage.profile import Sprecherprofile
-from appkern.kellerwolke import Kellerwolke
+from appkern.kellerwolke import Kellerwolke, Knoten
 
 from .ablage.transkripte import Transkripte, zugang
 from . import altbestand
@@ -20,6 +20,7 @@ from .abgleich import Abgleich
 from .abspielen import Abspielfassungen
 from .dienste import Klangwerk
 from .einstellungen import AppEinstellungen
+from .modell.transkript import Transkript
 from .sprechererkennung import Schwellen
 from .suchindex import Suchindex
 from .ton import Ton, TonFehler, programm
@@ -49,6 +50,14 @@ class Teile(Begleiter):
 
     def transkripte_fuer(self, anfrage: UUID | None = None) -> Transkripte:
         return self.transkripte.fuer(self.zugang(anfrage)) if anfrage else self.transkripte
+
+    async def geschrieben(self, t: Transkript, knoten: Knoten, anfrage: UUID | None = None) -> None:
+        """Nach jedem Schreiben eines Transkripts: der eigene Baum steht im Verzeichnis der App (Liste, Suche); von
+        Dateien aus der Kellerwolke (mit Anfrage) bleibt nur die Notiz zur Version."""
+        if anfrage is None:
+            await self.index.eintragen(t, knoten)
+        else:
+            await self.index.notiz_merken(t, knoten)
 
     @property
     def einstellungen(self) -> AppEinstellungen:

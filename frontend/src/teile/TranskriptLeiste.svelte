@@ -25,6 +25,7 @@
     ungespeichert = 0,
     onzuordnen,
     zuordnung = null,
+    anfrage = null,
   }: {
     antwort: TranskriptAntwort;
     zeit: number;
@@ -40,6 +41,7 @@
     onzuordnen?: () => void;
     zuordnung?: { neu: () => string | null; umbenennen: (kennung: string, name: string) => void;
                   zusammenfuehren: (von: string, nach: string) => void } | null;
+    anfrage?: string | null;     // aus der Kellerwolke geöffnet: alles mit dem Recht dieser Anfrage
   } = $props();
 
   const t = $derived(entwurf ?? antwort.transkript);
@@ -75,7 +77,7 @@
 
   async function versionenLaden() {
     try {
-      versionen = await api.versionen(antwort.id);
+      versionen = await api.versionen(antwort.id, anfrage);
     } catch (f) {
       fehler = (f as Error).message;
     }
@@ -95,7 +97,7 @@
         fehler = a.fehler ?? `${a.titel}: ${a.zustand}`;
         return;
       }
-      if (a.art === "sprecher_erkennen") void api.transkript(antwort.id).then((neu) => { onneu(neu); meldung = "Sprecher neu erkannt."; });
+      if (a.art === "sprecher_erkennen") void api.transkript(antwort.id, anfrage).then((neu) => { onneu(neu); meldung = "Sprecher neu erkannt."; });
       if (a.art === "korrigieren") onvorschlaege();
       if (a.art === "auswerten") meldung = `Auswertung liegt in der Kellerwolke: ${a.ergebnis?.pfad}`;
     });
@@ -149,11 +151,11 @@
       const geaendert = t.sprecher.filter((s) => (namen[s.kennung] ?? "").trim() && namen[s.kennung].trim() !== s.name);
       if (alsProfil) {
         for (const s of geaendert) {
-          aktuell = await api.profilZuordnen(antwort.id, s.kennung, { stand: aktuell.stand, name: namen[s.kennung].trim() });
+          aktuell = await api.profilZuordnen(antwort.id, s.kennung, { stand: aktuell.stand, name: namen[s.kennung].trim() }, anfrage);
         }
       } else if (geaendert.length) {
         aktuell = await api.aendern(antwort.id, { stand: aktuell.stand, sprecher: t.sprecher.map((s) => ({
-          kennung: s.kennung, name: (namen[s.kennung] ?? s.name).trim() || s.name })) });
+          kennung: s.kennung, name: (namen[s.kennung] ?? s.name).trim() || s.name })) }, anfrage);
       }
       onneu(aktuell);
       profile = await api.profile();
@@ -174,10 +176,10 @@
 
   function exportieren(format: ExportFormat) {
     const a = document.createElement("a");
-    a.href = api.exportAdresse(antwort.id, format);
+    a.href = api.exportAdresse(antwort.id, format, anfrage);
     a.download = "";
     a.click();
-    if (ablegen) void machen(async () => (meldung = `Liegt auch in der Kellerwolke: ${(await api.exportAblegen(antwort.id, format)).pfad}`));
+    if (ablegen) void machen(async () => (meldung = `Liegt auch in der Kellerwolke: ${(await api.exportAblegen(antwort.id, format, anfrage)).pfad}`));
   }
 
   function zurueck(v: Version) {
@@ -186,7 +188,7 @@
       return;
     }
     zurueckFrage = null;
-    void machen(async () => onneu(await api.zurueckholen(antwort.id, v.id, antwort.stand)));
+    void machen(async () => onneu(await api.zurueckholen(antwort.id, v.id, antwort.stand, anfrage)));
   }
 
   function tag(iso: string): string {
@@ -245,7 +247,7 @@
           <div class="vorschlag-chip"><i class="fa-solid fa-user-check" style="color:var(--akzent)"></i>
             <span>klingt wie <b>{profilName(s.vorschlag_id)}</b> ({Math.round((s.vorschlag_aehnlichkeit ?? 0) * 100)} % ähnlich)</span>
             <button class="knopf klein" style="margin-left:auto"
-                    onclick={() => machen(async () => onneu(await api.profilZuordnen(antwort.id, s.kennung, { stand: antwort.stand, profil_id: s.vorschlag_id! })))}>Übernehmen</button></div>
+                    onclick={() => machen(async () => onneu(await api.profilZuordnen(antwort.id, s.kennung, { stand: antwort.stand, profil_id: s.vorschlag_id! }, anfrage)))}>Übernehmen</button></div>
         {/if}
       </div>
     {:else}
@@ -260,7 +262,7 @@
     {:else if modus === "erkennen"}
       <div class="knopfreihe"><span class="beschriftung">Weg</span><Auswahl bind:wert={erkennenWeg} optionen={ERKENNEN_WEGE} klein /></div>
       <div class="knopfreihe"><span class="beschriftung">Anzahl</span><Auswahl bind:wert={anzahl} optionen={ANZAHL_OPTIONEN} klein />
-        <button class="knopf klein primaer" onclick={() => machen(async () => { await api.sprecherErkennen(antwort.id, erkennenWeg, anzahl); modus = ""; })}>Starten</button>
+        <button class="knopf klein primaer" onclick={() => machen(async () => { await api.sprecherErkennen(antwort.id, erkennenWeg, anzahl, anfrage); modus = ""; })}>Starten</button>
         <button class="knopf klein still" onclick={() => (modus = "")}>Abbrechen</button></div>
       <p class="leer-zeile" style="margin-top:8px">Ersetzt die Zuordnung; der jetzige Stand bleibt als Version und lässt sich zurückholen.</p>
     {:else if zuordnung}
@@ -318,8 +320,8 @@
   <div class="gruppe">
     <h3>Export</h3>
     <div class="knopfreihe">{#each FORMATE as [f, titel] (f)}<button class="knopf klein" onclick={() => exportieren(f)}>{titel}</button>{/each}</div>
-    <label class="schalter-zeile"><button class="schalter" class:an={ablegen} aria-label="Auch als Datei ablegen" aria-pressed={ablegen}
-           onclick={() => (ablegen = !ablegen)}></button>zusätzlich neben das Transkript legen</label>
+    <label class="schalter-zeile"><button class="schalter" class:an={ablegen} aria-label="Auch als Datei neben die Aufnahme legen" aria-pressed={ablegen}
+           onclick={() => (ablegen = !ablegen)}></button>zusätzlich neben die Aufnahme legen (als Begleiter)</label>
   </div>
 
   <div class="gruppe">
@@ -332,14 +334,14 @@
     {#if modus === "auswerten"}
       <div class="vorlagen">
         {#each VORLAGEN as [v, titel, inhalt] (v)}
-          <button class="vorlage" onclick={() => machen(async () => { await api.auswerten(antwort.id, v); modus = ""; })}>
+          <button class="vorlage" onclick={() => machen(async () => { await api.auswerten(antwort.id, v, anfrage); modus = ""; })}>
             <b>{titel}</b><span>{inhalt}</span></button>
         {/each}
         <button class="knopf klein still" onclick={() => (modus = "")}>Abbrechen</button>
       </div>
     {:else}
       <div class="knopfreihe">
-        <button class="knopf klein" disabled={!!laufend.korrigieren} onclick={() => machen(() => api.korrigieren(antwort.id))}>
+        <button class="knopf klein" disabled={!!laufend.korrigieren} onclick={() => machen(() => api.korrigieren(antwort.id, anfrage))}>
           <i class="fa-solid fa-wand-magic-sparkles"></i> Korrigieren</button>
         <button class="knopf klein" disabled={!!laufend.auswerten} onclick={() => (modus = "auswerten")}><i class="fa-solid fa-list-ul"></i> Auswerten</button>
       </div>

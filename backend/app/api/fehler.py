@@ -8,7 +8,7 @@ from appkern.kellerwolke import (
 )
 from appkern.leitstelle import LeitstellenFehler
 
-from ..ablage.transkripte import KeineKellerwolke
+from ..ablage.transkripte import KeineKellerwolke, Unlesbar
 from ..dienste import KeineLeitstelle
 from ..ton import TonFehler
 
@@ -60,6 +60,10 @@ def behandeln(app: FastAPI) -> None:
     @app.exception_handler(KeineLeitstelle)
     async def keine_leitstelle(_: Request, f: KeineLeitstelle):
         return _antwort(503, str(f))
+
+    @app.exception_handler(Unlesbar)
+    async def unlesbar(_: Request, f: Unlesbar):
+        return _antwort(422, str(f))
 
     @app.exception_handler(TonFehler)
     async def ton(_: Request, f: TonFehler):

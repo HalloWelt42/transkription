@@ -154,8 +154,7 @@ def router(teile: Teile) -> APIRouter:
             neu, knoten = await teile.transkripte_fuer(anfrage).schreiben(transkript_id, t, stand, aenderung)
         except StandVeraltet as f:
             raise Konflikt("Inzwischen geändert: bitte neu laden und dann ändern") from f
-        if anfrage is None:
-            await teile.index.eintragen(neu, knoten)
+        await teile.geschrieben(neu, knoten, anfrage)
         return _antwort(neu, knoten)
 
     @r.get("", response_model=Seite)
@@ -240,8 +239,7 @@ def router(teile: Teile) -> APIRouter:
                                                                              konto.name, konto.app)
         except StandVeraltet as f:
             raise Konflikt("Inzwischen geändert: bitte neu laden") from f
-        if anfrage is None:
-            await teile.index.eintragen(neu, knoten)
+        await teile.geschrieben(neu, knoten, anfrage)
         return _antwort(neu, knoten)
 
     # --- Export als Datei, Vorschläge -----------------------------------------------------------------------------
