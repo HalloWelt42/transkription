@@ -1,7 +1,8 @@
 <script lang="ts">
   // Ein Beitrag (Segment): Zeit, Sprecher, Text. Beim Mitlesen bekommt nur der laufende Beitrag die Zeit (`jetzt`),
   // so zeichnen die übrigen bei jedem Takt nicht neu. Klick auf ein Wort oder die Zeit springt dorthin. Im
-  // Bearbeiten: Textfeld, Sprecher, Zeiten, am Cursor teilen, mit dem nächsten zusammenführen, Marker.
+  // Bearbeiten: Textfeld, Sprecher, Zeiten, am Cursor teilen, mit dem nächsten zusammenführen, Marker. Beim Zuordnen der
+  // Sprecher ist der Beitrag wählbar: ein Klick wählt ihn (auch auf ein Wort), nur die Zeit springt in den Ton.
   import { Auswahl } from "appkern-oberflaeche";
   import type { Segment, Sprecher } from "../lib/typen";
   import { farbe, genau, lesen, marke } from "../lib/zeit";
@@ -15,7 +16,10 @@
     offen = false,
     bearbeiten = false,
     geaendert = false,
+    waehlbar = false,
+    gewaehlt = false,
     onspringen,
+    onwaehlen,
     onoeffnen,
     onschliessen,
     onaendern,
@@ -31,7 +35,10 @@
     offen?: boolean;
     bearbeiten?: boolean;
     geaendert?: boolean;
+    waehlbar?: boolean;
+    gewaehlt?: boolean;
     onspringen: (t: number) => void;
+    onwaehlen?: (e: MouseEvent) => void;
     onoeffnen?: () => void;
     onschliessen?: () => void;
     onaendern?: (s: Segment) => void;
@@ -88,7 +95,7 @@
 {#snippet text()}
   {#if mitWoertern && !suche.trim()}
     {#each seg.woerter as w, i (i)}<span class={wortKlasse(i)} role="button" tabindex="-1"
-        onclick={(e) => { e.stopPropagation(); onspringen(w.start); }} onkeydown={() => {}}>{w.wort}</span>{" "}{/each}
+        onclick={(e) => { if (waehlbar) return; e.stopPropagation(); onspringen(w.start); }} onkeydown={() => {}}>{w.wort}</span>{" "}{/each}
   {:else}
     {#each teileMitTreffer(seg.text) as stueck, i (i)}{#if stueck.treffer}<mark>{stueck.t}</mark>{:else}{stueck.t}{/if}{/each}
   {/if}
@@ -127,8 +134,10 @@
     <div class="text">{@render text()}</div>
   </div>
 {:else}
-  <div class="beitrag" class:jetzt={jetzt != null} class:geaendert role="button" tabindex="-1"
-       onclick={() => (bearbeiten ? onoeffnen?.() : onspringen(seg.start))} onkeydown={(e) => e.key === "Enter" && onoeffnen?.()}>
+  <div class="beitrag" class:jetzt={jetzt != null} class:geaendert class:waehlbar class:gewaehlt role="button" tabindex="-1"
+       aria-pressed={waehlbar ? gewaehlt : undefined} onmousedown={(e) => waehlbar && e.preventDefault()}
+       onclick={(e) => (waehlbar ? onwaehlen?.(e) : bearbeiten ? onoeffnen?.() : onspringen(seg.start))}
+       onkeydown={(e) => e.key === "Enter" && !waehlbar && onoeffnen?.()}>
     <button class="zeit" onclick={(e) => { e.stopPropagation(); onspringen(seg.start); }}>{marke(seg.start)}</button>
     <span class="sprecher"><span class="punkt" style="background:{farbe(seg.sprecher)}"></span>{name}</span>
     <div class="text">{@render text()}</div>

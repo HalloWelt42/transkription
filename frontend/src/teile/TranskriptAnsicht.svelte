@@ -2,7 +2,9 @@
   // Ein Transkript: Spieler, Text zum Mitlesen (Wort für Wort, folgt der Wiedergabe, bis man selbst rollt), Suche im
   // Text, rechts die Leiste. Bearbeiten: Änderungen sammeln sich in einem Entwurf, Vorschläge der KI-Korrektur stehen
   // unter ihrem Beitrag, Speichern legt eine neue Version an (nur mit dem gelesenen Stand; sonst neu laden).
-  // Entwurf: mockups/transkription.html (3, 4) und transkription-mobil.html (3).
+  // Sprecher zuordnen: Beiträge wählen (Klick, Umschalt für einen Bereich, Befehl für einzelne), dann Sprecher per Knopf
+  // oder Ziffer; N legt einen neuen an, Leertaste spielt die Auswahl. Auch das sammelt sich im Entwurf.
+  // Entwurf: mockups/transkription.html (3, 3b, 3c, 4) und transkription-mobil.html (3).
   import { onMount, tick } from "svelte";
   import { gehe, geraet, Leiste, leisteOeffnen, navigation } from "appkern-oberflaeche";
   import * as api from "../lib/api";
@@ -33,6 +35,10 @@
   let entscheidungen = $state<Record<string, "uebernommen" | "verworfen">>({});
   let speichert = $state(false);
   let mehr = $state(false);
+  let zuordnen = $state(false);
+  let gewaehlt = $state<number[]>([]);
+  let anker = $state<number | null>(null);
+  let spielBis = $state<number | null>(null);
   let ruhePause: ReturnType<typeof setTimeout>;
 
   const t = $derived(entwurf ?? antwort?.transkript ?? null);
@@ -73,8 +79,11 @@
     const alt = new Map(antwort.transkript.segmente.map((s) => [`${s.start}|${s.text}|${s.ende}|${s.sprecher}`, true]));
     return new Set(entwurf.segmente.flatMap((s, i) => (alt.has(`${s.start}|${s.text}|${s.ende}|${s.sprecher}`) ? [] : [i])));
   });
+  const gewaehltMenge = $derived(new Set(gewaehlt));
+  const sprecherGeaendert = $derived(!!entwurf && !!antwort && JSON.stringify(entwurf.sprecher.map((s) => [s.kennung, s.name]))
+    !== JSON.stringify(antwort.transkript.sprecher.map((s) => [s.kennung, s.name])));
   const markerGeaendert = $derived(!!entwurf && !!antwort && JSON.stringify(entwurf.marker) !== JSON.stringify(antwort.transkript.marker));
-  const anzahlAenderungen = $derived(geaendert.size + (entwurf && antwort && entwurf.segmente.length !== antwort.transkript.segmente.length ? 1 : 0) + (markerGeaendert ? 1 : 0));
+  const anzahlAenderungen = $derived(geaendert.size + (entwurf && antwort && entwurf.segmente.length !== antwort.transkript.segmente.length ? 1 : 0) + (markerGeaendert ? 1 : 0) + (sprecherGeaendert ? 1 : 0));
   const offeneVorschlaege = $derived(vorschlaege.filter((v) => !entscheidungen[v.id]));
   const verworfen = $derived(Object.values(entscheidungen).filter((z) => z === "verworfen").length);
   const ungespeichert = $derived(anzahlAenderungen + verworfen);
@@ -109,7 +118,7 @@
   // Dem laufenden Beitrag folgen, außer man rollt selbst (dann eine Weile nicht).
   $effect(() => {
     const i = aktiv;
-    if (i < 0 || !mitlaufen || !rollfeld || bearbeiten) return;
+    if (i < 0 || !mitlaufen || !rollfeld || bearbeiten || zuordnen) return;
     rollfeld.querySelector(`[data-i="${i}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
   });
 
@@ -142,7 +151,7 @@
   // --- Bearbeiten -----------------------------------------------------------------------------------------------
 
   function bearbeitenBeginnen() {
-    if (!antwort) return;
+    if (!antwort || zuordnen) return;
     entwurf = structuredClone($state.snapshot(antwort.transkript)) as Transkript;
     bearbeiten = true;
     entscheidungen = {};
@@ -211,6 +220,113 @@
     entscheidungen = { ...entscheidungen, [v.id]: zustand };
   }
 
+  // --- Sprecher zuordnen ----------------------------------------------------------------------------------------
+
+  function zuordnenBeginnen() {
+    if (!antwort) return;
+    entwurf = structuredClone($state.snapshot(antwort.transkript)) as Transkript;
+    if (!entwurf.sprecher.length) entwurf.sprecher = [{ kennung: "s1", name: "Sprecher 1" }];
+    zuordnen = true;
+    bearbeiten = false;
+    offen = null;
+    entscheidungen = {};
+    gewaehlt = [];
+    anker = null;
+  }
+
+  function zuordnenBeenden() {
+    entwurf = null;
+    zuordnen = false;
+    gewaehlt = [];
+    anker = null;
+    spielBis = null;
+  }
+
+  function waehlen(i: number, e: MouseEvent) {
+    spielBis = null;
+    if (e.shiftKey && anker != null) {
+      const [a, b] = anker < i ? [anker, i] : [i, anker];
+      gewaehlt = Array.from({ length: b - a + 1 }, (_, n) => a + n);
+      return;
+    }
+    if (e.metaKey || e.ctrlKey) gewaehlt = gewaehltMenge.has(i) ? gewaehlt.filter((x) => x !== i) : [...gewaehlt, i].sort((x, y) => x - y);
+    else gewaehlt = gewaehlt.length === 1 && gewaehlt[0] === i ? [] : [i];
+    anker = i;
+  }
+
+  function zeigen(i: number) {
+    void tick().then(() => rollfeld?.querySelector(`[data-i="${i}"]`)?.scrollIntoView({ block: "nearest" }));
+  }
+
+  function zuweisen(kennung: string) {
+    if (!entwurf || !gewaehlt.length) return;
+    for (const i of gewaehlt) entwurf.segmente[i] = { ...entwurf.segmente[i], sprecher: kennung };
+    // ein einzelner Beitrag: weiter zum nächsten, damit man beim Anhören nur Ziffern tippt
+    if (gewaehlt.length === 1 && gewaehlt[0] + 1 < entwurf.segmente.length) {
+      const weiter = gewaehlt[0] + 1;
+      gewaehlt = [weiter];
+      anker = weiter;
+      zeigen(weiter);
+      if (laeuft) auswahlAbspielen();
+    }
+  }
+
+  function neuerSprecher(): string | null {
+    if (!entwurf) return null;
+    const n = Math.max(0, ...entwurf.sprecher.map((s) => Number(s.kennung.slice(1)) || 0)) + 1;
+    const kennung = `s${n}`;
+    entwurf.sprecher = [...entwurf.sprecher, { kennung, name: `Sprecher ${n}` }];
+    return kennung;
+  }
+
+  function sprecherUmbenennen(kennung: string, name: string) {
+    if (!entwurf || !name.trim()) return;
+    entwurf.sprecher = entwurf.sprecher.map((s) => (s.kennung === kennung ? { ...s, name: name.trim() } : s));
+  }
+
+  function zusammenfuehren(von: string, nach: string) {
+    if (!entwurf || von === nach) return;
+    entwurf.segmente = entwurf.segmente.map((s) => (s.sprecher === von ? { ...s, sprecher: nach } : s));
+    entwurf.sprecher = entwurf.sprecher.filter((s) => s.kennung !== von);
+  }
+
+  function auswahlAbspielen() {
+    if (!gewaehlt.length) return;
+    spielBis = segmente[gewaehlt[gewaehlt.length - 1]].ende;
+    spieler?.springe(segmente[gewaehlt[0]].start, true);
+  }
+
+  function zuordnenTasten(e: KeyboardEvent) {
+    if (!zuordnen || !entwurf) return;
+    const ziel = e.target as HTMLElement;
+    if (ziel.closest("input, textarea, [contenteditable]") || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (/^[1-9]$/.test(e.key)) {
+      const s = entwurf.sprecher[Number(e.key) - 1];
+      if (s && gewaehlt.length) {
+        e.preventDefault();
+        zuweisen(s.kennung);
+      }
+    } else if ((e.key === "n" || e.key === "N") && gewaehlt.length) {
+      e.preventDefault();
+      const k = neuerSprecher();
+      if (k) zuweisen(k);
+    } else if (e.key === "Escape") {
+      gewaehlt = [];
+    } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && gewaehlt.length === 1) {
+      e.preventDefault();
+      const i = Math.max(0, Math.min(segmente.length - 1, gewaehlt[0] + (e.key === "ArrowDown" ? 1 : -1)));
+      gewaehlt = [i];
+      anker = i;
+      zeigen(i);
+    } else if (e.key === " " && gewaehlt.length) {
+      // vor dem Spieler (Erfassungsphase): mit Auswahl spielt die Leertaste genau die gewählten Beiträge
+      e.preventDefault();
+      e.stopPropagation();
+      if (laeuft) spieler?.umschalten();
+      else auswahlAbspielen();
+    }
+  }
+
   async function speichern() {
     if (!antwort || !entwurf) return;
     speichert = true;
@@ -220,6 +336,7 @@
         stand: antwort.stand,
         segmente: $state.snapshot(entwurf.segmente) as Segment[],
         marker: markerGeaendert ? ($state.snapshot(entwurf.marker) as Marker[]) : undefined,
+        sprecher: sprecherGeaendert ? entwurf.sprecher.map(({ kennung, name }) => ({ kennung, name })) : undefined,
         vorschlaege: Object.entries(entscheidungen).map(([vid, zustand]) => ({ id: vid, zustand })),
       });
       vorschlaege = await api.vorschlaege(id);
@@ -282,7 +399,8 @@
     {/each}
     <div data-i={i}>
       <Beitrag seg={s} sprecher={t?.sprecher ?? []} jetzt={i === aktiv ? zeit : null} {suche} mobil={geraet.mobil}
-               offen={bearbeiten && offen === i} {bearbeiten} geaendert={bearbeiten && geaendert.has(i)}
+               offen={bearbeiten && offen === i} {bearbeiten} geaendert={(bearbeiten || zuordnen) && geaendert.has(i)}
+               waehlbar={zuordnen} gewaehlt={zuordnen && gewaehltMenge.has(i)} onwaehlen={(e) => waehlen(i, e)}
                onspringen={springen} onoeffnen={() => (offen = i)} onschliessen={() => (offen = null)}
                onaendern={(neu) => segmentAendern(i, neu)} onteilen={(p) => teilen(i, p)} onzusammen={() => zusammen(i)}
                onmarker={() => markerAmBeitrag(i)} />
@@ -323,7 +441,16 @@
       <div class="seiten-kopf">
         <button class="knopf still" style="padding:0 6px" onclick={() => gehe("transkripte")}><i class="fa-solid fa-chevron-left"></i> Transkripte</button>
         <h1 class="titel-lang" title={antwort.transkript.name}>{antwort.transkript.name}</h1>
-        {#if bearbeiten}
+        {#if zuordnen}
+          <span style="margin-left:auto; display:flex; gap:8px">
+            {#if ungespeichert}
+              <button class="knopf still" onclick={zuordnenBeenden}>Abbrechen</button>
+              <button class="knopf primaer" onclick={speichern} disabled={speichert}>
+                <i class="fa-solid {speichert ? 'fa-circle-notch fa-spin' : 'fa-floppy-disk'}"></i>
+                Speichern ({ungespeichert === 1 ? "1 Änderung" : `${ungespeichert} Änderungen`})</button>
+            {:else}<button class="knopf" onclick={zuordnenBeenden}>Fertig</button>{/if}
+          </span>
+        {:else if bearbeiten}
           <span class="pille aktiv"><i class="fa-solid fa-pen"></i>Bearbeiten</span>
           {#if !ungespeichert && !Object.keys(entscheidungen).length}<button class="knopf" onclick={bearbeitenBeenden}>Fertig</button>{/if}
         {:else}
@@ -337,7 +464,7 @@
       </div>
       <Spieler bind:this={spieler} src={api.tonAdresse(id)} dauer={antwort.transkript.dauer_s} wellenform={antwort.transkript.wellenform}
                {spur} marker={(t?.marker ?? []).map((m) => m.zeit)} bind:zeit bind:laeuft
-               stoppBei={bearbeiten && nurBeitrag && offen != null ? segmente[offen]?.ende ?? null : null} />
+               stoppBei={bearbeiten && nurBeitrag && offen != null ? segmente[offen]?.ende ?? null : zuordnen ? spielBis : null} />
       {#if bearbeiten}
         <div class="knopfzeile" style="padding:8px 22px 0">
           <span class="segment"><button class:aktiv={nurBeitrag} onclick={() => (nurBeitrag = true)}>Nur diesen Beitrag</button>
@@ -362,6 +489,20 @@
               </span>
             </div>
           {/if}
+          {#if zuordnen && entwurf}
+            <div class="zuordnen">
+              <span class="titel">{gewaehlt.length === 0 ? "Beitrag wählen" : gewaehlt.length === 1 ? "1 Beitrag gewählt" : `${gewaehlt.length} Beiträge gewählt`}</span>
+              {#each entwurf.sprecher as s, n (s.kennung)}
+                <button class="sprecher-knopf" disabled={!gewaehlt.length} onclick={() => zuweisen(s.kennung)}>
+                  <span class="punkt" style="background:{farbe(s.kennung)}"></span>{s.name}{#if n < 9}<kbd class="taste">{n + 1}</kbd>{/if}</button>
+              {/each}
+              <button class="sprecher-knopf" onclick={() => { const k = neuerSprecher(); if (k && gewaehlt.length) zuweisen(k); }}>
+                <i class="fa-solid fa-user-plus"></i>Neuer Sprecher<kbd class="taste">N</kbd></button>
+              <button class="knopf still" style="margin-left:auto" disabled={!gewaehlt.length} onclick={() => (gewaehlt = [])}>Auswahl aufheben</button>
+              <span class="hinweis">Klick wählt einen Beitrag, mit Umschalt einen Bereich. Ziffer ordnet zu und springt zum nächsten Beitrag;
+                Leertaste spielt die gewählten ab, Pfeil hoch und runter wechselt den Beitrag.</span>
+            </div>
+          {/if}
           {@render text()}
           {#if !segmente.length}<p class="leer">In dieser Aufnahme wurde nichts gesprochen.</p>{/if}
           {#if bearbeiten && (ungespeichert || Object.keys(entscheidungen).length)}
@@ -377,9 +518,13 @@
     </section>
     <Leiste>
       <TranskriptLeiste {antwort} {zeit} {bearbeiten} vorschlaege={bearbeiten ? 0 : offeneVorschlaege.length} onspringen={springen}
-                        onneu={(a) => { antwort = a; if (bearbeiten) entwurf = structuredClone($state.snapshot(a.transkript)) as Transkript; }}
+                        entwurf={zuordnen ? entwurf : null} {ungespeichert} onzuordnen={zuordnenBeginnen}
+                        zuordnung={zuordnen ? { neu: neuerSprecher, umbenennen: sprecherUmbenennen, zusammenfuehren } : null}
+                        onneu={(a) => { antwort = a; if (bearbeiten || zuordnen) entwurf = structuredClone($state.snapshot(a.transkript)) as Transkript; }}
                         onmarker={markerSpeichern} onvorschlaege={() => api.vorschlaege(id).then((v) => (vorschlaege = v))}
                         onansehen={bearbeitenBeginnen} />
     </Leiste>
   </div>
 {/if}
+
+<svelte:window onkeydowncapture={zuordnenTasten} />

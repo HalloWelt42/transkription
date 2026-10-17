@@ -134,6 +134,23 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert r.status_code == 200 and r.json()["transkript"]["segmente"][0]["text"] == "Hallo Welt wie geht es"
                 stand = r.json()["stand"]
 
+                # Von Hand zuordnen: neuer Sprecher für den ersten Beitrag, Sprecher 2 geht in Sprecher 1 auf
+                aktuell = r.json()["transkript"]
+                von_hand = [{**seg, "sprecher": "s3" if n == 0 else "s1"} for n, seg in enumerate(aktuell["segmente"])]
+                r = await c.patch(f"/api/v1/transkripte/{tid}", headers=h, json={"stand": stand, "segmente": von_hand, "sprecher": [
+                    {"kennung": "s1", "name": aktuell["sprecher"][0]["name"]}, {"kennung": "s3", "name": "Carla"}]})
+                assert r.status_code == 200, r.text
+                zugeordnet = r.json()
+                assert [x["sprecher"] for x in zugeordnet["transkript"]["segmente"]] == ["s3", "s1", "s1", "s1"]
+                assert [x["kennung"] for x in zugeordnet["transkript"]["sprecher"]] == ["s1", "s3"]
+                was = (await c.get(f"/api/v1/transkripte/{tid}/versionen", headers=h)).json()[0]["notiz"]["was"]
+                assert "Sprecher in 3 Beiträgen zugeordnet" in was and "neu: Carla" in was and "entfällt" in was, was
+                # ein Beitrag mit einem Sprecher, den es nicht gibt, wird abgewiesen
+                kaputt = [{**seg, "sprecher": "s9"} for seg in von_hand]
+                r = await c.patch(f"/api/v1/transkripte/{tid}", headers=h, json={"stand": zugeordnet["stand"], "segmente": kaputt})
+                assert r.status_code == 422
+                stand = zugeordnet["stand"]
+
                 # Export: Download und als Datei daneben
                 r = await c.get(f"/api/v1/inhalt/transkripte/{tid}/export", headers=h, params={"format": "srt"})
                 assert r.status_code == 200 and "00:00:00,000 --> 00:00:02,600" in r.text and "filename*=UTF-8''" in r.headers["content-disposition"]

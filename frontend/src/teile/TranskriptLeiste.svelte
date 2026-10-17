@@ -2,12 +2,13 @@
   // Leiste eines Transkripts, wie im Entwurf (mockups/transkription.html, 3): Sprecher mit Anteil, Profilvorschlag zum
   // Übernehmen, Umbenennen (als Profil oder nur hier) und Neu erkennen; Marker; Export (Download, auf Wunsch auch als
   // Datei daneben); KI über die Leitstelle (Korrigieren, Auswerten nach Vorlage); Versionen. Laufende Aufträge zu
-  // diesem Transkript stehen in ihrem Abschnitt; fertige laden nach.
+  // diesem Transkript stehen in ihrem Abschnitt; fertige laden nach. Beim Zuordnen der Sprecher (3b) zeigt sie den Entwurf:
+  // Umbenennen, Zusammenführen und neue Sprecher wirken dort und werden mit dem Entwurf gespeichert.
   import { onMount } from "svelte";
   import { Auswahl, beiAuftrag, wann, type Auftrag } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, ERKENNEN_WEGE, type ErkennenWeg } from "../lib/sprecherwahl";
-  import type { ExportFormat, Marker, Profil, TranskriptAntwort, Version, Vorlage } from "../lib/typen";
+  import type { ExportFormat, Marker, Profil, Transkript, TranskriptAntwort, Version, Vorlage } from "../lib/typen";
   import { farbe, marke } from "../lib/zeit";
 
   let {
@@ -20,6 +21,10 @@
     onmarker,
     onvorschlaege,
     onansehen,
+    entwurf = null,
+    ungespeichert = 0,
+    onzuordnen,
+    zuordnung = null,
   }: {
     antwort: TranskriptAntwort;
     zeit: number;
@@ -30,9 +35,14 @@
     onmarker: (liste: Marker[]) => Promise<void>;
     onvorschlaege: () => void;
     onansehen: () => void;
+    entwurf?: Transkript | null;
+    ungespeichert?: number;
+    onzuordnen?: () => void;
+    zuordnung?: { neu: () => string | null; umbenennen: (kennung: string, name: string) => void;
+                  zusammenfuehren: (von: string, nach: string) => void } | null;
   } = $props();
 
-  const t = $derived(antwort.transkript);
+  const t = $derived(entwurf ?? antwort.transkript);
   let profile = $state<Profil[]>([]);
   let versionen = $state<Version[] | null>(null);
   let alleVersionen = $state(false);
@@ -47,6 +57,10 @@
   let ablegen = $state(false);
   let laufend = $state<Record<string, Auftrag>>({});
   let zurueckFrage = $state<string | null>(null);
+  let umbenennenKennung = $state<string | null>(null);
+  let neuerName = $state("");
+  let zusammenVon = $state<string | null>(null);
+  let zusammenNach = $state<string | null>(null);
 
   const anteile = $derived.by(() => {
     const summe: Record<string, number> = {};
@@ -101,6 +115,26 @@
       fehler = (f as Error).message;
     }
   }
+
+  const sprecherName = (kennung: string | null) => t.sprecher.find((s) => s.kennung === kennung)?.name ?? "";
+
+  function entwurfUmbenennen() {
+    if (umbenennenKennung && neuerName.trim()) zuordnung?.umbenennen(umbenennenKennung, neuerName);
+    umbenennenKennung = null;
+  }
+
+  function zusammenfuehrenJetzt() {
+    if (zusammenVon && zusammenNach) zuordnung?.zusammenfuehren(zusammenVon, zusammenNach);
+    zusammenVon = null;
+  }
+
+  // außerhalb des Zuordnens gibt es keinen Entwurf mehr, also auch kein offenes Umbenennen oder Zusammenführen
+  $effect(() => {
+    if (!zuordnung) {
+      umbenennenKennung = null;
+      zusammenVon = null;
+    }
+  });
 
   const profilName = (id: string | null | undefined) => profile.find((p) => p.id === id)?.name ?? "einem Profil";
 
@@ -183,12 +217,31 @@
         {#if modus === "umbenennen"}
           <label class="eingabe klein-eingabe"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:{farbe(s.kennung)}"></span>
             <input bind:value={namen[s.kennung]} list="profilnamen" aria-label="Name von {s.name}" /></label>
+        {:else if zuordnung && umbenennenKennung === s.kennung}
+          <label class="eingabe klein-eingabe"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:{farbe(s.kennung)}"></span>
+            <!-- svelte-ignore a11y_autofocus -->
+            <input bind:value={neuerName} list="profilnamen" aria-label="Neuer Name für {s.name}" autofocus
+                   onfocus={(e) => e.currentTarget.select()}
+                   onkeydown={(e) => { if (e.key === "Enter") entwurfUmbenennen(); else if (e.key === "Escape") umbenennenKennung = null; }} /></label>
         {:else}
           <span class="sprecher"><span class="punkt" style="background:{farbe(s.kennung)}"></span>{s.name}
             {#if s.profil_id}<i class="fa-solid fa-user-check" style="color:var(--text-3)" title="als Profil bestätigt"></i>{/if}</span>
         {/if}
-        <span class="anteil">{anteile[s.kennung] ?? 0} %</span>
-        {#if s.vorschlag_id && !s.profil_id && modus !== "umbenennen"}
+        {#if zuordnung}
+          <span class="aktionen"><span class="anteil">{anteile[s.kennung] ?? 0} %</span>
+            {#if umbenennenKennung === s.kennung}
+              <button class="rund" title="Übernehmen" aria-label="Namen übernehmen" onclick={entwurfUmbenennen}><i class="fa-solid fa-check"></i></button>
+            {:else}
+              <button class="rund" title="Umbenennen" aria-label="{s.name} umbenennen"
+                      onclick={() => { umbenennenKennung = s.kennung; neuerName = s.name; }}><i class="fa-solid fa-pen"></i></button>
+            {/if}
+            <button class="rund" title="Zusammenführen mit ..." aria-label="{s.name} zusammenführen" disabled={t.sprecher.length < 2}
+                    onclick={() => { zusammenVon = s.kennung; zusammenNach = t.sprecher.find((x) => x.kennung !== s.kennung)?.kennung ?? null; }}>
+              <i class="fa-solid fa-code-merge"></i></button></span>
+        {:else}
+          <span class="anteil">{anteile[s.kennung] ?? 0} %</span>
+        {/if}
+        {#if s.vorschlag_id && !s.profil_id && modus !== "umbenennen" && !zuordnung}
           <div class="vorschlag-chip"><i class="fa-solid fa-user-check" style="color:var(--akzent)"></i>
             <span>klingt wie <b>{profilName(s.vorschlag_id)}</b> ({Math.round((s.vorschlag_aehnlichkeit ?? 0) * 100)} % ähnlich)</span>
             <button class="knopf klein" style="margin-left:auto"
@@ -209,15 +262,37 @@
       <div class="knopfreihe"><span class="beschriftung">Anzahl</span><Auswahl bind:wert={anzahl} optionen={ANZAHL_OPTIONEN} klein />
         <button class="knopf klein primaer" onclick={() => machen(async () => { await api.sprecherErkennen(antwort.id, erkennenWeg, anzahl); modus = ""; })}>Starten</button>
         <button class="knopf klein still" onclick={() => (modus = "")}>Abbrechen</button></div>
+      <p class="leer-zeile" style="margin-top:8px">Ersetzt die Zuordnung; der jetzige Stand bleibt als Version und lässt sich zurückholen.</p>
+    {:else if zuordnung}
+      <div class="knopfreihe">
+        <button class="knopf klein still" onclick={() => zuordnung.neu()}><i class="fa-solid fa-user-plus"></i> Neuer Sprecher</button>
+        <button class="knopf klein still" onclick={() => (modus = "erkennen")} disabled={ungespeichert > 0 || !!laufend.sprecher_erkennen}
+                title={ungespeichert > 0 ? "Erst speichern oder abbrechen" : undefined}><i class="fa-solid fa-rotate"></i> Neu erkennen</button>
+      </div>
     {:else}
       <div class="knopfreihe">
         {#if t.sprecher.length}<button class="knopf klein still" onclick={umbenennenBeginnen} disabled={bearbeiten}><i class="fa-solid fa-pen"></i> Umbenennen</button>{/if}
+        {#if onzuordnen}<button class="knopf klein still" onclick={onzuordnen} disabled={bearbeiten}><i class="fa-solid fa-hand-pointer"></i> Von Hand zuordnen</button>{/if}
         <button class="knopf klein still" onclick={() => (modus = "erkennen")} disabled={!!laufend.sprecher_erkennen || bearbeiten}>
-          <i class="fa-solid fa-rotate"></i> Neu erkennen</button>
+          <i class="fa-solid fa-rotate"></i> {t.sprecher.length ? "Neu erkennen" : "Sprecher erkennen"}</button>
       </div>
     {/if}
     {#if laufend.sprecher_erkennen}<p class="lauf-zeile"><i class="fa-solid fa-circle-notch fa-spin"></i> {lauf("sprecher_erkennen")}</p>{/if}
   </div>
+
+  {#if zuordnung && zusammenVon}
+    <div class="gruppe">
+      <h3>Zusammenführen</h3>
+      <div class="knopfreihe"><span class="sprecher"><span class="punkt" style="background:{farbe(zusammenVon)}"></span>{sprecherName(zusammenVon)}</span>
+        <span class="beschriftung">ist</span>
+        <Auswahl bind:wert={zusammenNach} klein
+                 optionen={t.sprecher.filter((x) => x.kennung !== zusammenVon).map((x) => ({ wert: x.kennung as string | null, titel: x.name }))} /></div>
+      <div class="knopfreihe" style="margin-top:8px"><button class="knopf klein primaer" disabled={!zusammenNach} onclick={zusammenfuehrenJetzt}>Zusammenführen</button>
+        <button class="knopf klein still" onclick={() => (zusammenVon = null)}>Abbrechen</button></div>
+      <p class="leer-zeile" style="margin-top:8px">Alle Beiträge von {sprecherName(zusammenVon)} gehen an {sprecherName(zusammenNach)};
+        {sprecherName(zusammenVon)} entfällt.</p>
+    </div>
+  {/if}
 
   <div class="gruppe">
     <h3>Marker</h3>

@@ -115,11 +115,19 @@ def _beschreiben(alt: Transkript, a: Aenderungen) -> str:
             teile.append(f"{len(a.segmente)} statt {len(alt.segmente)} Segmente")
         elif n:
             teile.append(f"Text in {n} Segment{'en' if n != 1 else ''}")
+        bisher = {(s.start, s.text): s.sprecher for s in alt.segmente}
+        zugeordnet = sum((s.start, s.text) in bisher and bisher[(s.start, s.text)] != s.sprecher for s in a.segmente)
+        if zugeordnet:
+            teile.append(f"Sprecher in {zugeordnet} Beitr{'ägen' if zugeordnet != 1 else 'ag'} zugeordnet")
     if a.sprecher is not None:
         alte_namen = {s.kennung: s.name for s in alt.sprecher}
+        neue = {s.kennung for s in a.sprecher}
         for s in a.sprecher:
             if alte_namen.get(s.kennung) not in (None, s.name):
                 teile.append(f"{alte_namen[s.kennung]} heißt {s.name}")
+            elif s.kennung not in alte_namen:
+                teile.append(f"neu: {s.name}")
+        teile += [f"{name} entfällt" for kennung, name in alte_namen.items() if kennung not in neue]
     if a.marker is not None and [(m.zeit, m.titel) for m in a.marker] != [(m.zeit, m.titel) for m in alt.marker]:
         teile.append("Marker")
     if a.vorschlaege:
