@@ -2,7 +2,7 @@
 import type { ErkennenWeg, SprecherWeg } from "./sprecherwahl";
 import { hole, json, type Auftrag } from "appkern-oberflaeche";
 import type {
-  AufnahmenSeite, ExportFormat, Ordner, Profil, TranskriptAntwort, Verzeichnis, Version, Vorlage, Vorschlag,
+  Aufnahme, AufnahmenSeite, ExportFormat, Ordner, Profil, TranskriptAntwort, Verzeichnis, Version, Vorlage, Vorschlag,
   Marker, Segment, Transkript,
 } from "./typen";
 
@@ -62,6 +62,12 @@ export const exportAblegen = (id: string, format: ExportFormat) =>
   hole<{ id: string; pfad: string; name: string }>(`/transkripte/${id}/export`, { method: "POST", ...json({ format }) });
 
 export const exportAdresse = (id: string, format: ExportFormat) => `/api/v1/inhalt/transkripte/${id}/export?format=${format}`;
+export const aufnahme = (id: string) => hole<Aufnahme>(`/aufnahmen/${id}`);
+export const aufnahmeLoeschen = (id: string, mitTranskripten: boolean) =>
+  hole<void>(`/aufnahmen/${id}?mit_transkripten=${mitTranskripten}`, { method: "DELETE" });
+export const aufnahmeMarker = (id: string, marker: { zeit: number; titel: string }[]) =>
+  hole<{ zeit: number; titel: string }[]>(`/aufnahmen/${id}/marker`, { method: "PUT", ...json(marker) });
+export const aufnahmeTonAdresse = (id: string) => `/api/v1/inhalt/aufnahmen/${id}/ton`;
 export const wellenform = (aufnahmeId: string) => hole<number[]>(`/inhalt/aufnahmen/${aufnahmeId}/wellenform`);
 export const tonAdresse = (id: string) => `/api/v1/inhalt/transkripte/${id}/ton`;
 export const aufnahmeAdresse = (id: string) => `/api/v1/inhalt/aufnahmen/${id}`;

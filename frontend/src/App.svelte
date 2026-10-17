@@ -10,6 +10,7 @@
   ereignisseBenennen({
     "aufnahme.hochgeladen": "Aufnahme hochgeladen",
     "transkript.geloescht": "Transkript in den Papierkorb",
+    "aufnahme.geloescht": "Aufnahme in den Papierkorb",
     "sprecher.ohne_trennung": "Sprecher ohne Sprechertrennung",
   });
 

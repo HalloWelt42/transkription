@@ -9,6 +9,7 @@
   import { aufnahme, beenden, markerSetzen, pause, quelleWechseln, tonFortsetzen, verwerfen } from "../lib/aufnahme.svelte";
   import { hochladen } from "../lib/hochladen.svelte";
   import { marke, SPRACHEN } from "../lib/zeit";
+  import Rueckfrage from "./Rueckfrage.svelte";
 
   let { kompakt = false, onfertig }: { kompakt?: boolean; onfertig?: (meldung: string) => void } = $props();
 
@@ -19,6 +20,7 @@
   let sprecher = $state<SprecherWeg>("ohne");
   let anzahl = $state<number | null>(null);
   let textfeld = $state<HTMLElement>();
+  let verwerfenFrage = $state(false);
 
   const geraete = $derived([{ wert: "", titel: "Standard des Systems" }, ...aufnahme.geraete
     .filter((g) => g.id && g.id !== "default").map((g) => ({ wert: g.id, titel: g.name }))]);
@@ -42,6 +44,23 @@
                           mitschrift: [...aufnahme.mitschrift] };
     } catch (f) {
       fehler = `${(f as Error).message}. Die Aufnahme bleibt auf diesem Gerät und lässt sich später hochladen.`;
+    } finally {
+      sendet = false;
+    }
+  }
+
+  async function verwerfenJetzt() {
+    const d = aufnahme.danach;
+    if (!d) return;
+    sendet = true;
+    fehler = "";
+    try {
+      await api.aufnahmeLoeschen(d.id, false);
+      aufnahme.danach = null;
+      verwerfenFrage = false;
+      onfertig?.(`${d.name} verworfen; sie liegt im Papierkorb der Kellerwolke.`);
+    } catch (f) {
+      fehler = (f as Error).message;
     } finally {
       sendet = false;
     }
@@ -103,8 +122,14 @@
             <i class="fa-solid fa-file-lines"></i> Live-Text als Transkript speichern</button>
         {/if}
         <button class="knopf still" disabled={sendet} onclick={() => entscheiden("fertig")}>Nur speichern</button>
+        <button class="knopf still gefahr" style="margin-left:auto" disabled={sendet} onclick={() => (verwerfenFrage = true)}>
+          <i class="fa-solid fa-trash-can"></i> Verwerfen</button>
       </div>
     </div>
+    {#if verwerfenFrage}
+      <Rueckfrage frage="Aufnahme verwerfen?" hinweis="Sie landet im Papierkorb der Kellerwolke und lässt sich dort zurückholen."
+                  knopf="Verwerfen" beschaeftigt={sendet} onabbrechen={() => (verwerfenFrage = false)} onja={verwerfenJetzt} />
+    {/if}
   {:else}
     <div class="t-uhr">{marke(aufnahme.dauer_ms / 1000)}</div>
     <p class="rekorder-stand">

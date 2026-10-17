@@ -215,6 +215,30 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert (await c.delete(f"/api/v1/transkripte/{tid}", headers=h)).status_code == 204
                 angelegt.remove(tid)
                 assert (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).status_code == 404
+
+                # Eine Aufnahme lesen (mit Markern und Transkripten), ihr Ton als Abspielfassung
+                eine = (await c.get(f"/api/v1/aufnahmen/{aufnahme['id']}", headers=h)).json()
+                assert eine["stand"] == "transkribiert" and [(m["zeit"], m["titel"]) for m in eine["marker"]] == [(4.5, "Wichtig")]
+                assert live["id"] in [t["id"] for t in eine["transkripte"]]
+                r = await c.get(f"/api/v1/inhalt/aufnahmen/{aufnahme['id']}/ton", headers={**h, "Range": "bytes=0-43"})
+                assert r.status_code == 206 and r.content[:4] == b"RIFF" and int.from_bytes(r.content[24:28], "little") == 44100
+
+                # Aufnahme in den Papierkorb: einmal ohne, einmal mit ihren Transkripten
+                zweite = (await c.post("/api/v1/aufnahmen", params={"name": f"{name} zwei.mp3"}, content=ton.read_bytes(),
+                                       headers={**h, "Content-Type": "audio/mpeg"})).json()
+                angelegt.append(zweite["id"])
+                assert (await c.delete(f"/api/v1/aufnahmen/{zweite['id']}", headers=h)).status_code == 204
+                angelegt.remove(zweite["id"])
+                assert (await c.get(f"/api/v1/aufnahmen/{zweite['id']}", headers=h)).status_code == 404
+                verweise = [t["id"] for t in eine["transkripte"]]
+                assert (await c.delete(f"/api/v1/aufnahmen/{aufnahme['id']}", headers=h, params={"mit_transkripten": True})).status_code == 204
+                for k in [aufnahme["id"], *verweise]:
+                    if k in angelegt:
+                        angelegt.remove(k)
+                for t in verweise:
+                    assert (await c.get(f"/api/v1/transkripte/{t}", headers=h)).status_code == 404
+                protokoll = (await c.get("/api/v1/protokoll", headers=h, params={"ereignis": "aufnahme.geloescht"})).json()
+                assert any(name in (e.get("text") or "") for e in protokoll["eintraege"])
             finally:
                 await c.post("/api/v1/anmeldung/abmelden", headers=h)
     finally:

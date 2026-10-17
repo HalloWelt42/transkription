@@ -114,6 +114,7 @@ export interface Aufnahme {
   stand: AufnahmeStand;
   transkripte: { id: string; name: string }[];
   auftrag: { id: string; zustand: string; fortschritt: number | null; schritt: string; phase: string | null } | null;
+  marker: { zeit: number; titel: string }[];
 }
 
 export interface AufnahmenSeite {

@@ -187,7 +187,8 @@
 .leiste .gruppe .knopfreihe, .leiste-inhalt .gruppe .knopfreihe { margin-top: 8px; align-items: center; }
 /* am Telefon sind auch stille Knöpfe als Knopf erkennbar und groß genug zum Tippen */
 .mobil .leiste-inhalt .gruppe { padding: 14px 16px; }
-.mobil .leiste-inhalt .knopf.still { background: var(--flaeche-2); box-shadow: 0 0 0 1px var(--rand); min-height: 40px; }
+.mobil .leiste-inhalt .knopf.still, .mobil .t-karte .knopf.still, .mobil .t-loeschen .knopf.still {
+  background: var(--flaeche-2); box-shadow: 0 0 0 1px var(--rand); min-height: 40px; }
 .leiste .beschriftung { font-size: var(--klein); color: var(--text-2); }
 .sprecher-zeile .eingabe.klein-eingabe, .eingabe.klein-eingabe { height: 36px; gap: 8px; }
 .schalter-zeile { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: var(--klein); color: var(--text-2); }
@@ -271,3 +272,10 @@ kbd.taste { font-family: ui-monospace, monospace; font-size: var(--marke); color
 .ohne-text p { margin: 0 0 14px; color: var(--text-2); }
 .vorschau-ziel { flex-basis: 100%; font-size: var(--klein); color: var(--text-2); }
 .vorschau-ziel code { font-family: ui-monospace, monospace; color: var(--text); }
+/* Aufnahme am Telefon (1b): großer Knopf zum Transkribieren, Marker als Karte, Papierkorb darunter */
+.mobil .t-breit { width: 100%; height: 48px; justify-content: center; margin: 10px 0 16px; }
+.mobil .t-karte { padding: 10px 14px; }
+.mobil .t-loeschen { margin: 16px 0 8px; }
+.mobil .t-loeschen > .knopf { width: 100%; justify-content: center; min-height: 44px; }
+.mobil .t-zeile .t-text .auswahl { margin-top: 2px; }
+.eingabe .zeit-marke { font-family: ui-monospace, monospace; font-size: var(--marke); color: var(--text-3); flex: none; }

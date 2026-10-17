@@ -3,14 +3,16 @@
   // Ziehen), Aufnehmen im Browser, Auswahl transkribieren. Am Telefon: großer Aufnahmeknopf, Datei wählen, die letzten.
   // Entwurf: mockups/transkription.html (1) und transkription-mobil.html (1, 2).
   import { onMount } from "svelte";
-  import { Auswahl, beiAuftrag, gehe, geraet, hole, json, sitzung, wann } from "appkern-oberflaeche";
+  import { Auswahl, beiAuftrag, gehe, geraet, hole, json, navigation, sitzung, wann } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import { alsDatei, aufnahme, geraeteLaden, gespeicherte, quelleWechseln, starten as aufnehmen, verwerfen, type Gespeichert } from "../lib/aufnahme.svelte";
   import { entfernen, hochladen, uploads } from "../lib/hochladen.svelte";
   import type { Aufnahme, AufnahmenSeite, Ordner } from "../lib/typen";
   import { groesse, marke, SPRACHEN } from "../lib/zeit";
+  import AufnahmeAnsicht from "../teile/AufnahmeAnsicht.svelte";
   import Rekorder from "../teile/Rekorder.svelte";
+  import Rueckfrage from "../teile/Rueckfrage.svelte";
 
   type Filter = "alle" | "ohne" | "transkribiert";
   const SEITE = 50;
@@ -31,7 +33,8 @@
   let ueber = $state(false);
   let liegen = $state<Gespeichert[]>([]);
   let eingabe: HTMLInputElement;
-  let vorschau = $state<string | null>(null);
+  let loeschenFuer = $state<string | null>(null);
+  let loescht = $state(false);
   let mobilOrdner = $state(false);
 
   const aktuellerOrdner = $derived(stapel.at(-1)?.id ?? ordner);
@@ -114,6 +117,38 @@
     stapel = stapel.slice(0, -1);
     ab = 0;
     void laden();
+  }
+
+  // /aufnahmen/<id>: die Aufnahme zum Anhören (auch ohne Transkript), sonst die Liste
+  const kennung = $derived(navigation.seite === "aufnahmen" ? navigation.teile[0] ?? null : null);
+
+  // zurück aus einer Aufnahme: die Liste neu holen (sie kann gelöscht, transkribiert oder umbenannt sein)
+  let warOffen = false;
+  $effect(() => {
+    if (kennung) warOffen = true;
+    else if (warOffen) {
+      warOffen = false;
+      void laden();
+    }
+  });
+
+  function oeffnen(a: Aufnahme) {
+    gehe(a.stand === "transkribiert" ? `transkripte/${a.transkripte[0].id}` : `aufnahmen/${a.id}`);
+  }
+
+  async function loeschen(a: Aufnahme, mitTranskripten: boolean) {
+    loescht = true;
+    fehler = "";
+    try {
+      await api.aufnahmeLoeschen(a.id, mitTranskripten);
+      meldung = `${a.name} liegt im Papierkorb der Kellerwolke.`;
+      loeschenFuer = null;
+      await laden();
+    } catch (f) {
+      fehler = (f as Error).message;
+    } finally {
+      loescht = false;
+    }
   }
 
   function waehlen(a: Aufnahme) {
@@ -213,10 +248,19 @@
     </div>
     <span class="stand-pille {a.stand === 'transkribiert' ? 'fertig' : a.stand === 'laeuft' ? 'laeuft' : 'offen'}">
       {#if a.stand === "laeuft"}<i class="fa-solid fa-circle-notch fa-spin"></i>{/if} {standText(a)}</span>
-    <button class="knopf still" title={vorschau === a.id ? "Anhalten" : "Anhören"}
-            onclick={(e) => { e.stopPropagation(); vorschau = vorschau === a.id ? null : a.id; }}>
-      <i class="fa-solid {vorschau === a.id ? 'fa-pause' : 'fa-play'}"></i></button>
+    <span class="knopfreihe">
+      <button class="knopf still" title={a.stand === "transkribiert" ? "Transkript öffnen" : "Öffnen und abspielen"}
+              onclick={(e) => { e.stopPropagation(); oeffnen(a); }}><i class="fa-solid fa-play"></i></button>
+      <button class="knopf still" title="In den Papierkorb" aria-label="{a.name} in den Papierkorb"
+              onclick={(e) => { e.stopPropagation(); loeschenFuer = loeschenFuer === a.id ? null : a.id; }}><i class="fa-solid fa-trash-can"></i></button>
+    </span>
   </div>
+  {#if loeschenFuer === a.id}
+    <Rueckfrage frage={`${a.name} in den Papierkorb?`} knopf="In den Papierkorb" beschaeftigt={loescht}
+                hinweis={a.transkripte.length ? "" : "Landet im Papierkorb der Kellerwolke und lässt sich dort zurückholen."}
+                schalter={a.transkripte.length ? (a.transkripte.length === 1 ? "das Transkript dazu auch" : `die ${a.transkripte.length} Transkripte dazu auch`) : ""}
+                onabbrechen={() => (loeschenFuer = null)} onja={(mit) => loeschen(a, mit && a.transkripte.length > 0)} />
+  {/if}
 {/snippet}
 
 {#snippet uploadListe()}
@@ -243,11 +287,9 @@
   {/each}
 {/snippet}
 
-{#if vorschau}
-  <audio src={api.aufnahmeAdresse(vorschau)} autoplay onended={() => (vorschau = null)} hidden></audio>
-{/if}
-
-{#if geraet.mobil}
+{#if kennung}
+  {#key kennung}<AufnahmeAnsicht id={kennung} />{/key}
+{:else if geraet.mobil}
   {#if aufnahme.laeuft || aufnahme.danach}
     <Rekorder onfertig={aufnahmeFertig} />
   {:else}
@@ -288,11 +330,10 @@
     {/if}
     <div class="t-liste">
       {#each seite?.eintraege.slice(0, mobilOrdner ? SEITE : 15) ?? [] as a (a.id)}
-        <button class="t-zeile" onclick={() => (a.stand === "ohne" ? api.transkribieren({ quelle_id: a.id }).then(laden) : waehlen(a))}>
+        <button class="t-zeile" onclick={() => oeffnen(a)}>
           <i class="fa-solid {a.stand === 'transkribiert' ? 'fa-file-lines' : ART[a.art]}"></i>
           <span class="t-text"><span class="t-name">{a.name}</span><span class="t-meta">{standText(a)}</span></span>
           {#if a.stand === "laeuft"}<span class="stand-pille laeuft"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
-          {:else if a.stand === "ohne"}<span class="stand-pille offen">Transkribieren</span>
           {:else}<i class="fa-solid fa-chevron-right" style="color:var(--text-3)"></i>{/if}
         </button>
       {:else}
