@@ -13,7 +13,7 @@ import { arbeit } from "./arbeit.svelte";
 
 const DB_NAME = "transkription-aufnahmen";
 const STUECK_MS = 2000;
-const PEGEL = 40;
+const PEGEL = 160;            // Verlauf des Pegels (alle 100 ms ein Wert); angezeigt wird, was in die Breite passt
 const GERAET_MERKER = "transkription_mikrofon";
 const ZIEL_RATE = 16000;
 const LIVE_MIN_S = 5;
@@ -68,6 +68,8 @@ let analyse: AnalyserNode | null = null;
 let ziel: MediaStreamAudioDestinationNode | null = null;
 let abgriff: AudioWorkletNode | null = null;
 let wachbleiben: { release(): Promise<void> } | null = null;
+// jede Aufnahme hat ihren Lauf; Antworten der Live-Mitschrift aus einem früheren (etwa abgebrochenen) gehen verloren
+let lauf = 0;
 let aktuell: Gespeichert | null = null;
 let takt: ReturnType<typeof setInterval> | null = null;
 let zuletzt = 0;
@@ -238,6 +240,7 @@ export async function starten(): Promise<void> {
     beginn: Date.now(), dauer_ms: 0, marker: [], groesse: 0 };
   aufnahme.name = name;
   aufnahme.marker = [];
+  lauf++;
   aufnahme.mitschrift = [];
   aufnahme.liveStand = "";
   await merken(aktuell);
@@ -334,6 +337,23 @@ export async function beenden(name: string): Promise<{ daten: Blob; info: Gespei
   return alsDatei(a.id);
 }
 
+/** Abbrechen während der Aufnahme: nichts wird gespeichert, auch die Stücke auf diesem Gerät gehen weg. */
+export async function abbrechen(): Promise<void> {
+  if (!rekorder || !aktuell) return;
+  const r = rekorder;
+  const a = aktuell;
+  const fertig = new Promise<void>((ok) => (r.onstop = () => ok()));
+  r.ondataavailable = null;
+  r.stop();
+  await fertig;
+  await schreiben;
+  lauf++;
+  aufraeumen();
+  aufnahme.mitschrift = [];
+  aufnahme.marker = [];
+  await verwerfen(a.id);
+}
+
 function aufraeumen(): void {
   strom?.getTracks().forEach((t) => t.stop());
   abgriff?.port.close();
@@ -420,7 +440,8 @@ function liveSchneiden(alles: boolean): void {
   stilleSeit = 0;
   if (laenge < 0.8) return;
   const wav = alsWav(herunterrechnen(roh, rate));
-  warteschlange = warteschlange.then(() => hoeren(wav, beginn, laenge));
+  const meinLauf = lauf;
+  warteschlange = warteschlange.then(() => hoeren(wav, beginn, laenge, meinLauf));
 }
 
 function herunterrechnen(roh: Float32Array, von: number): Float32Array {
@@ -458,7 +479,7 @@ function alsWav(werte: Float32Array): Blob {
   return new Blob([puffer], { type: "audio/wav" });
 }
 
-async function hoeren(wav: Blob, beginn: number, laenge: number): Promise<void> {
+async function hoeren(wav: Blob, beginn: number, laenge: number, meinLauf: number): Promise<void> {
   const form = new FormData();
   form.append("datei", wav, "live.wav");
   aufnahme.liveStand = "hört ...";
@@ -475,6 +496,7 @@ async function hoeren(wav: Blob, beginn: number, laenge: number): Promise<void> 
       return;
     }
     const daten = (await antwort.json()) as { text: string };
+    if (meinLauf !== lauf) return;
     if (daten.text.trim()) aufnahme.mitschrift = [...aufnahme.mitschrift, { start: beginn, ende: beginn + laenge, text: daten.text.trim() }];
     aufnahme.liveStand = "";
   } catch {

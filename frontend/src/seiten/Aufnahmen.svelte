@@ -290,7 +290,10 @@
 {#if kennung}
   {#key kennung}<AufnahmeAnsicht id={kennung} />{/key}
 {:else if geraet.mobil}
-  {#if aufnahme.laeuft || aufnahme.danach}
+  {#if aufnahme.laeuft}
+    <!-- über die ganze Höhe: die Aufnahmeleiste steht unten über den Reitern wie der Spieler -->
+    <div class="t-ansicht"><Rekorder onfertig={aufnahmeFertig} /></div>
+  {:else if aufnahme.danach}
     <Rekorder onfertig={aufnahmeFertig} />
   {:else}
     {@render liegendeListe()}
@@ -341,6 +344,9 @@
       {/each}
     </div>
   {/if}
+{:else if aufnahme.laeuft}
+  <div class="seiten-kopf"><h1>Aufnahme läuft</h1></div>
+  <div class="rollfeld rek-flaeche"><Rekorder onfertig={aufnahmeFertig} /></div>
 {:else}
   <div class="seiten-kopf">
     <h1>Aufnahmen</h1>
@@ -358,7 +364,7 @@
   </div>
   <div class="rollfeld" role="region" aria-label="Aufnahmen"
        ondragover={(e) => { e.preventDefault(); ueber = true; }} ondragleave={() => (ueber = false)} ondrop={ablegen}>
-    {#if aufnahme.laeuft || aufnahme.danach}<Rekorder kompakt onfertig={aufnahmeFertig} />{/if}
+    {#if aufnahme.danach}<Rekorder kompakt onfertig={aufnahmeFertig} />{/if}
     {#if aufnahme.fehler}<div class="fehlertext" style="margin-bottom:12px">{aufnahme.fehler}</div>{/if}
     {@render liegendeListe()}
     <div class="ordnerzeile">

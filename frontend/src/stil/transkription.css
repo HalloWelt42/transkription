@@ -131,26 +131,7 @@
 .seiten-kopf h1.titel-lang { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ----- Umsetzung: Rekorder, Uploads ----- */
-.rekorder .t-uhr, .rekorder .t-pegel, .rekorder .t-steuer { font-family: inherit; }
-.rekorder .t-uhr { font-family: ui-monospace, monospace; font-size: 54px; font-weight: 600; text-align: center; margin: 18px 0 6px; }
-.rekorder-stand { text-align: center; margin: 0 0 6px; color: var(--text-3); font-size: var(--klein); }
-.rekorder-warnung { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; margin: 0 0 6px;
-  color: var(--warn); font-size: var(--klein); text-align: center; }
-.rekorder .t-pegel { display: flex; align-items: center; justify-content: center; gap: 3px; height: 90px; }
-.rekorder .t-pegel span { width: 5px; border-radius: 3px; background: var(--gefahr); transition: height .1s; }
-.rekorder .t-steuer { display: flex; justify-content: center; align-items: center; gap: 28px; margin: 20px 0 16px; }
-.rekorder .t-steuer .rund { width: 64px; height: 64px; border-radius: 32px; font-size: 22px; }
-.rekorder .t-steuer .stopp { width: 84px; height: 84px; border-radius: 42px; border: 0; background: var(--gefahr); color: #fff; font-size: 28px; cursor: pointer; }
-.rekorder .t-liste { background: var(--flaeche); border-radius: 14px; overflow: hidden; max-width: 520px; margin: 0 auto; }
-.rekorder .t-zeile { display: flex; align-items: center; gap: 14px; min-height: 60px; padding: 10px 14px; }
-.rekorder .t-zeile + .t-zeile { border-top: 1px solid var(--rand); }
-.rekorder .t-zeile > i { width: 26px; text-align: center; font-size: 20px; color: var(--text-3); }
-.rekorder .t-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.rekorder .t-meta { font-size: var(--klein); color: var(--text-3); }
 .rekorder.kompakt { background: var(--flaeche); border-radius: var(--r3); box-shadow: var(--schatten); padding: 6px 16px 16px; margin-bottom: 14px; }
-.rekorder.kompakt .t-uhr { font-size: 40px; margin-top: 8px; }
-.rekorder.kompakt .t-pegel { height: 60px; }
-.rekorder.kompakt .t-liste { background: var(--flaeche-2); }
 .upload { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 14px;
           background: var(--flaeche); border-radius: var(--r2); margin-bottom: 6px; font-size: var(--klein); }
 .upload .balken { grid-column: 2 / -1; }
@@ -293,8 +274,9 @@ kbd.taste { font-family: ui-monospace, monospace; font-size: var(--marke); color
 .rek-leiste .marken { grid-area: marken; position: relative; }
 .rek-leiste .marken .zahl { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; border-radius: 9px; padding: 0 5px;
   background: var(--akzent); color: #fff; font-size: 11px; display: grid; place-items: center; }
-.rek-pegel { grid-area: pegel; display: flex; align-items: center; justify-content: center; gap: 2px; height: 40px; min-width: 0; overflow: hidden; }
-.rek-pegel span { flex: 1; min-width: 2px; max-width: 4px; border-radius: 2px; background: var(--gefahr); }
+.rek-pegel { grid-area: pegel; display: flex; align-items: center; justify-content: flex-end; gap: 2px; height: 40px; min-width: 0; overflow: hidden; }
+.rek-pegel span { flex: 0 0 3px; border-radius: 2px; background: var(--gefahr); transition: height .1s; }
+.rek-zeit.pause ~ .rek-pegel span, .rek-leiste:has(.rek-zeit.pause) .rek-pegel span { background: var(--text-3); }
 .rek-zeit { grid-area: zeit; font-family: ui-monospace, monospace; font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .rek-zeit .punkt { width: 9px; height: 9px; border-radius: 5px; background: var(--gefahr); }
 .rek-zeit.pause .punkt { background: var(--text-3); }
@@ -324,3 +306,7 @@ kbd.taste { font-family: ui-monospace, monospace; font-size: var(--marke); color
   box-shadow: 0 -1px 0 var(--rand); position: sticky; bottom: -16px; }
 .mobil .rek-leiste .stopp { width: 48px; height: 48px; }
 .mobil .rek-zeit { font-size: 15px; }
+/* die laufende Aufnahme füllt die Fläche: am Rechner das Rollfeld, am Telefon die Spalte über die ganze Höhe */
+.rek-flaeche { display: flex; flex-direction: column; }
+.rekorder:has(> .rek) { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.rek { flex: 1; }
