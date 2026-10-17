@@ -1,0 +1,11 @@
+name = "Transkription"
+beschreibung = "macht aus Ton Text"
+oberflaeche = "http://127.0.0.1:8631"
+
+[[teile]]
+kennung = "backend"
+name = "Backend"
+ordner = "/Users/alpha/Entwicklung/03_KI_Erstellung/transkription/backend"
+befehl = [".venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8631", "--log-level", "warning"]
+port = 8631
+speicher_gb = 0.3
