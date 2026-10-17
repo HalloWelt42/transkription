@@ -258,7 +258,7 @@ async def test_werkzeug_vorschau_einreihen_umwandeln(tmp_path: Path, capsys):
         daten = tmp_path / "daten"
         assert await werkzeug.altbestand(plan, False, daten) == 1                 # eine fehlt in der alten App
         ausgabe = capsys.readouterr().out
-        assert "neu              Aufnahmen/REKO/2026/Besprechung.mp3  (2 Stände" in ausgabe and "fehlt" in ausgabe
+        assert "neu              Aufnahmen/REKO/2026/Besprechung.mp3  (2 Stände, " in ausgabe and "fehlt" in ausgabe
         db = await Datenbank(daten / "transkription.sqlite").oeffnen()
         try:
             assert await db.zeilen("SELECT id FROM auftrag") == []               # die Vorschau ändert nichts

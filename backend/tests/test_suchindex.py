@@ -74,7 +74,7 @@ async def test_neu_eintragen_ersetzt_und_entfernen_raeumt_auf(index):
                               "aenderung": Aenderung(was="Text korrigiert", wer="chef")})
     await index.eintragen(t2, k2)
     assert (await index.seite(suche="Heizung")).gesamt == 0 and (await index.seite(suche="Wasser")).gesamt == 1
-    assert (await index.staende()) == {str(k.id): "v2"}
+    assert (await index.lagen()) == {str(k.id): ("v2", k.pfad)}
     assert [e.id for e in (await index.zur_quelle([quelle]))[quelle]] == [k.id]
     notizen = await index.notizen(k.id)
     assert notizen["v1"].was == "erzeugt" and notizen["v2"].wer == "chef"

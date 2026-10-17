@@ -184,8 +184,9 @@ class Suchindex:
 
     # --- Lesen ------------------------------------------------------------------------------------------------
 
-    async def staende(self) -> dict[str, str | None]:
-        return {z["id"]: z["stand"] for z in await self.db.zeilen("SELECT id, stand FROM transkript")}
+    async def lagen(self) -> dict[str, tuple[str | None, str]]:
+        """Je Transkript Stand und Pfad, wie das Verzeichnis sie kennt (zum Vergleich mit der Kellerwolke)."""
+        return {z["id"]: (z["stand"], z["pfad"]) for z in await self.db.zeilen("SELECT id, stand, pfad FROM transkript")}
 
     async def eintrag(self, transkript_id: UUID | str) -> Eintrag | None:
         z = await self.db.zeile("SELECT * FROM transkript WHERE id=?", (str(transkript_id),))

@@ -60,8 +60,10 @@ class Abgleich(Begleiter):
         seit = await self.index.abgleich_seit(ordner.id)
         if seit == 0:
             seit = await self._journal_ende(ordner.id)      # erst die Stelle merken, dann lesen: nichts geht verloren
-            await self.vollstaendig()
-            await self.index.abgleich_merken(ordner.id, seit)
+        # bei jedem Start einmal ganz: so heilt auch, was ohne eigenes Ereignis anders wurde (gelesen wird nur, was
+        # sich in Stand oder Ort unterscheidet)
+        await self.vollstaendig()
+        await self.index.abgleich_merken(ordner.id, seit)
         self.bereit.set()
         async for stand in self.transkripte.kw.beobachten(ordner.id, seit):
             if stand.luecke:
@@ -80,29 +82,48 @@ class Abgleich(Begleiter):
                 return seit
 
     async def vollstaendig(self) -> None:
-        """Alle Transkripte im Ordner; nur Dateien mit anderem Stand werden gelesen, Verschwundene entfernt."""
-        bekannt = await self.index.staende()
+        """Alle Transkripte im Ordner; nur Dateien mit anderem Stand oder Ort werden gelesen, Verschwundene entfernt."""
+        bekannt = await self.index.lagen()
         gesehen: set[str] = set()
         async for k in self.transkripte.alle():
             gesehen.add(str(k.id))
-            if bekannt.get(str(k.id)) != k.etag:
+            if bekannt.get(str(k.id)) != (k.etag, k.pfad):
                 await self._eintragen(k.id)
         for tid in set(bekannt) - gesehen:
             await self.index.entfernen(tid)
 
     async def nachlesen(self, knoten_id: UUID, ordner: Knoten) -> None:
         """Eine geänderte Stelle: liegt dort (noch) ein Transkript irgendwo im Zweig der App, kommt es in den Index,
-        sonst heraus."""
+        sonst heraus. Ein umbenannter oder verschobener Ordner meldet nur sich selbst; seine Transkripte haben dann
+        einen neuen Pfad (oder liegen nicht mehr im Zweig) und werden mit nachgelesen."""
         try:
             knoten = await self.transkripte.kw.knoten(knoten_id)
         except NichtGefunden:
             await self.index.entfernen(knoten_id)
             return
+        if knoten.ist_ordner:
+            await self._ordner_nachlesen(knoten, ordner)
+            return
         if not knoten.pfad.startswith(ordner.pfad + "/") or not orte.ist_transkript(knoten):
             await self.index.entfernen(knoten_id)
             return
-        if (await self.index.staende()).get(str(knoten_id)) != knoten.etag:
+        if (await self.index.lagen()).get(str(knoten_id)) != (knoten.etag, knoten.pfad):
             await self._eintragen(knoten_id)
+
+    async def _ordner_nachlesen(self, unter: Knoten, ordner: Knoten) -> None:
+        bekannt = await self.index.lagen()
+        im_zweig = unter.pfad == ordner.pfad or unter.pfad.startswith(ordner.pfad + "/")
+        offen = [unter.id]
+        while offen:
+            async for k in self.transkripte.kw.alle_kinder(offen.pop()):
+                if k.ist_ordner:
+                    offen.append(k.id)
+                elif not orte.ist_transkript(k):
+                    continue
+                elif not im_zweig:
+                    await self.index.entfernen(k.id)
+                elif bekannt.get(str(k.id)) != (k.etag, k.pfad):
+                    await self._eintragen(k.id)
 
     async def _eintragen(self, knoten_id: UUID) -> None:
         try:

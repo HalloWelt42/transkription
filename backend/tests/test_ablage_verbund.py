@@ -129,3 +129,44 @@ async def test_profile_aendern_mit_stand(umgebung):
     assert gelesen.holen(pid).name == name and stand
     await profile.aendern(lambda p: setattr(p, "profile", [x for x in p.profile if x.id != pid]))
     assert (await profile.lesen())[0].holen(pid) is None
+
+
+async def test_abgleich_folgt_umbenannten_ordnern(umgebung):
+    """Ein umbenannter Ordner meldet nur sich selbst: die Transkripte darin bekommen trotzdem ihren neuen Pfad; aus dem
+    Zweig verschoben fallen sie aus dem Verzeichnis."""
+    kw, transkripte, index, abgleich, angelegt = umgebung
+    ich = await kw.ich()
+    name = f"Ordner {secrets.token_hex(3)}"
+    ordner = await kw.ordner(f"{ich.zweig}/Aufnahmen/{name}")
+    angelegt.append(ordner.id)
+    aufnahme = await kw.schreiben(f"{ordner.pfad}/Runde.wav", b"RIFF", nur_neu=True, inhaltstyp="audio/wav")
+    _, t = await transkripte.speichern(probe("Runde", "im Ordner"), aufnahme, Aenderung(was="erzeugt"))
+    await abgleich.verbunden()
+    await asyncio.wait_for(abgleich.bereit.wait(), 30)
+    assert (await index.eintrag(t.id)).pfad == f"{ordner.pfad}/Runde.transkript.json"
+
+    neu = f"{name} umbenannt"
+    await kw.umziehen(ordner.id, ordner.parent_id, neu)
+
+    async def bis(bedingung):
+        for _ in range(100):
+            if await bedingung():
+                return True
+            await asyncio.sleep(0.1)
+        return False
+
+    async def umbenannt():
+        e = await index.eintrag(t.id)
+        return e is not None and e.pfad.endswith(f"/{neu}/Runde.transkript.json")
+
+    assert await bis(umbenannt)
+    draussen = await kw.ordner(f"{ich.zweig}/Draußen {secrets.token_hex(2)}")
+    angelegt.append(draussen.id)
+    # aus dem Baum Aufnahmen heraus, aber noch im Zweig: das Verzeichnis folgt
+    await kw.umziehen(ordner.id, draussen.id, neu)
+
+    async def gefolgt():
+        e = await index.eintrag(t.id)
+        return e is not None and e.pfad.startswith(draussen.pfad + "/")
+
+    assert await bis(gefolgt)

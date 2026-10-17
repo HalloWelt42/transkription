@@ -93,7 +93,8 @@ async def altbestand(plan_datei: Path, ausfuehren: bool, daten: Path | None = No
                 neu.append(UebernehmenAnfrage(schluessel=alt.schluessel, zielordner=a.zielordner, name=name))
             summen[befund.split()[0]] += 1
             ziel = "/".join(t for t in ("Aufnahmen", a.zielordner, name + (alt.endung if alt else "")) if t)
-            print(f"{befund:16} {ziel}" + (f"  ({len(alt.staende)} Stände, {_mb(alt.groesse)})" if alt else ""))
+            staende = f"{len(alt.staende)} {'Stand' if len(alt.staende) == 1 else 'Stände'}" if alt else ""
+            print(f"{befund:16} {ziel}" + (f"  ({staende}, {_mb(alt.groesse)})" if alt else ""))
         for p in plan.profile:
             print(f"{'Profil, ' + profile_schon if profile_schon else 'Profil':16} {p.name} ({p.proben} Proben)")
         print(f"Summe: {summen['neu']} neu, {summen['schon']} schon eingereiht, {summen['fehlt']} fehlen in der alten App; "
