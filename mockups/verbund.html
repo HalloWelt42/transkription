@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="de" data-theme="hell">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Transkription - Kellerwolke und eine Ablage</title>
+    <link rel="stylesheet" href="kopf.css" />
+    <style>
+      /* neu (kommt nach der Freigabe in transkription.css) */
+      .hinweis-band { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 12px; border-radius: var(--r2, 10px);
+                      background: var(--akzent-weich); color: var(--text); font-size: var(--klein); }
+      .hinweis-band > i { color: var(--akzent); }
+      .hinweis-band b { font-weight: 600; }
+      .hinweis-band .knopfzeile { margin-left: auto; flex: none; }
+      .zeile.nicht-waehlbar { opacity: .55; cursor: default; }
+      .umzug-liste { margin: 0 0 14px; border-radius: 10px; background: var(--flaeche); overflow: hidden; }
+      .umzug-liste .u-zeile { display: grid; grid-template-columns: 22px minmax(0, 1fr) 24px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+                              padding: 9px 14px; font-size: var(--klein); border-bottom: 1px solid var(--rand); }
+      .umzug-liste .u-zeile:last-child { border-bottom: 0; }
+      .umzug-liste .u-zeile code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .umzug-liste .u-zeile .fa-arrow-right { color: var(--text-3); }
+      .umzug-liste .u-kopf { font-weight: 600; color: var(--text-2); background: var(--flaeche-2, var(--hg)); }
+    </style>
+  </head>
+  <body>
+    <!-- Kopf, Navigation und Aufträge kommen aus der Schale des Appkerns (freigegeben). Hier nur, was neu ist. -->
+
+    <p class="zustand-titel" style="margin-top:0">6a. Quelle wählen: die eigenen Ordner der App, der Altbestand und neu alle deine Dateien in der Kellerwolke (statt "Ordner freigeben": kein Dauerrecht, jede Datei einzeln)</p>
+    <div class="fenster" style="height:560px">
+      <header class="kopf" data-erzeugen></header>
+      <div></div>
+      <div class="geruest">
+        <nav class="nav" data-aktiv="aufnahmen"></nav>
+        <section class="seite">
+          <div class="seiten-kopf">
+            <h1>Aufnahmen</h1>
+            <span class="segment"><span class="aktiv">Alle 9</span><span>Ohne Transkript 4</span><span>Transkribiert</span></span>
+            <span class="suche" style="min-width:200px"><i class="fa-solid fa-magnifying-glass"></i>Name suchen</span>
+            <span class="knopfzeile" style="margin-left:auto">
+              <button class="knopf"><i class="fa-solid fa-circle-dot" style="color:var(--gefahr)"></i> Aufnehmen</button>
+              <button class="knopf primaer"><i class="fa-solid fa-upload"></i> Hochladen</button>
+            </span>
+          </div>
+          <div class="rollfeld">
+            <div class="ordnerzeile">Ordner
+              <span class="auswahl">
+                <button class="auswahl-knopf" aria-expanded="true"><i class="fa-solid fa-folder"></i><span class="auswahl-text">Apps/Transkription/Aufnahmen</span><i class="fa-solid fa-chevron-down auswahl-pfeil"></i></button>
+                <span class="auswahl-liste" role="listbox" style="min-width:420px">
+                  <button class="aktiv">Apps/Transkription/Aufnahmen<span class="auswahl-hinweis">Aufnahmen der App, Transkripte daneben</span></button>
+                  <button>Apps/Transkription/Aufnahmen/Besprechungen</button>
+                  <button>Altbestand der alten App<span class="auswahl-hinweis">nur lesen, übernehmen von Hand</span></button>
+                  <button>Alle deine Dateien in der Kellerwolke<span class="auswahl-hinweis">jede Datei einzeln, nur für den Auftrag</span></button>
+                </span>
+              </span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <p class="zustand-titel">6b. Alle deine Dateien: blättern wie in der Kellerwolke, wählbar sind Ton und Video; das Transkript kommt neben die Datei, die App liest sie nur, solange der Auftrag läuft</p>
+    <div class="fenster">
+      <header class="kopf" data-erzeugen></header>
+      <div></div>
+      <div class="geruest">
+        <nav class="nav" data-aktiv="aufnahmen"></nav>
+        <section class="seite">
+          <div class="seiten-kopf">
+            <h1>Aufnahmen</h1>
+            <span class="suche" style="min-width:200px"><i class="fa-solid fa-magnifying-glass"></i>Name suchen</span>
+          </div>
+          <div class="rollfeld">
+            <div class="ordnerzeile">Ordner
+              <span class="auswahl"><button class="auswahl-knopf"><i class="fa-solid fa-cloud"></i><span class="auswahl-text">Alle deine Dateien in der Kellerwolke</span><i class="fa-solid fa-chevron-down auswahl-pfeil"></i></button></span>
+              <span class="chip"><i class="fa-solid fa-folder-open"></i>Besprechungen</span>
+              <button class="knopf still"><i class="fa-solid fa-arrow-up"></i> Hoch</button>
+            </div>
+            <div class="hinweis-band"><i class="fa-solid fa-shield-halved"></i>
+              <span>Hier siehst du nur Namen. Lesen darf die App eine Datei erst, wenn du sie zum Transkribieren wählst, und nur bis der Auftrag fertig ist. Das Transkript liegt dann neben der Datei.</span></div>
+            <div class="optionen">
+              <span class="titel"><i class="fa-solid fa-closed-captioning"></i> 2 gewählt</span>
+              <label>Sprache <span class="ordnerwahl">Deutsch <i class="fa-solid fa-chevron-down"></i></span></label>
+              <label>Sprecher <span class="ordnerwahl">Ohne Sprecher <i class="fa-solid fa-chevron-down"></i></span></label>
+              <span class="knopfzeile" style="margin-left:auto">
+                <button class="knopf still">Auswahl aufheben</button>
+                <button class="knopf primaer"><i class="fa-solid fa-play"></i> Transkribieren</button>
+              </span>
+            </div>
+            <div class="zeile ordner-zeile">
+              <span class="art"><i class="fa-solid fa-folder"></i></span>
+              <div style="min-width:0"><div class="name">Archiv</div><div class="meta">Ordner · 3 Einträge</div></div>
+              <span></span><i class="fa-solid fa-chevron-right" style="color:var(--text-3); padding-right:10px"></i>
+            </div>
+            <div class="zeile gewaehlt">
+              <span class="art"><i class="fa-solid fa-file-audio"></i></span>
+              <div style="min-width:0"><div class="name">Elternabend Klasse 7b.m4a</div><div class="meta">M4A · 23,4 MB · gestern 19:42</div></div>
+              <span class="stand-pille offen">ohne Transkript</span><span></span>
+            </div>
+            <div class="zeile gewaehlt">
+              <span class="art"><i class="fa-solid fa-file-audio"></i></span>
+              <div style="min-width:0"><div class="name">Interview Schulleitung.wav</div><div class="meta">WAV · 118 MB · 14.10.2026</div></div>
+              <span class="stand-pille offen">ohne Transkript</span><span></span>
+            </div>
+            <div class="zeile">
+              <span class="art"><i class="fa-solid fa-file-audio"></i></span>
+              <div style="min-width:0"><div class="name">Runde 2026-10-12.wav</div><div class="meta">WAV · 54,2 MB · 12.10.2026 · Transkript und Untertitel daneben</div></div>
+              <span class="stand-pille fertig">transkribiert</span><button class="knopf still" title="In der App öffnen"><i class="fa-solid fa-up-right-from-square"></i> Öffnen</button>
+            </div>
+            <div class="zeile">
+              <span class="art"><i class="fa-solid fa-file-video"></i></span>
+              <div style="min-width:0"><div class="name">Vortrag Stadtrat.mp4</div><div class="meta">MP4 · 1,2 GB · 09.10.2026</div></div>
+              <span class="stand-pille laeuft"><i class="fa-solid fa-circle-notch fa-spin"></i> Hören 40 %</span><span></span>
+            </div>
+            <div class="zeile nicht-waehlbar" title="Nur Ton und Video lassen sich transkribieren">
+              <span class="art"><i class="fa-solid fa-file-lines"></i></span>
+              <div style="min-width:0"><div class="name">Tagesordnung.md</div><div class="meta">kein Ton · 2 KB</div></div>
+              <span></span><span></span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <p class="zustand-titel">6c. Aus der Kellerwolke geöffnet (Dateimenü "In Transkription öffnen" oder Öffnen in 6b): dieselbe Ansicht wie sonst, oben der Hinweis, woher die Datei kommt und wie lange die App sie bearbeiten darf; Versionen bleiben in der Kellerwolke</p>
+    <div class="fenster">
+      <header class="kopf" data-erzeugen></header>
+      <div></div>
+      <div class="geruest mit-leiste">
+        <nav class="nav" data-aktiv="aufnahmen"></nav>
+        <section class="seite">
+          <div class="seiten-kopf">
+            <button class="knopf still" style="padding:0 6px"><i class="fa-solid fa-chevron-left"></i> Kellerwolke</button>
+            <h1 class="titel-lang">Runde 2026-10-12</h1>
+            <span class="suche" style="min-width:180px"><i class="fa-solid fa-magnifying-glass"></i>Im Text suchen</span>
+            <button class="knopf"><i class="fa-solid fa-pen"></i> Bearbeiten</button>
+          </div>
+          <div style="padding:0 22px"><div class="hinweis-band"><i class="fa-solid fa-cloud"></i>
+            <span><b>Aus der Kellerwolke:</b> Meine Dateien / Besprechungen / Runde 2026-10-12.wav. Die App darf nur diese Datei und ihre Begleiter bearbeiten, bis heute 23:40; danach wieder aus der Kellerwolke öffnen.</span>
+            <span class="knopfzeile"><button class="knopf still"><i class="fa-solid fa-folder-open"></i> In der Kellerwolke zeigen</button></span></div></div>
+          <div class="spieler">
+            <button class="gross" title="Abspielen (Leertaste)"><i class="fa-solid fa-play"></i></button>
+            <span class="knopfreihe"><button class="rund" title="5 s zurück"><i class="fa-solid fa-rotate-left"></i></button><button class="rund" title="5 s vor"><i class="fa-solid fa-rotate-right"></i></button></span>
+            <div class="welle" data-kopf="0.2" data-saeulen="110" data-spur="" data-marker=""></div>
+            <span class="zeitangabe">02:41 / 13:28</span>
+            <button class="knopf" title="Tempo"><i class="fa-solid fa-gauge"></i> 100 %</button>
+          </div>
+          <div class="rollfeld" style="padding-top:14px">
+            <div class="text-flaeche">
+              <div class="beitrag"><span class="zeit">02:31</span><span class="sprecher"></span><div class="text">Dann gehen wir die Punkte der Tagesordnung der Reihe nach durch, zuerst die Termine für das zweite Halbjahr.</div></div>
+              <div class="beitrag jetzt"><span class="zeit">02:41</span><span class="sprecher"></span>
+                <div class="text"><span class="wort gehoert">Der</span> <span class="wort gehoert">Elternabend</span> <span class="wort jetzt">liegt</span> <span class="wort">jetzt</span> <span class="wort">auf</span> <span class="wort">dem</span> <span class="wort">zwölften</span> <span class="wort">November,</span> <span class="wort">neunzehn</span> <span class="wort">Uhr.</span></div></div>
+              <div class="beitrag"><span class="zeit">02:55</span><span class="sprecher"></span><div class="text">Die Einladungen gehen bis Ende der Woche raus.</div></div>
+            </div>
+          </div>
+        </section>
+        <aside class="leiste">
+          <div class="rollfeld" style="padding:0">
+            <div class="gruppe">
+              <h3>Sprecher</h3>
+              <p style="margin:0 0 8px; font-size:var(--klein); color:var(--text-3)">Ohne Sprecher transkribiert.</p>
+              <div class="knopfreihe"><button class="knopf klein still"><i class="fa-solid fa-hand-pointer"></i> Von Hand zuordnen</button><button class="knopf klein still"><i class="fa-solid fa-users"></i> Erkennen</button></div>
+            </div>
+            <div class="gruppe">
+              <h3>Export</h3>
+              <div class="knopfreihe"><button class="knopf klein">Text</button><button class="knopf klein">Untertitel SRT</button><button class="knopf klein">DOCX</button></div>
+              <label style="display:flex; align-items:center; gap:10px; margin-top:10px; font-size:var(--klein); color:var(--text-2)"><button class="schalter an"></button>zusätzlich neben die Aufnahme legen (als Begleiter)</label>
+            </div>
+            <div class="gruppe" style="border-bottom:0">
+              <h3>Versionen</h3>
+              <div class="liste-klein">
+                <div><span class="zeit">17.10.</span><span><b>2</b> · 22:41 · Sprecher von Hand zugeordnet</span></div>
+                <div><span class="zeit">17.10.</span><span><b>1</b> · erzeugt von klangwerk-hoeren</span></div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <p class="zustand-titel">6d. Eine Ablage: einmal zusammenführen, mit Vorschau; Transkripte kommen neben ihre Aufnahme, ohne Aufnahme in den gleichen Unterordner; nichts wird gelöscht, der leere Ordner Transkripte geht in den Papierkorb</p>
+    <div class="fenster">
+      <header class="kopf" data-erzeugen></header>
+      <div></div>
+      <div class="geruest">
+        <nav class="nav" data-aktiv="aufnahmen"></nav>
+        <section class="seite">
+          <div class="seiten-kopf">
+            <h1>Aufnahmen</h1>
+            <span class="segment"><span class="aktiv">Alle 9</span><span>Ohne Transkript 4</span><span>Transkribiert</span></span>
+            <span class="suche" style="min-width:200px"><i class="fa-solid fa-magnifying-glass"></i>Name suchen</span>
+            <span class="knopfzeile" style="margin-left:auto">
+              <button class="knopf"><i class="fa-solid fa-circle-dot" style="color:var(--gefahr)"></i> Aufnehmen</button>
+              <button class="knopf primaer"><i class="fa-solid fa-upload"></i> Hochladen</button>
+            </span>
+          </div>
+          <div class="rollfeld">
+            <div class="hinweis-band"><i class="fa-solid fa-code-merge"></i>
+              <span><b>Eine Ablage:</b> Transkripte liegen künftig neben ihrer Aufnahme (wie in der Kellerwolke). 6 ziehen um, 1 hat keine Aufnahme mehr. Nichts wird gelöscht.</span>
+              <span class="knopfzeile"><button class="knopf still">Vorschau ausblenden</button><button class="knopf primaer"><i class="fa-solid fa-code-merge"></i> Zusammenführen</button></span></div>
+            <div class="umzug-liste">
+              <div class="u-zeile u-kopf"><span></span><span>Jetzt</span><span></span><span>Danach</span><span></span></div>
+              <div class="u-zeile"><i class="fa-solid fa-closed-captioning"></i><code>Transkripte/Besprechungen/ReKo 2026-06-12.transkript.json</code><i class="fa-solid fa-arrow-right"></i><code>Aufnahmen/Besprechungen/ReKo 2026-06-12.transkript.json</code><span class="stand-pille fertig">neben die Aufnahme</span></div>
+              <div class="u-zeile"><i class="fa-solid fa-closed-captioning"></i><code>Transkripte/Sprachnotiz 2026-10-17 18-03.transkript.json</code><i class="fa-solid fa-arrow-right"></i><code>Aufnahmen/Sprachnotiz 2026-10-17 18-03.transkript.json</code><span class="stand-pille fertig">neben die Aufnahme</span></div>
+              <div class="u-zeile"><i class="fa-solid fa-closed-captioning"></i><code>Transkripte/Gespräch Hausverwaltung (2).transkript.json</code><i class="fa-solid fa-arrow-right"></i><code>Aufnahmen/Gespräch Hausverwaltung (2).transkript.json</code><span class="stand-pille warn" title="Zu dieser Aufnahme gibt es schon ein neueres Transkript; das ältere liegt als eigene Datei daneben">zweites Transkript</span></div>
+              <div class="u-zeile"><i class="fa-solid fa-closed-captioning"></i><code>Transkripte/Testlauf alt.transkript.json</code><i class="fa-solid fa-arrow-right"></i><code>Aufnahmen/Testlauf alt.transkript.json</code><span class="stand-pille offen" title="Die Aufnahme liegt im Papierkorb oder fehlt">ohne Aufnahme</span></div>
+              <div class="u-zeile"><i class="fa-solid fa-folder"></i><code>Transkripte</code><i class="fa-solid fa-arrow-right"></i><code>Papierkorb (leer)</code><span></span></div>
+            </div>
+            <div class="zeile">
+              <span class="art"><i class="fa-solid fa-microphone"></i></span>
+              <div style="min-width:0"><div class="name">Sprachnotiz 2026-10-17 18-03.webm</div><div class="meta">00:13 · aufgenommen · 214 KB · heute 18:03</div></div>
+              <span class="stand-pille fertig">transkribiert</span><button class="knopf still"><i class="fa-solid fa-play"></i></button>
+            </div>
+            <div class="zeile">
+              <span class="art"><i class="fa-solid fa-file-audio"></i></span>
+              <div style="min-width:0"><div class="name">Gespräch Hausverwaltung.mp3</div><div class="meta">02:50 · MP3 · 499 KB · heute 09:38</div></div>
+              <span class="stand-pille fertig">transkribiert</span><button class="knopf still"><i class="fa-solid fa-play"></i></button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <p class="zustand-titel">6e. Telefon: "Aus der Kellerwolke" (Knopf unter Aufnehmen, schon im freigegebenen Entwurf) blättert durch alle deine Dateien; Ton antippen wählt, unten Transkribieren; aus der Kellerwolke geöffnet mit Hinweis über dem Text</p>
+    <div class="buehne">
+      <div class="telefon"><div class="mobil">
+        <div class="t-kopf"><button class="rund" aria-label="Zurück"><i class="fa-solid fa-chevron-left"></i></button><h1 style="font-size:21px">Besprechungen</h1><span class="pille"><i class="fa-solid fa-cloud"></i>Kellerwolke</span></div>
+        <div class="t-inhalt">
+          <div class="hinweis-band"><i class="fa-solid fa-shield-halved"></i><span>Lesen darf die App nur, was du wählst, und nur für den Auftrag.</span></div>
+          <div class="t-gruppe">Ordner</div>
+          <div class="t-liste">
+            <div class="t-zeile"><i class="fa-solid fa-folder"></i><div class="t-text"><div class="t-name">Archiv</div><div class="t-meta">3 Einträge</div></div><i class="fa-solid fa-chevron-right" style="color:var(--text-3)"></i></div>
+          </div>
+          <div class="t-gruppe">Ton und Video</div>
+          <div class="t-liste">
+            <div class="t-zeile gewaehlt"><i class="fa-solid fa-circle-check" style="color:var(--akzent)"></i><div class="t-text"><div class="t-name">Elternabend Klasse 7b.m4a</div><div class="t-meta">23,4 MB · ohne Transkript</div></div></div>
+            <div class="t-zeile"><i class="fa-solid fa-file-audio"></i><div class="t-text"><div class="t-name">Interview Schulleitung.wav</div><div class="t-meta">118 MB · ohne Transkript</div></div></div>
+            <div class="t-zeile"><i class="fa-solid fa-file-audio"></i><div class="t-text"><div class="t-name">Runde 2026-10-12.wav</div><div class="t-meta">54,2 MB · transkribiert, antippen öffnet</div></div><i class="fa-solid fa-chevron-right" style="color:var(--text-3)"></i></div>
+          </div>
+        </div>
+        <div class="t-spieler" style="justify-content:space-between; padding:10px 16px">
+          <b>1 gewählt</b><button class="knopf primaer"><i class="fa-solid fa-play"></i> Transkribieren</button>
+        </div>
+        <nav class="t-reiter">
+          <button class="aktiv"><i class="fa-solid fa-microphone-lines"></i>Aufnahmen</button>
+          <button><i class="fa-solid fa-file-lines"></i>Transkripte</button>
+          <button><i class="fa-solid fa-list-check"></i>Aufträge</button>
+          <button><i class="fa-solid fa-ellipsis"></i>Mehr</button>
+        </nav>
+      </div></div>
+
+      <div class="telefon"><div class="mobil">
+        <div class="t-kopf"><button class="rund" aria-label="Zurück"><i class="fa-solid fa-chevron-left"></i></button><h1 style="font-size:21px">Runde 2026-10-12</h1><button class="rund" aria-label="Mehr"><i class="fa-solid fa-ellipsis-vertical"></i></button></div>
+        <div class="t-inhalt">
+          <div class="hinweis-band"><i class="fa-solid fa-cloud"></i><span><b>Aus der Kellerwolke</b>, nur diese Datei, bearbeitbar bis 23:40</span></div>
+          <div class="t-beitrag"><div class="wer"><span class="zeit">02:31</span></div>
+            <div class="text">Dann gehen wir die Punkte der Tagesordnung der Reihe nach durch, zuerst die Termine.</div></div>
+          <div class="t-beitrag jetzt"><div class="wer"><span class="zeit">02:41</span></div>
+            <div class="text"><span class="wort gehoert">Der</span> <span class="wort gehoert">Elternabend</span> <span class="wort jetzt">liegt</span> <span class="wort">jetzt auf dem zwölften November, neunzehn Uhr.</span></div></div>
+          <div class="t-beitrag"><div class="wer"><span class="zeit">02:55</span></div>
+            <div class="text">Die Einladungen gehen bis Ende der Woche raus.</div></div>
+        </div>
+        <div class="t-spieler">
+          <button class="gross"><i class="fa-solid fa-play"></i></button>
+          <div class="welle" data-kopf="0.2" data-saeulen="60"></div>
+          <span class="zeitangabe">02:41<br />13:28</span>
+        </div>
+        <nav class="t-reiter">
+          <button class="aktiv"><i class="fa-solid fa-microphone-lines"></i>Aufnahmen</button>
+          <button><i class="fa-solid fa-file-lines"></i>Transkripte</button>
+          <button><i class="fa-solid fa-list-check"></i>Aufträge</button>
+          <button><i class="fa-solid fa-ellipsis"></i>Mehr</button>
+        </nav>
+      </div></div>
+    </div>
+
+    <script src="gemeinsam.js"></script>
+  </body>
+</html>
