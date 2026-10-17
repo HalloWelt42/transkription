@@ -244,3 +244,15 @@ kbd.taste { font-family: ui-monospace, monospace; font-size: var(--marke); color
 .sprecher-knopf:disabled:hover { border-color: var(--rand); }
 .sprecher-zeile .aktionen { display: flex; gap: 2px; }
 .sprecher-zeile .aktionen .rund { width: 30px; height: 30px; }
+
+/* Rückfrage vor dem Löschen, im Ablauf statt als Fenster */
+.rueckfrage { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 14px; margin: 4px 0 10px;
+  background: var(--flaeche-2); border-radius: var(--r2); box-shadow: 0 0 0 1px var(--rand); font-size: var(--klein); }
+.rueckfrage .frage { font-weight: 600; color: var(--text); }
+.rueckfrage .aktionen { display: flex; gap: 8px; margin-left: auto; }
+/* Aufnahme ohne Transkript: an der Stelle des Textes */
+.ohne-text { max-width: 980px; padding: 22px; background: var(--flaeche); border-radius: var(--r3); box-shadow: var(--schatten); }
+.ohne-text h2 { margin: 0 0 6px; font-size: 1.15em; }
+.ohne-text p { margin: 0 0 14px; color: var(--text-2); }
+.vorschau-ziel { flex-basis: 100%; font-size: var(--klein); color: var(--text-2); }
+.vorschau-ziel code { font-family: ui-monospace, monospace; color: var(--text); }

@@ -69,6 +69,140 @@
       </div>
     </div>
 
+    <p class="zustand-titel">1b. Aufnahme ohne Transkript: dieselbe Ansicht wie ein Transkript (Spieler, Wellenform, Marker, Tasten), an der Stelle des Textes die Wahl zum Transkribieren</p>
+    <div class="fenster">
+      <header class="kopf" data-erzeugen></header>
+      <div></div>
+      <div class="geruest mit-leiste">
+        <nav class="nav" data-aktiv="aufnahmen"></nav>
+        <section class="seite">
+          <div class="seiten-kopf">
+            <button class="knopf still" style="padding:0 6px"><i class="fa-solid fa-chevron-left"></i> Aufnahmen</button>
+            <h1 class="titel-lang">Sprachnotiz 2026-10-17 19-30</h1>
+          </div>
+          <div class="spieler">
+            <button class="gross" title="Anhalten (Leertaste)"><i class="fa-solid fa-pause"></i></button>
+            <span class="knopfreihe"><button class="rund" title="5 s zurück"><i class="fa-solid fa-rotate-left"></i></button><button class="rund" title="5 s vor"><i class="fa-solid fa-rotate-right"></i></button></span>
+            <div class="welle" data-kopf="0.34" data-saeulen="110" data-spur="" data-marker="0.21"></div>
+            <span class="zeitangabe">01:05 / 03:12</span>
+            <button class="knopf" title="Tempo"><i class="fa-solid fa-gauge"></i> 100 %</button>
+          </div>
+          <div class="rollfeld" style="padding-top:14px">
+            <div class="ohne-text">
+              <h2>Noch kein Transkript</h2>
+              <p>Abspielen, springen und Marker setzen geht schon. Transkribiert wird erst, wenn du es hier startest.</p>
+              <div class="optionen" style="margin:0">
+                <label>Sprache <span class="ordnerwahl">Deutsch <i class="fa-solid fa-chevron-down"></i></span></label>
+                <label>Sprecher <span class="ordnerwahl">Ohne Sprecher <i class="fa-solid fa-chevron-down"></i></span></label>
+                <span class="knopfzeile" style="margin-left:auto"><button class="knopf primaer"><i class="fa-solid fa-play"></i> Transkribieren</button></span>
+              </div>
+            </div>
+          </div>
+        </section>
+        <aside class="leiste">
+          <div class="rollfeld" style="padding:0">
+            <div class="gruppe">
+              <h3>Marker</h3>
+              <div class="liste-klein"><div><span class="zeit">00:40</span><span><i class="fa-solid fa-flag" style="color:var(--warn)"></i> Idee Einkauf</span></div></div>
+              <button class="knopf klein still" style="margin-top:6px"><i class="fa-solid fa-plus"></i> Marker bei 01:05</button>
+            </div>
+            <div class="gruppe">
+              <h3>Datei</h3>
+              <div class="liste-klein">
+                <div><span class="zeit">Ordner</span><span>Apps/Transkription/Aufnahmen</span></div>
+                <div><span class="zeit">Art</span><span>WEBM · 2,1 MB · heute 19:30</span></div>
+              </div>
+            </div>
+            <div class="gruppe" style="border-bottom:0">
+              <h3>Löschen</h3>
+              <button class="knopf klein still"><i class="fa-solid fa-trash-can"></i> In den Papierkorb</button>
+              <p style="margin:8px 0 0; font-size:var(--klein); color:var(--text-3)">Landet im Papierkorb der Kellerwolke und lässt sich dort zurückholen.</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <p class="zustand-titel">1c. Löschen in der Liste: Papierkorb-Knopf je Zeile, Rückfrage direkt darunter (kein Fenster); bei Aufnahmen mit Transkript wählbar, ob es mitgeht</p>
+    <div class="fenster" style="height:auto">
+      <header class="kopf" data-erzeugen></header>
+      <div></div>
+      <div class="geruest" style="min-height:420px">
+        <nav class="nav" data-aktiv="aufnahmen"></nav>
+        <section class="seite">
+          <div class="seiten-kopf"><h1>Aufnahmen</h1>
+            <span class="segment"><span class="aktiv">Alle 5</span><span>Ohne Transkript 1</span><span>Transkribiert</span></span></div>
+          <div class="rollfeld">
+            <div class="zeile">
+              <span class="art"><i class="fa-solid fa-microphone"></i></span>
+              <div style="min-width:0"><div class="name">Sprachnotiz 2026-10-17 19-30.webm</div><div class="meta">3:12 · WEBM · 2,1 MB · heute 19:30</div></div>
+              <span class="stand offen">ohne Transkript</span>
+              <span class="knopfreihe"><button class="knopf still" title="Öffnen und abspielen"><i class="fa-solid fa-play"></i></button><button class="knopf still" title="In den Papierkorb"><i class="fa-solid fa-trash-can"></i></button></span>
+            </div>
+            <div class="zeile gewaehlt">
+              <span class="art"><i class="fa-solid fa-file-lines"></i></span>
+              <div style="min-width:0"><div class="name">Sprachnotiz 2026-10-17 17-51.webm</div><div class="meta">1:04 · WEBM · 0,8 MB · heute 17:51</div></div>
+              <span class="stand">transkribiert</span>
+              <span class="knopfreihe"><button class="knopf still"><i class="fa-solid fa-play"></i></button><button class="knopf still"><i class="fa-solid fa-trash-can"></i></button></span>
+            </div>
+            <div class="rueckfrage">
+              <span class="frage">Sprachnotiz 2026-10-17 17-51 in den Papierkorb?</span>
+              <label style="display:flex; align-items:center; gap:8px"><button class="schalter an"></button>das Transkript dazu auch</label>
+              <span class="aktionen"><button class="knopf still">Abbrechen</button><button class="knopf gefahr"><i class="fa-solid fa-trash-can"></i> In den Papierkorb</button></span>
+            </div>
+            <div class="zeile">
+              <span class="art"><i class="fa-solid fa-file-lines"></i></span>
+              <div style="min-width:0"><div class="name">Echtprobe voice_20-09-2026_18-51-42.mp3</div><div class="meta">0:54 · MP3 · 1,1 MB · heute 18:39</div></div>
+              <span class="stand">transkribiert</span>
+              <span class="knopfreihe"><button class="knopf still"><i class="fa-solid fa-play"></i></button><button class="knopf still"><i class="fa-solid fa-trash-can"></i></button></span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <p class="zustand-titel">1d. Altbestand der alten App: als Quelle unter Ordner; nur deine eigenen Aufnahmen; übernommen wird nur, was du wählst, mit Zielordner und Vorschau</p>
+    <div class="fenster" style="height:auto">
+      <header class="kopf" data-erzeugen></header>
+      <div></div>
+      <div class="geruest" style="min-height:520px">
+        <nav class="nav" data-aktiv="aufnahmen"></nav>
+        <section class="seite">
+          <div class="seiten-kopf"><h1>Aufnahmen</h1>
+            <span class="suche" style="min-width:200px"><i class="fa-solid fa-magnifying-glass"></i>Name suchen</span></div>
+          <div class="rollfeld">
+            <div class="ordnerzeile">Ordner <span class="ordnerwahl"><i class="fa-solid fa-box-archive"></i>Altbestand der alten App (13)<i class="fa-solid fa-chevron-down"></i></span>
+              <span style="font-size:var(--klein); color:var(--text-3)">txt2voice auf 192.168.178.45, nur lesen</span></div>
+            <div class="optionen">
+              <span class="titel"><i class="fa-solid fa-box-archive"></i> 1 gewählt</span>
+              <label>Zielordner <span class="ordnerwahl">Aufnahmen/Besprechungen <i class="fa-solid fa-chevron-down"></i></span></label>
+              <label>Name <span class="eingabe" style="height:38px; min-width:280px">ReKo 2026-06-12 smart Garantie</span></label>
+              <label>Neu transkribieren <button class="schalter an"></button></label>
+              <label>Sprecher <span class="ordnerwahl">Ohne Sprecher <i class="fa-solid fa-chevron-down"></i></span></label>
+              <span class="knopfzeile" style="margin-left:auto"><button class="knopf still">Auswahl aufheben</button><button class="knopf primaer"><i class="fa-solid fa-file-import"></i> Übernehmen</button></span>
+              <span class="vorschau-ziel">Ziel: <code>Aufnahmen/Besprechungen/ReKo 2026-06-12 smart Garantie.wav</code>, Transkript in <code>Transkripte/Besprechungen</code>; die 4 alten Stände werden die Versionen 1 bis 4, die neue Transkription die Version 5. Die alte App bleibt unverändert.</span>
+            </div>
+            <div class="zeile gewaehlt">
+              <span class="art"><i class="fa-solid fa-file-audio"></i></span>
+              <div style="min-width:0"><div class="name">ReKo 2026 06 12 - smart Garantie.wav</div><div class="meta">1:33:41 · WAV · 360 MB · vom 12.06.2026 · 4 Stände, ohne Wortzeiten</div></div>
+              <span class="stand offen">offen</span><span></span>
+            </div>
+            <div class="zeile">
+              <span class="art"><i class="fa-solid fa-file-audio"></i></span>
+              <div style="min-width:0"><div class="name">ReKO 2026 07 20 - cacheserver.wav</div><div class="meta">1:58:01 · WAV · 453 MB · vom 20.07.2026 · 1 Stand mit Wortzeiten</div></div>
+              <span class="stand offen">offen</span><span></span>
+            </div>
+            <div class="zeile">
+              <span class="art"><i class="fa-solid fa-file-audio"></i></span>
+              <div style="min-width:0"><div class="name">20260429-dasherrschaf-142196.mp3</div><div class="meta">57:52 · MP3 · 47 MB · vom 29.04.2026 · 1 Stand mit Wortzeiten</div></div>
+              <span class="stand">übernommen</span><i class="fa-solid fa-chevron-right" style="color:var(--text-3); padding-right:10px"></i>
+            </div>
+            <p class="leer" style="padding:14px">Nur deine eigenen Tonaufnahmen der alten App; Videos und Ergebnisse der Sprachausgabe gehören nicht hierher.</p>
+          </div>
+        </section>
+      </div>
+    </div>
+
     <p class="zustand-titel">2. Transkripte: Verzeichnis mit Volltextsuche (Treffer mit Zeit, Klick springt in den Ton), Filter nach Sprache und Sprecher, seitenweise</p>
     <div class="fenster">
       <header class="kopf" data-erzeugen></header>
