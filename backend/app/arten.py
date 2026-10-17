@@ -33,7 +33,7 @@ from .ablage.transkripte import zugang
 from .dienste import KeineLeitstelle, Wechsel
 from .einstellungen import Sprache
 from .fassung import FASSUNG
-from .modell.transkript import Aenderung, ErzeugtMit, Quelle, Segment, Transkript
+from .modell.transkript import Aenderung, ErzeugtMit, Marker, Quelle, Segment, Transkript
 from .sprechererkennung import erkennen
 from .teile import Teile
 from .ton import Abschnitt, abschnitte_planen
@@ -158,6 +158,7 @@ def arten(teile: Teile) -> list[Art]:
             await k.fortschritt(0.0, "Vorbereiten", phase="vorbereiten")
             wav, dauer = await ton_holen(k, quelle.id, ordner)
             plan = await abschnitte(k, wav, dauer)
+            wellenform = await teile.ton.wellenform(wav)
 
             fertig: dict[str, dict] = dict(k.zwischenstand.get("hoeren", {}))
             await k.fortschritt(len(fertig) / max(len(plan), 1), "Hören", phase="hoeren")
@@ -198,9 +199,11 @@ def arten(teile: Teile) -> list[Art]:
 
             await k.pruefen()
             await k.fortschritt(None, "Speichern", phase="speichern")
-            t = Transkript(name=name, quelle=Quelle(knoten_id=quelle.id, pfad=quelle.pfad, etag=quelle.etag),
+            marker = [Marker(zeit=m["zeit"], titel=m["titel"]) for m in quelle.felder.get(orte.FELD_MARKER) or []
+                      if isinstance(m, dict) and "zeit" in m and m.get("titel")]
+            t = Transkript(name=name, quelle=Quelle(knoten_id=quelle.id, pfad=quelle.pfad, etag=quelle.etag), marker=marker,
                            sprache=(erkannt if sprache == "auto" and erkannt else sprache), dauer_s=round(dauer, 3),
-                           sprecher=sprecher, segmente=segmente,
+                           sprecher=sprecher, segmente=segmente, wellenform=wellenform,
                            erzeugt_mit=ErzeugtMit(dienst=einst.dienst_hoeren, modell=modell, app=FASSUNG),
                            aenderung=Aenderung(was="erzeugt", wer=e.von))
             knoten = await teile.transkripte.anlegen(t, quelle)
@@ -242,7 +245,8 @@ def arten(teile: Teile) -> list[Art]:
             abdruecke = [x for a in plan for x in gesammelt[str(a.nummer)]]
             segmente, sprecher = await sprecher_bestimmen(k, wav, ordner, t.segmente, abdruecke, e.anzahl, t.name)
             await k.fortschritt(None, "Speichern", phase="speichern")
-            neu = t.model_copy(update={"segmente": segmente, "sprecher": sprecher})
+            neu = t.model_copy(update={"segmente": segmente, "sprecher": sprecher,
+                                       "wellenform": t.wellenform or await teile.ton.wellenform(wav)})
             try:
                 neu, knoten = await teile.transkripte.schreiben(e.transkript_id, neu, knoten.etag,
                                                                 Aenderung(was="Sprecher neu erkannt", wer=e.von))

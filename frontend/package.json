@@ -9,7 +9,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "appkern-oberflaeche": "file:/Users/alpha/Entwicklung/Werkzeuge/Appkern"
+    "appkern-oberflaeche": "github:HalloWelt42/appkern"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",

@@ -1,8 +1,11 @@
 """Transkription: macht aus Ton Text. Backend auf dem Gerüst des Appkerns.
 
     uvicorn app.main:app --port 8631
+
+Daten (SQLite, Zwischendateien) liegen in `daten/`, zum Entwickeln mit `TRANSKRIPTION_DATEN` woanders.
 """
 
+import os
 from pathlib import Path
 
 import httpx
@@ -33,4 +36,4 @@ def app_bauen(daten: Path, transport: httpx.AsyncBaseTransport | None = None) ->
     return app
 
 
-app = app_bauen(WURZEL / "daten")
+app = app_bauen(Path(os.environ.get("TRANSKRIPTION_DATEN") or WURZEL / "daten"))

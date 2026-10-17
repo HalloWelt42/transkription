@@ -34,6 +34,9 @@ async def test_wandeln_dauer_pausen_ausschneiden(mit_pausen: Path, tmp_path: Pat
     assert [a.ende for a in abschnitte] == pytest.approx([3.5, 7.5, 11.5, 15.5, 20.0], abs=0.1)
     stueck = await ton.ausschneiden(wav, abschnitte[1], tmp_path / "stueck.wav")
     assert await ton.dauer(stueck) == pytest.approx(abschnitte[1].ende - abschnitte[1].start, abs=0.05)
+    welle = await ton.wellenform(wav, punkte=40)
+    assert len(welle) == 40 and max(welle) == 100 and min(welle) < 20     # Pausen sind leise
+    assert sum(w > 80 for w in welle) >= 25                                 # der Ton (440 Hz) bleibt erhalten
     flac = await ton.flac(wav, tmp_path / "ganz.flac")
     assert flac.stat().st_size < wav.stat().st_size
 

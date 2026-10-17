@@ -110,6 +110,26 @@ class Ton:
                           "-c:a", "pcm_s16le", str(ziel))
         return ziel
 
+    async def wellenform(self, datei: Path, punkte: int = 800) -> list[int]:
+        """Lautstärke in `punkte` Abschnitten (0 bis 100, Spitzenwert je Abschnitt) für die Anzeige im Spieler. Aus
+        2000 Werten je Sekunde: genug für die Grundtöne der Stimme (weniger würde sie beim Umrechnen wegfiltern) und
+        klein genug für Stunden (zwei Stunden etwa 30 MB). Ausreißer zählen nicht: 100 ist das 99. Perzentil."""
+        import numpy as np
+
+        prozess = await asyncio.create_subprocess_exec(
+            programm("ffmpeg", self.ordner), "-nostdin", "-hide_banner", "-loglevel", "error", "-i", str(datei),
+            "-ac", "1", "-ar", "2000", "-f", "s16le", "-", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        roh, fehler = await prozess.communicate()
+        if prozess.returncode != 0:
+            raise TonFehler(f"ffmpeg gescheitert: {fehler.decode('utf-8', 'replace').strip()[-200:]}")
+        werte = np.abs(np.frombuffer(roh, dtype="<i2").astype(np.float64))
+        if werte.size == 0:
+            return []
+        teile = np.array_split(werte, min(punkte, werte.size))
+        spitzen = np.array([t.max() for t in teile])
+        hoch = float(np.percentile(spitzen, 99)) or float(spitzen.max()) or 1.0
+        return [int(min(100, round(100 * w / hoch))) for w in spitzen]
+
     async def flac(self, datei: Path, ziel: Path) -> Path:
         """Verlustfrei kleiner (etwa die Hälfte) für Dienste, die die ganze Aufnahme brauchen (Sprechertrennung)."""
         await _ausfuehren(programm("ffmpeg", self.ordner), "-nostdin", "-hide_banner", "-loglevel", "error", "-y",

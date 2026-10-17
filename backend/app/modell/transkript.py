@@ -102,6 +102,7 @@ class Transkript(_Teil):
     marker: list[Marker] = Field(default_factory=list)
     erzeugt_mit: ErzeugtMit | None = None
     aenderung: Aenderung | None = None
+    wellenform: list[int] | None = Field(None, description="Lautstärke 0 bis 100 in gleichen Abschnitten (Spieler)")
 
     @model_validator(mode="after")
     def _stimmig(self) -> Transkript:

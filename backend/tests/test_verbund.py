@@ -4,57 +4,29 @@ Sprechertrennung fehlt, also Gruppieren), lesen, suchen, ändern mit Stand, Vers
 Auswertung, Ton mit Bereichen, Zugriff einer anderen App. Am Ende liegt alles Angelegte im Papierkorb."""
 
 import asyncio
-import json
-import re
 import secrets
+import sys
 from pathlib import Path
 
 import httpx
-import numpy as np
 import pytest
 
 from app.main import app_bauen
 from app.ton import programm
 from tests.hilfen import HAT_KELLERWOLKE, W
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+from leitstelle_schein import antworten  # noqa: E402
+
 pytestmark = pytest.mark.skipif(not (HAT_KELLERWOLKE and W.get("KELLERWOLKE_KENNUNG")),
                                 reason="keine Test-Kellerwolke eingerichtet (backend/.env.test)")
-RNG = np.random.default_rng(3)
-STIMMEN = [list(RNG.normal(size=192)), list(RNG.normal(size=192))]
-
-
-def leitstelle(request: httpx.Request) -> httpx.Response:
-    """Klangwerk und Sprachmodell zum Schein: je Abschnitt zwei Sätze, Stimmen im Wechsel, keine Sprechertrennung."""
-    pfad = request.url.path
-    if pfad == "/v1/models":
-        return httpx.Response(200, json={"data": [{"id": "klein"}]})
-    if pfad.endswith("/stt"):
-        woerter = lambda text, a: [{"word": f" {w}", "start": a + i * 0.4, "end": a + i * 0.4 + 0.3} for i, w in enumerate(text.split())]  # noqa: E731
-        return httpx.Response(200, json={"language": "de", "model": "Schein", "segments": [
-            {"start": 0.0, "end": 2.6, "text": " Hallo Welt wie geht es", "words": woerter("Hallo Welt wie geht es", 0.0)},
-            {"start": 4.0, "end": 6.6, "text": " Zweiter Satz mit Nebenkosten", "words": woerter("Zweiter Satz mit Nebenkosten", 4.0)}]})
-    if pfad.endswith("/speaker/embed"):
-        segmente = json.loads(re.search(rb'name="segments"\r\n\r\n(.*?)\r\n', request.content, re.S).group(1))
-        return httpx.Response(200, json={"embeddings": [STIMMEN[i % 2] for i in range(len(segmente))], "dim": 192})
-    if pfad.endswith("/speaker/diarize"):
-        return httpx.Response(503, json={"detail": "Modell ist nicht bereit (ohne_zugang)"})
-    if pfad == "/v1/chat/completions":
-        nachrichten = json.loads(request.content)["messages"]
-        if "korrigierst" in nachrichten[0]["content"]:
-            zeilen = re.findall(r"^\[(\d+)\] (.*)$", nachrichten[1]["content"], re.M)
-            text = "\n".join(f"[{n}] {t.replace('Hallo Welt', 'Hallo, Welt,')}" for n, t in zeilen)
-        else:
-            text = "## Zusammenfassung\n\nZwei Sätze zum Schein."
-        return httpx.Response(200, json={"model": "klein", "choices": [{"message": {"content": text}, "finish_reason": "stop"}]})
-    return httpx.Response(404, json={"detail": f"unbekannt: {pfad}"})
-
 
 class Weiche(httpx.AsyncBaseTransport):
     """Leitstelle zum Schein, alles andere echt."""
 
     def __init__(self):
         self.echt = httpx.AsyncHTTPTransport()
-        self.schein = httpx.MockTransport(leitstelle)
+        self.schein = httpx.MockTransport(antworten)
 
     async def handle_async_request(self, request):
         ziel = self.schein if request.url.host == "ls.test" else self.echt
@@ -106,6 +78,9 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 liste = (await c.get("/api/v1/aufnahmen", headers=h, params={"filter": "ohne", "suche": name})).json()
                 assert [a["id"] for a in liste["eintraege"]] == [aufnahme["id"]] and liste["eintraege"][0]["stand"] == "ohne"
 
+                r = await c.put(f"/api/v1/aufnahmen/{aufnahme['id']}/marker", headers=h, json=[{"zeit": 4.5, "titel": "Wichtig"}])
+                assert r.status_code == 200, r.text
+
                 # Transkribieren: zwei Abschnitte, ohne Sprechertrennung gruppiert
                 a = (await c.post("/api/v1/transkribieren", headers=h, json={"quelle_id": aufnahme["id"], "name": name})).json()
                 a = await warten(c, h, a["id"])
@@ -117,6 +92,8 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert len(segmente) == 4 and segmente[2]["start"] > 100 and segmente[0]["woerter"][0]["wort"] == "Hallo"
                 assert [s["sprecher"] for s in segmente] == ["s1", "s2", "s1", "s2"]
                 assert all(s.get("abdruck") is None for s in t["transkript"]["sprecher"])
+                assert len(t["transkript"]["wellenform"]) == 800
+                assert [(m["zeit"], m["titel"]) for m in t["transkript"]["marker"]] == [(4.5, "Wichtig")]
                 eintrag = (await c.get("/api/v1/aufnahmen", headers=h, params={"suche": name})).json()["eintraege"][0]
                 assert eintrag["stand"] == "transkribiert" and eintrag["transkripte"][0]["id"] == tid
                 protokoll = (await c.get("/api/v1/protokoll", headers=h, params={"ereignis": "sprecher"})).json()
@@ -136,7 +113,9 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert [w["wort"] for w in neu["transkript"]["segmente"][0]["woerter"]][:3] == ["Hallo", "liebe", "Welt"]
                 assert (await c.patch(f"/api/v1/transkripte/{tid}", headers=h, json={"stand": stand, "name": "x"})).status_code == 409
                 versionen = (await c.get(f"/api/v1/transkripte/{tid}/versionen", headers=h)).json()
-                assert len(versionen) == 2 and "Sprecher 1 heißt Anna" in versionen[0]["notiz"]["was"]
+                # s1 kann schon über ein vorhandenes Profil Anna heißen; s2 bekommt den Namen hier
+                assert len(versionen) == 2 and "Sprecher 2 heißt Bernd" in versionen[0]["notiz"]["was"]
+                assert [x["name"] for x in neu["transkript"]["sprecher"]] == ["Anna", "Bernd"]
                 assert versionen[1]["notiz"]["was"] == "erzeugt"
 
                 # Zurückholen und wieder vor
@@ -166,13 +145,14 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 a = await warten(c, h, (await c.post(f"/api/v1/transkripte/{tid}/korrigieren", headers=h)).json()["id"])
                 assert a["zustand"] == "fertig", a.get("fehler")
                 vorschlaege = (await c.get(f"/api/v1/transkripte/{tid}/vorschlaege", headers=h)).json()
-                assert [v["neu"] for v in vorschlaege] == ["Hallo, Welt, wie geht es", "Hallo, Welt, wie geht es"]
+                assert [v["neu"] for v in vorschlaege] == ["Hallo, Welt, wie geht es.", "Zweiter Satz mit Nebenkosten."] * 2
                 t = (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()
                 segs = t["transkript"]["segmente"]
                 segs[0]["text"] = vorschlaege[0]["neu"]
                 r = await c.patch(f"/api/v1/transkripte/{tid}", headers=h, json={
                     "stand": t["stand"], "segmente": segs,
-                    "vorschlaege": [{"id": vorschlaege[0]["id"], "zustand": "uebernommen"}, {"id": vorschlaege[1]["id"], "zustand": "verworfen"}]})
+                    "vorschlaege": [{"id": vorschlaege[0]["id"], "zustand": "uebernommen"}]
+                                   + [{"id": v["id"], "zustand": "verworfen"} for v in vorschlaege[1:]]})
                 assert r.status_code == 200 and (await c.get(f"/api/v1/transkripte/{tid}/vorschlaege", headers=h)).json() == []
 
                 # Auswertung als Markdown-Datei daneben

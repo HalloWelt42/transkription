@@ -107,6 +107,6 @@ def erzeugen(t: Transkript, format: Format) -> bytes:
     if format == "docx":
         return als_docx(t)
     if format == "json":   # ohne Stimmabdrücke: die gehören zur Erkennung, nicht zum Inhalt
-        return t.model_dump_json(indent=1, exclude_none=True, exclude={"sprecher": {"__all__": {"abdruck"}}}).encode("utf-8")
+        return t.model_dump_json(indent=1, exclude_none=True, exclude={"wellenform": True, "sprecher": {"__all__": {"abdruck"}}}).encode("utf-8")
     text = {"txt": als_text, "md": als_markdown, "srt": als_srt, "vtt": als_vtt}[format](t)
     return text.encode("utf-8")

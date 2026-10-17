@@ -1,5 +1,6 @@
-/* Eigene Teile der Transkription (Spieler, Wellenform, Segmente, Wörter, Sprecher, Korrektur). Farben und Größen aus
-   der Schale; Sprecherfarben fest je Kennung. */
+/* Eigene Teile der Transkription (Spieler, Wellenform, Beiträge, Wörter, Sprecher, Korrektur). Farben und Größen aus
+   der Schale; Sprecherfarben fest je Kennung. Einzige Quelle: die Oberfläche bindet sie ein, die Entwürfe in mockups/
+   ebenso. */
 
 :root {
   --s1: #12938a; --s2: #c2410c; --s3: #7c3aed; --s4: #2f7ce0; --s5: #b45309; --s6: #db2777;
@@ -119,3 +120,58 @@
 .mobil .t-treffer .zeit { font-family: ui-monospace, monospace; color: var(--akzent); margin-right: 6px; }
 .mobil .t-treffer mark { background: var(--warn-weich); color: var(--text); border-radius: 3px; }
 .seiten-kopf h1.titel-lang { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ----- Umsetzung: Auswahl, Rekorder, Uploads ----- */
+.auswahl { position: relative; display: inline-flex; }
+.auswahl .ordnerwahl { cursor: pointer; font: inherit; font-size: var(--klein); color: var(--text); }
+.auswahl-text { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auswahl-liste { position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; min-width: 100%; max-height: 320px; overflow-y: auto;
+                 background: var(--flaeche); border-radius: var(--r2); box-shadow: var(--schatten), 0 8px 28px rgba(20, 30, 45, .18);
+                 display: flex; flex-direction: column; padding: 4px; }
+.auswahl-liste button { border: 0; background: transparent; font: inherit; font-size: var(--klein); text-align: left; padding: 8px 12px;
+                        border-radius: var(--r1); cursor: pointer; color: var(--text); white-space: nowrap; }
+.auswahl-liste button:hover, .auswahl-liste button.aktiv { background: var(--akzent-weich); color: var(--akzent); }
+.rekorder .t-uhr, .rekorder .t-pegel, .rekorder .t-steuer { font-family: inherit; }
+.rekorder .t-uhr { font-family: ui-monospace, monospace; font-size: 54px; font-weight: 600; text-align: center; margin: 18px 0 6px; }
+.rekorder-stand { text-align: center; margin: 0 0 6px; color: var(--text-3); font-size: var(--klein); }
+.rekorder .t-pegel { display: flex; align-items: center; justify-content: center; gap: 3px; height: 90px; }
+.rekorder .t-pegel span { width: 5px; border-radius: 3px; background: var(--gefahr); transition: height .1s; }
+.rekorder .t-steuer { display: flex; justify-content: center; align-items: center; gap: 28px; margin: 20px 0 16px; }
+.rekorder .t-steuer .rund { width: 64px; height: 64px; border-radius: 32px; font-size: 22px; }
+.rekorder .t-steuer .stopp { width: 84px; height: 84px; border-radius: 42px; border: 0; background: var(--gefahr); color: #fff; font-size: 28px; cursor: pointer; }
+.rekorder .t-liste { background: var(--flaeche); border-radius: 14px; overflow: hidden; max-width: 520px; margin: 0 auto; }
+.rekorder .t-zeile { display: flex; align-items: center; gap: 14px; min-height: 60px; padding: 10px 14px; }
+.rekorder .t-zeile + .t-zeile { border-top: 1px solid var(--rand); }
+.rekorder .t-zeile > i { width: 26px; text-align: center; font-size: 20px; color: var(--text-3); }
+.rekorder .t-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rekorder .t-meta { font-size: var(--klein); color: var(--text-3); }
+.rekorder.kompakt { background: var(--flaeche); border-radius: var(--r3); box-shadow: var(--schatten); padding: 6px 16px 16px; margin-bottom: 14px; }
+.rekorder.kompakt .t-uhr { font-size: 40px; margin-top: 8px; }
+.rekorder.kompakt .t-pegel { height: 60px; }
+.rekorder.kompakt .t-liste { background: var(--flaeche-2); }
+.upload { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 14px;
+          background: var(--flaeche); border-radius: var(--r2); margin-bottom: 6px; font-size: var(--klein); }
+.upload .balken { grid-column: 2 / -1; }
+.ablage.ueber { border-color: var(--akzent); background: var(--akzent-weich); color: var(--akzent); }
+.zeile { cursor: pointer; }
+.zeile.ordner-zeile .art { color: var(--akzent); }
+.knopfzeile { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.welle .leinwand { position: absolute; inset: 6px 0 8px 0; width: 100%; height: calc(100% - 14px); cursor: pointer; touch-action: none; }
+.welle .sprecherspur { position: absolute; }
+.welle .fahne { pointer-events: none; }
+.welle .abspielkopf { pointer-events: none; }
+.beitrag .zeit, .t-beitrag .zeit { border: 0; background: transparent; font: inherit; font-family: ui-monospace, monospace;
+                                   font-size: var(--klein); color: var(--text-3); text-align: left; cursor: pointer; padding: 3px 0 0; }
+.t-beitrag .wer .zeit { margin-left: auto; padding: 0; }
+.beitrag { cursor: default; }
+.beitrag.geaendert { box-shadow: inset 3px 0 0 var(--akzent); }
+.wort { cursor: pointer; border-radius: 4px; }
+.wort:hover { background: var(--akzent-weich); }
+.beitrag mark, .t-beitrag mark { background: var(--warn-weich); color: var(--text); border-radius: 3px; }
+.feld-text { width: 100%; font: inherit; color: var(--text); resize: vertical; min-height: 70px; }
+.werkzeuge .eingabe { height: 32px; font-size: var(--klein); }
+.mobil .t-spieler { position: sticky; bottom: -16px; margin: 8px -16px -16px; z-index: 2; }
+/* Transkript am Rechner: Seite und Leiste nebeneinander im Bereich der Schale */
+.geruest-innen { display: grid; grid-template-columns: minmax(0, 1fr) 380px; flex: 1; min-height: 0; }
+.geruest-innen > .seite { min-height: 0; }
+.rund.aktiv { background: var(--akzent-weich); color: var(--akzent); }

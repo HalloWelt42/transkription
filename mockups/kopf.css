@@ -1,9 +1,9 @@
 /* Entwürfe laden die echte Gestaltung der Schale aus dem eingebundenen Appkern (keine Kopie). */
-@import "../frontend/node_modules/appkern-oberflaeche/node_modules/@fontsource/barlow/400.css";
-@import "../frontend/node_modules/appkern-oberflaeche/node_modules/@fontsource/barlow/600.css";
-@import "../frontend/node_modules/appkern-oberflaeche/node_modules/@fortawesome/fontawesome-free/css/all.min.css";
+@import "../frontend/node_modules/@fontsource/barlow/400.css";
+@import "../frontend/node_modules/@fontsource/barlow/600.css";
+@import "../frontend/node_modules/@fortawesome/fontawesome-free/css/all.min.css";
 @import "../frontend/node_modules/appkern-oberflaeche/oberflaeche/stil/schale.css";
-@import "transkription.css";
+@import "../frontend/src/stil/transkription.css";
 
 /* Nur für die Entwurfsseite: Rahmen je Zustand */
 body { padding: 28px; background: #d6dce4; height: auto; }

@@ -26,7 +26,7 @@ Pinnwand und morf-gpt sind ihre Kunden).
 
 | Ort | Inhalt |
 |---|---|
-| `Aufnahmen/` | hochgeladene oder aufgenommene Ton- und Videodateien (weitere Ordner gibt der Nutzer der App frei) |
+| `Aufnahmen/` | hochgeladene oder aufgenommene Ton- und Videodateien (weitere Ordner gibt der Nutzer der App frei); beim Aufnehmen gesetzte Marker hängen als Feld `marker` an der Aufnahme |
 | `Transkripte/<Name>.transkript.json` | das Transkript (Format unten); Herkunftsbezug `transkript_zu` auf die Aufnahme |
 | `Transkripte/<Name> (Auswertung).md` | KI-Auswertung, Herkunft `abgeleitet_von` |
 | `Sprecher/profile.json` | Sprecherprofile: Name, gemittelter Stimmabdruck, Zahl der Proben |
@@ -47,7 +47,9 @@ Pinnwand und morf-gpt sind ihre Kunden).
      "woerter": [{"wort": "Guten", "start": 12.40, "ende": 12.71}]}
   ],
   "marker": [{"zeit": 301.2, "titel": "Kosten", "farbe": "gelb"}],
-  "erzeugt_mit": {"modell": "whisper-large-v3", "app": "0.1.0"}
+  "wellenform": [0, 12, 80, 95],
+  "erzeugt_mit": {"dienst": "klangwerk-hoeren", "modell": "...", "app": "0.2.0"},
+  "aenderung": {"was": "Text in 1 Segment", "wer": "chef", "zeit": "..."}
 }
 ```
 
@@ -72,14 +74,17 @@ Abschnitten; das Bisherige bleibt als Zwischenstand.
 | Aufruf | Zweck |
 |---|---|
 | `GET /aufnahmen?ordner=` | Ton- und Videodateien in den freigegebenen Ordnern, mit Stand (transkribiert, läuft, nein) |
-| `POST /aufnahmen` | hochladen (Strom, große Dateien) nach `Aufnahmen/` |
+| `POST /aufnahmen?name=` | hochladen (Körper ist der Inhalt, gestreamt) nach `Aufnahmen/` |
+| `PUT /aufnahmen/{id}/marker` | Marker einer Aufnahme (kommen beim Transkribieren ins Transkript) |
 | `POST /transkribieren` | `{quelle (Knoten oder Pfad), sprache (de, en, auto), sprecher (an/aus, Anzahl), name}` liefert den Auftrag |
 | `GET /transkripte?suche=&sprache=&sprecher=&seite=` | Verzeichnis, seitenweise; mit `suche` Treffer im Text samt Zeit |
 | `GET /transkripte/{id}` | das Transkript (Datei aus der Kellerwolke) |
 | `PATCH /transkripte/{id}` | Änderungen an Text, Sprechern, Zeiten, Markern; nur mit dem zuletzt gelesenen Stand (sonst 409) |
 | `GET /transkripte/{id}/versionen`, `POST .../versionen/{v}/zurueck` | Versionen aus der Kellerwolke |
-| `GET /transkripte/{id}/export?format=txt\|md\|srt\|vtt\|json\|docx&ablegen=` | Export als Download oder als Datei neben dem Transkript |
-| `GET /transkripte/{id}/ton` | Ton zum Mitlesen (aus der Kellerwolke durchgereicht, mit Bereichen) |
+| `GET /inhalt/transkripte/{id}/export?format=txt\|md\|srt\|vtt\|json\|docx`, `POST /transkripte/{id}/export` | Export als Download oder als Datei neben dem Transkript |
+| `GET /inhalt/transkripte/{id}/ton`, `GET /inhalt/aufnahmen/{id}` | Ton zum Mitlesen und Anhören (aus der Kellerwolke durchgereicht, mit Bereichen; auch mit dem Inhalts-Cookie) |
+| `GET /transkripte/{id}/vorschlaege` | offene Vorschläge der KI-Korrektur; übernommen und verworfen wird beim Speichern (`PATCH`, Feld `vorschlaege`) |
+| `POST /transkripte/{id}/sprecher/{kennung}/profil` | Sprecher einem Profil zuordnen oder ein neues anlegen; der Abdruck schärft das Profil |
 | `POST /transkripte/{id}/sprecher-erkennen`, `/korrigieren`, `/auswerten` | Aufträge |
 | `DELETE /transkripte/{id}` | in den Papierkorb der Kellerwolke (die Aufnahme bleibt) |
 | `GET /sprecher`, `PATCH /sprecher/{id}`, `POST /sprecher/{id}/zusammenfuehren`, `DELETE /sprecher/{id}` | Profile |

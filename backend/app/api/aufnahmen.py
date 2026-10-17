@@ -8,7 +8,7 @@ from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from appkern.anmeldung import Konto
 from appkern.auftraege import Auftrag
@@ -63,6 +63,11 @@ class AufnahmenSeite(BaseModel):
     gesamt: int
     zahlen: dict[str, int]
     eintraege: list[Aufnahme]
+
+
+class MarkerEingabe(BaseModel):
+    zeit: float = Field(ge=0)
+    titel: str = Field(min_length=1, max_length=200)
 
 
 def router(teile: Teile) -> APIRouter:
@@ -140,6 +145,15 @@ def router(teile: Teile) -> APIRouter:
         await g.protokoll.eintragen("aufnahme.hochgeladen", k.name, bezug_art="aufnahme", bezug_name=k.name)
         return Aufnahme(id=k.id, name=k.name, pfad=k.pfad, art=art, groesse=k.groesse, inhaltstyp=k.inhaltstyp,
                         geaendert_am=k.geaendert_am, stand="ohne", transkripte=[])
+
+    @r.put("/aufnahmen/{knoten_id}/marker", response_model=list[MarkerEingabe])
+    async def marker_setzen(knoten_id: UUID, marker: list[MarkerEingabe]) -> list[MarkerEingabe]:
+        """Marker, die beim Aufnehmen gesetzt wurden; sie hängen an der Aufnahme und kommen ins Transkript."""
+        kw = zugang(lambda: g.kellerwolke)
+        if orte.art_der_aufnahme(await kw.knoten(knoten_id)) is None:
+            raise HTTPException(422, "Keine Ton- oder Videodatei")
+        await kw.felder_setzen(knoten_id, {orte.FELD_MARKER: [m.model_dump() for m in sorted(marker, key=lambda m: m.zeit)]})
+        return marker
 
     @r.post("/transkribieren", status_code=201, response_model=Auftrag)
     async def transkribieren(anfrage: TranskribierenAnfrage, konto: Konto = g.pflicht) -> Auftrag:

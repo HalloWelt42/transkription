@@ -1,4 +1,4 @@
--e /Users/alpha/Entwicklung/Werkzeuge/Appkern[web]
+appkern[web] @ https://github.com/HalloWelt42/appkern/archive/refs/heads/main.tar.gz
 uvicorn[standard]>=0.30
 pytest>=8
 pytest-asyncio>=0.24
