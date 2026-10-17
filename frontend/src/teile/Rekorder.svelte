@@ -5,6 +5,7 @@
   import { Auswahl, hole, json } from "appkern-oberflaeche";
   import { tick } from "svelte";
   import * as api from "../lib/api";
+  import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import { aufnahme, beenden, markerSetzen, pause, quelleWechseln, verwerfen } from "../lib/aufnahme.svelte";
   import { hochladen } from "../lib/hochladen.svelte";
   import { marke, SPRACHEN } from "../lib/zeit";
@@ -15,15 +16,13 @@
   let fehler = $state("");
   let sendet = $state(false);
   let sprache = $state("de");
-  let sprecher = $state(true);
+  let sprecher = $state<SprecherWeg>("ohne");
   let anzahl = $state<number | null>(null);
   let textfeld = $state<HTMLElement>();
 
   const geraete = $derived([{ wert: "", titel: "Standard des Systems" }, ...aufnahme.geraete
     .filter((g) => g.id && g.id !== "default").map((g) => ({ wert: g.id, titel: g.name }))]);
   const sprachOptionen = Object.entries(SPRACHEN).map(([wert, titel]) => ({ wert, titel }));
-  const anzahlOptionen = [{ wert: null as number | null, titel: "von selbst" },
-    ...[2, 3, 4, 5, 6].map((n) => ({ wert: n as number | null, titel: `${n} Sprecher` }))];
 
   $effect(() => {
     void aufnahme.mitschrift.length;
@@ -55,7 +54,7 @@
     fehler = "";
     try {
       if (wie === "genau") {
-        await api.transkribieren({ quelle_id: d.id, name: d.name, sprache, sprecher, anzahl: sprecher ? anzahl : null });
+        await api.transkribieren({ quelle_id: d.id, name: d.name, sprache, sprecher, anzahl: sprecher !== "ohne" ? anzahl : null });
         onfertig?.(`${d.name} wird transkribiert; der Stand steht in der Liste und unter Aufträge.`);
       } else if (wie === "live") {
         await api.ausMitschrift({ quelle_id: d.id, name: d.name, sprache: sprache === "auto" ? "de" : sprache, stuecke: d.mitschrift });
@@ -94,9 +93,8 @@
     <div class="entscheidung">
       <div class="entscheidung-optionen">
         <label>Sprache <Auswahl bind:wert={sprache} optionen={sprachOptionen} /></label>
-        <label>Sprecher erkennen <button class="schalter" class:an={sprecher} aria-label="Sprecher erkennen" aria-pressed={sprecher}
-                                         onclick={() => (sprecher = !sprecher)}></button></label>
-        {#if sprecher}<label>Anzahl <Auswahl bind:wert={anzahl} optionen={anzahlOptionen} /></label>{/if}
+        <label>Sprecher <Auswahl bind:wert={sprecher} optionen={SPRECHER_WEGE} /></label>
+        {#if sprecher !== "ohne"}<label>Anzahl <Auswahl bind:wert={anzahl} optionen={ANZAHL_OPTIONEN} /></label>{/if}
       </div>
       <div class="knopfzeile">
         <button class="knopf primaer" disabled={sendet} onclick={() => entscheiden("genau")}><i class="fa-solid fa-closed-captioning"></i> Transkribieren</button>

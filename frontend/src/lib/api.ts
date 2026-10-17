@@ -1,4 +1,5 @@
 // Aufrufe der Schnittstelle der Transkription (über `hole` der Schale: Anmeldung, Fehler, Verbindungsstand).
+import type { ErkennenWeg, SprecherWeg } from "./sprecherwahl";
 import { hole, json, type Auftrag } from "appkern-oberflaeche";
 import type {
   AufnahmenSeite, ExportFormat, Ordner, Profil, TranskriptAntwort, Verzeichnis, Version, Vorlage, Vorschlag,
@@ -22,7 +23,7 @@ export const ordnerListe = () => hole<Ordner[]>("/aufnahmen/ordner");
 export const aufnahmen = (o: { ordner?: string | null; filter?: string; suche?: string; ab?: number; anzahl?: number }) =>
   hole<AufnahmenSeite>(`/aufnahmen${abfrage(o)}`);
 
-export const transkribieren = (e: { quelle_id: string; name?: string; sprache?: string; sprecher?: boolean; anzahl?: number | null }) =>
+export const transkribieren = (e: { quelle_id: string; name?: string; sprache?: string; sprecher?: SprecherWeg; anzahl?: number | null }) =>
   hole<Auftrag>("/transkribieren", { method: "POST", ...json(e) });
 
 // --- Transkripte ------------------------------------------------------------------------------------------------
@@ -69,8 +70,8 @@ export const vorschlaege = (id: string) => hole<Vorschlag[]>(`/transkripte/${id}
 export const profilZuordnen = (id: string, kennung: string, z: { stand: string; profil_id?: string; name?: string }) =>
   hole<TranskriptAntwort>(`/transkripte/${id}/sprecher/${kennung}/profil`, { method: "POST", ...json(z) });
 
-export const sprecherErkennen = (id: string, anzahl: number | null) =>
-  hole<Auftrag>(`/transkripte/${id}/sprecher-erkennen`, { method: "POST", ...json({ anzahl }) });
+export const sprecherErkennen = (id: string, weg: ErkennenWeg, anzahl: number | null) =>
+  hole<Auftrag>(`/transkripte/${id}/sprecher-erkennen`, { method: "POST", ...json({ weg, anzahl }) });
 export const korrigieren = (id: string) => hole<Auftrag>(`/transkripte/${id}/korrigieren`, { method: "POST" });
 export const auswerten = (id: string, vorlage: Vorlage) =>
   hole<Auftrag>(`/transkripte/${id}/auswerten`, { method: "POST", ...json({ vorlage }) });

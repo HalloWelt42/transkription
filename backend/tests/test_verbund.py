@@ -81,8 +81,17 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 r = await c.put(f"/api/v1/aufnahmen/{aufnahme['id']}/marker", headers=h, json=[{"zeit": 4.5, "titel": "Wichtig"}])
                 assert r.status_code == 200, r.text
 
-                # Transkribieren: zwei Abschnitte, ohne Sprechertrennung gruppiert
-                a = (await c.post("/api/v1/transkribieren", headers=h, json={"quelle_id": aufnahme["id"], "name": name})).json()
+                # Ohne Wahl gibt es keine Sprecher (ab Werk ohne, nur auf ausdrücklichen Wunsch)
+                a = (await c.post("/api/v1/transkribieren", headers=h, json={"quelle_id": aufnahme["id"], "name": f"{name} ohne"})).json()
+                a = await warten(c, h, a["id"])
+                assert a["zustand"] == "fertig", a.get("fehler")
+                angelegt.append(a["ergebnis"]["transkript_id"])
+                ohne = (await c.get(f"/api/v1/transkripte/{a['ergebnis']['transkript_id']}", headers=h)).json()["transkript"]
+                assert ohne["sprecher"] == [] and all(s["sprecher"] is None for s in ohne["segmente"])
+
+                # Transkribieren mit gewählter Sprechertrennung: zwei Abschnitte; die Trennung fehlt, also gruppiert
+                a = (await c.post("/api/v1/transkribieren", headers=h, json={"quelle_id": aufnahme["id"], "name": name,
+                                                                              "sprecher": "trennung"})).json()
                 a = await warten(c, h, a["id"])
                 assert a["zustand"] == "fertig", a.get("fehler")
                 tid = a["ergebnis"]["transkript_id"]

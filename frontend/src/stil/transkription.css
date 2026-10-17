@@ -225,3 +225,19 @@
 .entscheidung-optionen { display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: center; }
 .entscheidung-optionen label { display: inline-flex; gap: 8px; align-items: center; font-size: var(--klein); color: var(--text-2); }
 .t-aufnehmen .auswahl { margin-top: 4px; }
+
+/* Sprecher von Hand zuordnen: Leiste mit den Sprechern als Knöpfe (Ziffer als Taste), gewählte Beiträge markiert */
+.zuordnen { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px;
+  margin-bottom: 10px; background: var(--flaeche); border-radius: var(--r2); box-shadow: var(--schatten); }
+.zuordnen .titel { font-weight: 600; margin-right: 4px; }
+.zuordnen .hinweis { font-size: var(--klein); color: var(--text-3); flex-basis: 100%; }
+.sprecher-knopf { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border: 1px solid var(--rand);
+  border-radius: var(--r2); background: var(--flaeche-2); color: var(--text); font: inherit; cursor: pointer; }
+.sprecher-knopf:hover { border-color: var(--akzent); }
+.sprecher-knopf .punkt { width: 10px; height: 10px; border-radius: 5px; }
+kbd.taste { font-family: ui-monospace, monospace; font-size: var(--marke); color: var(--text-2); border: 1px solid var(--rand);
+  border-radius: var(--r1); padding: 0 5px; line-height: 18px; background: var(--flaeche); }
+.beitrag.gewaehlt { background: var(--akzent-weich); box-shadow: inset 3px 0 0 var(--akzent); }
+.beitrag.waehlbar { cursor: pointer; }
+.sprecher-zeile .aktionen { display: flex; gap: 2px; }
+.sprecher-zeile .aktionen .rund { width: 30px; height: 30px; }

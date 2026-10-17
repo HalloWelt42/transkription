@@ -5,6 +5,7 @@
   import { onMount } from "svelte";
   import { Auswahl, beiAuftrag, gehe, geraet, hole, json, sitzung, wann } from "appkern-oberflaeche";
   import * as api from "../lib/api";
+  import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import { alsDatei, aufnahme, geraeteLaden, gespeicherte, quelleWechseln, starten as aufnehmen, verwerfen, type Gespeichert } from "../lib/aufnahme.svelte";
   import { entfernen, hochladen, uploads } from "../lib/hochladen.svelte";
   import type { Aufnahme, AufnahmenSeite, Ordner } from "../lib/typen";
@@ -23,7 +24,7 @@
   let ab = $state(0);
   let gewaehlt = $state<string[]>([]);
   let sprache = $state("de");
-  let sprecher = $state(true);
+  let sprecher = $state<SprecherWeg>("ohne");
   let anzahl = $state<number | null>(null);
   let fehler = $state("");
   let meldung = $state("");
@@ -51,7 +52,7 @@
         ordnerListe = await api.ordnerListe();
         ordner = ordnerListe[0]?.id ?? null;
         sprache = (await api.einstellung<string>("sprache")) ?? "de";
-        sprecher = (await api.einstellung<boolean>("sprecher_erkennen")) ?? true;
+        sprecher = (await api.einstellung<SprecherWeg>("sprecher_weg")) ?? "ohne";
       } catch (f) {
         fehler = (f as Error).message;
       }
@@ -140,7 +141,7 @@
     fehler = "";
     try {
       for (const id of gewaehlt) {
-        await api.transkribieren({ quelle_id: id, sprache, sprecher, anzahl: sprecher ? anzahl : null });
+        await api.transkribieren({ quelle_id: id, sprache, sprecher, anzahl: sprecher !== "ohne" ? anzahl : null });
       }
       meldung = `${gewaehlt.length} ${gewaehlt.length === 1 ? "Aufnahme wird" : "Aufnahmen werden"} transkribiert.`;
       gewaehlt = [];
@@ -182,8 +183,6 @@
 
   const ordnerOptionen = $derived(ordnerListe.map((o) => ({ wert: o.id as string | null, titel: o.pfad })));
   const sprachOptionen = Object.entries(SPRACHEN).map(([wert, titel]) => ({ wert, titel }));
-  const anzahlOptionen = [{ wert: null as number | null, titel: "von selbst" },
-    ...[2, 3, 4, 5, 6].map((n) => ({ wert: n as number | null, titel: `${n} Sprecher` }))];
   const ART = { ton: "fa-file-audio", video: "fa-file-video" };
 
   // "2:14:08 · M4A · 186 MB · heute 08:12" wie im Entwurf; die Dauer, sobald sie bekannt ist
@@ -341,9 +340,8 @@
       <div class="optionen">
         <span class="titel"><i class="fa-solid fa-closed-captioning"></i> {gewaehlt.length} gewählt</span>
         <label>Sprache <Auswahl bind:wert={sprache} optionen={sprachOptionen} /></label>
-        <label>Sprecher erkennen <button class="schalter" class:an={sprecher} aria-label="Sprecher erkennen" aria-pressed={sprecher}
-                                         onclick={() => (sprecher = !sprecher)}></button></label>
-        {#if sprecher}<label>Anzahl <Auswahl bind:wert={anzahl} optionen={anzahlOptionen} /></label>{/if}
+        <label>Sprecher <Auswahl bind:wert={sprecher} optionen={SPRECHER_WEGE} /></label>
+        {#if sprecher !== "ohne"}<label>Anzahl <Auswahl bind:wert={anzahl} optionen={ANZAHL_OPTIONEN} /></label>{/if}
         <span class="knopfzeile" style="margin-left:auto">
           <button class="knopf still" onclick={() => (gewaehlt = [])}>Auswahl aufheben</button>
           <button class="knopf primaer" onclick={transkribierenAlle}><i class="fa-solid fa-play"></i> Transkribieren</button>

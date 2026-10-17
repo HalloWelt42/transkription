@@ -6,6 +6,7 @@
   import { onMount } from "svelte";
   import { Auswahl, beiAuftrag, wann, type Auftrag } from "appkern-oberflaeche";
   import * as api from "../lib/api";
+  import { ANZAHL_OPTIONEN, ERKENNEN_WEGE, type ErkennenWeg } from "../lib/sprecherwahl";
   import type { ExportFormat, Marker, Profil, TranskriptAntwort, Version, Vorlage } from "../lib/typen";
   import { farbe, marke } from "../lib/zeit";
 
@@ -41,6 +42,7 @@
   let namen = $state<Record<string, string>>({});
   let alsProfil = $state(true);
   let anzahl = $state<number | null>(null);
+  let erkennenWeg = $state<ErkennenWeg>("stimmen");
   let markerTitel = $state("");
   let ablegen = $state(false);
   let laufend = $state<Record<string, Auftrag>>({});
@@ -163,7 +165,6 @@
     ["docx", "DOCX"], ["json", "JSON"]];
   const VORLAGEN: [Vorlage, string, string][] = [["protokoll", "Protokoll", "Zusammenfassung, Themen, Entscheidungen, Aufgaben"],
     ["zusammenfassung", "Zusammenfassung", "fünf bis zehn Sätze und Kernaussagen"], ["aufgaben", "Aufgaben", "Was, wer, bis wann"]];
-  const ANZAHL = [{ wert: null as number | null, titel: "von selbst" }, ...[2, 3, 4, 5, 6].map((n) => ({ wert: n as number | null, titel: `${n} Sprecher` }))];
   const lauf = (art: string) => {
     const a = laufend[art];
     if (!a) return "";
@@ -204,8 +205,9 @@
       <div class="knopfreihe"><button class="knopf klein primaer" onclick={umbenennenSpeichern}>Speichern</button>
         <button class="knopf klein still" onclick={() => (modus = "")}>Abbrechen</button></div>
     {:else if modus === "erkennen"}
-      <div class="knopfreihe"><span class="beschriftung">Anzahl</span><Auswahl bind:wert={anzahl} optionen={ANZAHL} klein />
-        <button class="knopf klein primaer" onclick={() => machen(async () => { await api.sprecherErkennen(antwort.id, anzahl); modus = ""; })}>Starten</button>
+      <div class="knopfreihe"><span class="beschriftung">Weg</span><Auswahl bind:wert={erkennenWeg} optionen={ERKENNEN_WEGE} klein /></div>
+      <div class="knopfreihe"><span class="beschriftung">Anzahl</span><Auswahl bind:wert={anzahl} optionen={ANZAHL_OPTIONEN} klein />
+        <button class="knopf klein primaer" onclick={() => machen(async () => { await api.sprecherErkennen(antwort.id, erkennenWeg, anzahl); modus = ""; })}>Starten</button>
         <button class="knopf klein still" onclick={() => (modus = "")}>Abbrechen</button></div>
     {:else}
       <div class="knopfreihe">

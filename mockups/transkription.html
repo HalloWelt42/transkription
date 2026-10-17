@@ -32,8 +32,7 @@
             <div class="optionen">
               <span class="titel"><i class="fa-solid fa-closed-captioning"></i> 2 gewählt</span>
               <label>Sprache <span class="ordnerwahl">Deutsch <i class="fa-solid fa-chevron-down"></i></span></label>
-              <label>Sprecher erkennen <button class="schalter an"></button></label>
-              <label>Anzahl <span class="ordnerwahl">von selbst <i class="fa-solid fa-chevron-down"></i></span></label>
+              <label>Sprecher <span class="ordnerwahl" title="Ohne Sprecher, Stimmen gruppieren oder mit Sprechertrennung; ab Werk ohne">Ohne Sprecher <i class="fa-solid fa-chevron-down"></i></span></label>
               <span style="margin-left:auto; display:flex; gap:8px">
                 <button class="knopf still">Auswahl aufheben</button>
                 <button class="knopf primaer"><i class="fa-solid fa-play"></i> Transkribieren</button>
@@ -197,6 +196,117 @@
                 <div><span class="zeit">15.10.</span><span><b>1</b> erzeugt von klangwerk-hoeren</span></div>
               </div>
               <button class="knopf klein still" style="margin-top:6px"><i class="fa-solid fa-clock-rotate-left"></i> Alle Versionen</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <p class="zustand-titel">3b. Sprecher von Hand zuordnen: Beiträge wählen (Klick, mit Umschalt einen Bereich), dann Sprecher per Knopf oder Ziffertaste; neuer Sprecher, Zusammenführen, Neu erkennen nur auf Wunsch; Speichern legt eine Version an</p>
+    <div class="fenster">
+      <header class="kopf" data-erzeugen></header>
+      <div></div>
+      <div class="geruest mit-leiste">
+        <nav class="nav" data-aktiv="transkripte"></nav>
+        <section class="seite">
+          <div class="seiten-kopf">
+            <button class="knopf still" style="padding:0 6px"><i class="fa-solid fa-chevron-left"></i> Transkripte</button>
+            <h1 class="titel-lang">ReKo 2026-07-20 Cacheserver</h1>
+            <span style="margin-left:auto; display:flex; gap:8px">
+              <button class="knopf still">Abbrechen</button>
+              <button class="knopf primaer"><i class="fa-solid fa-floppy-disk"></i> Speichern (12 Änderungen)</button>
+            </span>
+          </div>
+          <div class="spieler">
+            <button class="gross" title="Abspielen (Leertaste)"><i class="fa-solid fa-play"></i></button>
+            <span class="knopfreihe"><button class="rund" title="5 s zurück"><i class="fa-solid fa-rotate-left"></i></button><button class="rund" title="5 s vor"><i class="fa-solid fa-rotate-right"></i></button></span>
+            <div class="welle" data-kopf="0.22" data-saeulen="110" data-spur="s1:30 s2:10 s1:22 s3:8 s1:30" data-marker=""></div>
+            <span class="zeitangabe">26:03 / 1:58:01</span>
+            <button class="knopf" title="Tempo"><i class="fa-solid fa-gauge"></i> 100 %</button>
+          </div>
+          <div class="rollfeld" style="padding-top:14px">
+            <div class="text-flaeche">
+              <div class="zuordnen">
+                <span class="titel">3 Beiträge gewählt</span>
+                <button class="sprecher-knopf"><span class="punkt" style="background:var(--s1)"></span>Jens Wilde<kbd class="taste">1</kbd></button>
+                <button class="sprecher-knopf"><span class="punkt" style="background:var(--s2)"></span>Marcel Papp<kbd class="taste">2</kbd></button>
+                <button class="sprecher-knopf"><span class="punkt" style="background:var(--s3)"></span>Heiko<kbd class="taste">3</kbd></button>
+                <button class="sprecher-knopf"><span class="punkt" style="background:var(--s4)"></span>Frank<kbd class="taste">4</kbd></button>
+                <button class="sprecher-knopf"><i class="fa-solid fa-user-plus"></i>Neuer Sprecher<kbd class="taste">N</kbd></button>
+                <button class="knopf still" style="margin-left:auto">Auswahl aufheben</button>
+                <span class="hinweis">Klick wählt einen Beitrag, mit Umschalt einen Bereich. Ziffer ordnet zu und springt zum nächsten Beitrag; Leertaste spielt den gewählten ab.</span>
+              </div>
+              <div class="beitrag waehlbar"><span class="zeit">25:41</span><span class="sprecher"><span class="punkt" style="background:var(--s1)"></span>Jens Wilde</span>
+                <div class="text">Der Cache läuft jetzt seit Montag auf dem neuen Server, die Antwortzeiten sind deutlich runter.</div></div>
+              <div class="beitrag waehlbar gewaehlt"><span class="zeit">25:52</span><span class="sprecher"><span class="punkt" style="background:var(--s1)"></span>Jens Wilde</span>
+                <div class="text">Wie sieht es mit dem Aufräumen aus, läuft das schon automatisch?</div></div>
+              <div class="beitrag waehlbar gewaehlt jetzt"><span class="zeit">26:01</span><span class="sprecher"><span class="punkt" style="background:var(--s1)"></span>Jens Wilde</span>
+                <div class="text">Noch nicht, das stelle ich diese Woche um, dann räumt er nachts alles ab, was älter als sieben Tage ist.</div></div>
+              <div class="beitrag waehlbar gewaehlt"><span class="zeit">26:14</span><span class="sprecher"><span class="punkt" style="background:var(--s1)"></span>Jens Wilde</span>
+                <div class="text">Und die Größe begrenzen wir zusätzlich, sonst läuft die Platte voll.</div></div>
+              <div class="beitrag waehlbar geaendert"><span class="zeit">26:22</span><span class="sprecher"><span class="punkt" style="background:var(--s3)"></span>Heiko</span>
+                <div class="text">Gut, dann nehmen wir das ins Protokoll.</div></div>
+            </div>
+          </div>
+        </section>
+        <aside class="leiste">
+          <div class="rollfeld" style="padding:0">
+            <div class="gruppe">
+              <h3>Sprecher</h3>
+              <div class="sprecher-zeile"><span class="sprecher"><span class="punkt" style="background:var(--s1)"></span>Jens Wilde</span>
+                <span class="aktionen"><span class="anteil">61 %</span><button class="rund" title="Umbenennen"><i class="fa-solid fa-pen"></i></button><button class="rund" title="Zusammenführen mit ..."><i class="fa-solid fa-code-merge"></i></button></span></div>
+              <div class="sprecher-zeile"><span class="sprecher"><span class="punkt" style="background:var(--s2)"></span>Marcel Papp</span>
+                <span class="aktionen"><span class="anteil">22 %</span><button class="rund" title="Umbenennen"><i class="fa-solid fa-pen"></i></button><button class="rund" title="Zusammenführen mit ..."><i class="fa-solid fa-code-merge"></i></button></span></div>
+              <div class="sprecher-zeile"><span class="sprecher"><span class="punkt" style="background:var(--s3)"></span>Heiko</span>
+                <span class="aktionen"><span class="anteil">13 %</span><button class="rund" title="Umbenennen"><i class="fa-solid fa-pen"></i></button><button class="rund" title="Zusammenführen mit ..."><i class="fa-solid fa-code-merge"></i></button></span></div>
+              <div class="sprecher-zeile"><span class="sprecher"><span class="punkt" style="background:var(--s4)"></span>Sprecher 4</span>
+                <span class="aktionen"><span class="anteil">4 %</span><button class="rund" title="Umbenennen"><i class="fa-solid fa-pen"></i></button><button class="rund" title="Zusammenführen mit ..."><i class="fa-solid fa-code-merge"></i></button></span>
+                <div class="vorschlag-chip"><i class="fa-solid fa-user-check" style="color:var(--akzent)"></i><span>klingt wie <b>Frank</b> (ähnlich 0,74)</span><button class="knopf klein" style="margin-left:auto">Übernehmen</button></div></div>
+              <div class="knopfreihe" style="margin-top:8px"><button class="knopf klein still"><i class="fa-solid fa-user-plus"></i> Neuer Sprecher</button><button class="knopf klein still"><i class="fa-solid fa-rotate"></i> Neu erkennen</button></div>
+            </div>
+            <div class="gruppe">
+              <h3>Zusammenführen</h3>
+              <div class="knopfreihe"><span class="sprecher"><span class="punkt" style="background:var(--s4)"></span>Sprecher 4</span><span class="beschriftung">ist</span>
+                <span class="ordnerwahl">Frank <i class="fa-solid fa-chevron-down"></i></span></div>
+              <div class="knopfreihe" style="margin-top:8px"><button class="knopf klein primaer">Zusammenführen</button><button class="knopf klein still">Abbrechen</button></div>
+              <p style="margin:8px 0 0; font-size:var(--klein); color:var(--text-3)">Alle Beiträge von Sprecher 4 gehen an Frank; Sprecher 4 entfällt.</p>
+            </div>
+            <div class="gruppe" style="border-bottom:0">
+              <h3>Neu erkennen</h3>
+              <div class="knopfreihe"><span class="beschriftung">Weg</span><span class="ordnerwahl">Stimmen gruppieren <i class="fa-solid fa-chevron-down"></i></span></div>
+              <div class="knopfreihe" style="margin-top:8px"><span class="beschriftung">Anzahl</span><span class="ordnerwahl">4 Sprecher <i class="fa-solid fa-chevron-down"></i></span></div>
+              <p style="margin:8px 0 0; font-size:var(--klein); color:var(--text-3)">Ersetzt die Zuordnung; der jetzige Stand bleibt als Version und lässt sich zurückholen.</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <p class="zustand-titel">3c. Ohne Sprecher (ab Werk): die Leiste bietet beides an, nichts läuft von selbst</p>
+    <div class="fenster" style="height:auto">
+      <header class="kopf" data-erzeugen></header>
+      <div></div>
+      <div class="geruest mit-leiste" style="min-height:360px">
+        <nav class="nav" data-aktiv="transkripte"></nav>
+        <section class="seite">
+          <div class="seiten-kopf">
+            <button class="knopf still" style="padding:0 6px"><i class="fa-solid fa-chevron-left"></i> Transkripte</button>
+            <h1 class="titel-lang">2026-04-29 dasherrschaf</h1>
+            <button class="knopf"><i class="fa-solid fa-pen"></i> Bearbeiten</button>
+          </div>
+          <div class="rollfeld" style="padding-top:14px">
+            <div class="text-flaeche">
+              <div class="beitrag"><span class="zeit">00:00</span><span class="sprecher"></span><div class="text">Herzlich willkommen zu einer neuen Folge. Heute geht es um eine Frage, die uns alle betrifft.</div></div>
+              <div class="beitrag"><span class="zeit">00:09</span><span class="sprecher"></span><div class="text">Wer bestimmt eigentlich, was wir wissen dürfen, und wer entscheidet das?</div></div>
+            </div>
+          </div>
+        </section>
+        <aside class="leiste">
+          <div class="rollfeld" style="padding:0">
+            <div class="gruppe" style="border-bottom:0">
+              <h3>Sprecher</h3>
+              <p class="leer-zeile">Ohne Sprecher transkribiert.</p>
+              <div class="knopfreihe"><button class="knopf klein still"><i class="fa-solid fa-hand-pointer"></i> Von Hand zuordnen</button><button class="knopf klein still"><i class="fa-solid fa-rotate"></i> Sprecher erkennen</button></div>
             </div>
           </div>
         </aside>

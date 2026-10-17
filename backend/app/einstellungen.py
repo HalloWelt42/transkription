@@ -16,6 +16,8 @@ TECHNIK = {"gruppe": "Technik"}
 SPRACHEN = {"de": "Deutsch", "en": "Englisch", "fr": "Französisch", "es": "Spanisch", "it": "Italienisch",
             "nl": "Niederländisch", "auto": "Erkennen"}
 Sprache = Literal["de", "en", "fr", "es", "it", "nl", "auto"]
+SprecherWeg = Literal["ohne", "stimmen", "trennung"]
+SPRECHER_WEGE = {"ohne": "Ohne Sprecher", "stimmen": "Stimmen gruppieren", "trennung": "Mit Sprechertrennung"}
 
 
 class AppEinstellungen(Grundeinstellungen):
@@ -29,14 +31,14 @@ class AppEinstellungen(Grundeinstellungen):
                                description="Macht aus Ton Text mit Wortzeiten. Zur Wahl steht, was die Leitstelle dieser App "
                                            "anbietet.")
 
-    sprecher_erkennen: bool = Field(True, title="Sprecher erkennen", json_schema_extra=SPRECHER,
-                                    description="Vorgabe für neue Aufträge, je Auftrag änderbar.")
+    sprecher_weg: SprecherWeg = Field("ohne", title="Sprecher beim Transkribieren",
+                                      json_schema_extra={**SPRECHER, "beschriftungen": SPRECHER_WEGE},
+                                      description="Vorgabe für die Wahl je Aufnahme. Ab Werk ohne: die automatische Zuordnung "
+                                                  "ist nicht bei jeder Aufnahme sauber. Sprecher erkennen oder von Hand zuordnen "
+                                                  "geht jederzeit später am Transkript.")
     dienst_sprecher: str = Field("klangwerk-sprecher", title="Dienst für Stimmabdrücke", json_schema_extra=SPRECHER,
                                  description="Liefert je Stelle einen Stimmabdruck; damit werden Stimmen gruppiert und mit den "
                                              "Profilen verglichen.")
-    sprechertrennung: bool = Field(True, title="Sprechertrennung nutzen", json_schema_extra=SPRECHER,
-                                   description="Erst fragen, wer wann spricht. Fehlt der Dienst oder scheitert er, werden die "
-                                               "Stimmabdrücke gruppiert.")
     dienst_trennen: str = Field("klangwerk-trennen", title="Dienst für die Sprechertrennung", json_schema_extra=SPRECHER,
                                 description="Sagt, wer wann spricht.")
     trennen_zugang: SecretStr = Field(SecretStr(""), title="Zugang zum Modell der Sprechertrennung", json_schema_extra=SPRECHER,

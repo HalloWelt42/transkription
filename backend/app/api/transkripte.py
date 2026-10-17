@@ -4,6 +4,7 @@ Export als Datei neben dem Transkript, Vorschläge der KI-Korrektur, Sprecher ei
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
@@ -86,8 +87,9 @@ class ExportEingabe(BaseModel):
     format: export.Format
 
 
-class AnzahlEingabe(BaseModel):
-    anzahl: int | None = Field(None, ge=1, le=20)
+class ErkennenEingabe(BaseModel):
+    weg: Literal["stimmen", "trennung"] = Field("stimmen", description="Stimmen gruppieren oder erst die Sprechertrennung fragen")
+    anzahl: int | None = Field(None, ge=1, le=20, description="bekannte Zahl der Sprecher")
 
 
 class VorlageEingabe(BaseModel):
@@ -294,10 +296,11 @@ def router(teile: Teile) -> APIRouter:
     # --- Aufträge -------------------------------------------------------------------------------------------------
 
     @r.post("/{transkript_id}/sprecher-erkennen", status_code=201, response_model=Auftrag)
-    async def sprecher_erkennen(transkript_id: UUID, eingabe: AnzahlEingabe, konto: Konto = g.pflicht) -> Auftrag:
+    async def sprecher_erkennen(transkript_id: UUID, eingabe: ErkennenEingabe, konto: Konto = g.pflicht) -> Auftrag:
+        """Nur auf ausdrücklichen Wunsch; ersetzt die Zuordnung (der alte Stand bleibt als Version)."""
         t, _ = await lesen(transkript_id)
         return await g.auftraege.einreihen("sprecher_erkennen", SprecherEingabe(
-            transkript_id=transkript_id, anzahl=eingabe.anzahl, von=von(konto)), titel=f"{t.name}: Sprecher")
+            transkript_id=transkript_id, weg=eingabe.weg, anzahl=eingabe.anzahl, von=von(konto)), titel=f"{t.name}: Sprecher")
 
     @r.post("/{transkript_id}/korrigieren", status_code=201, response_model=Auftrag)
     async def korrigieren(transkript_id: UUID, konto: Konto = g.pflicht) -> Auftrag:
