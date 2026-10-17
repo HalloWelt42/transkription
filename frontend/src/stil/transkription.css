@@ -157,7 +157,8 @@
                                    font-size: var(--klein); color: var(--text-3); text-align: left; cursor: pointer; padding: 3px 0 0; }
 .t-beitrag .wer .zeit { margin-left: auto; padding: 0; }
 .beitrag { cursor: default; }
-.beitrag.geaendert { box-shadow: inset 3px 0 0 var(--akzent); }
+.beitrag.geaendert .zeit::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 4px;
+  background: var(--akzent); vertical-align: middle; }
 .wort { cursor: pointer; border-radius: 4px; }
 .wort:hover { background: var(--akzent-weich); }
 .beitrag mark, .t-beitrag mark { background: var(--warn-weich); color: var(--text); border-radius: 3px; }
@@ -237,7 +238,7 @@
 .sprecher-knopf .punkt { width: 10px; height: 10px; border-radius: 5px; }
 kbd.taste { font-family: ui-monospace, monospace; font-size: var(--marke); color: var(--text-2); border: 1px solid var(--rand);
   border-radius: var(--r1); padding: 0 5px; line-height: 18px; background: var(--flaeche); }
-.beitrag.gewaehlt { background: var(--akzent-weich); box-shadow: inset 3px 0 0 var(--akzent); }
+.beitrag.gewaehlt { background: var(--akzent-weich); box-shadow: 0 0 0 1px var(--akzent); }
 .beitrag.waehlbar { cursor: pointer; }
 .sprecher-zeile .aktionen { display: flex; gap: 2px; }
 .sprecher-zeile .aktionen .rund { width: 30px; height: 30px; }
