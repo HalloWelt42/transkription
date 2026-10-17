@@ -1,12 +1,25 @@
-// Aufnehmen im Browser. Der Rekorder liefert alle zwei Sekunden ein Stück, das sofort in den Gerätespeicher
-// (IndexedDB) geht: so übersteht eine Aufnahme ein Neuladen oder einen Absturz und lässt sich danach noch hochladen.
-// Nach dem Beenden wird sie eine Datei; erst wenn sie in der Kellerwolke liegt, verschwindet sie vom Gerät. Während
-// der Aufnahme bleibt der Bildschirm an (soweit der Browser das erlaubt) und die App lädt nicht neu.
+// Aufnehmen im Browser.
+//
+// Das Mikrofon läuft über eine Audio-Weiche (AudioContext): Quelle -> Pegel, Quelle -> Rekorder, Quelle -> Mitschrift.
+// So lässt sich die Quelle auch während der Aufnahme umschalten, ohne dass die Aufnahme abreißt.
+// Der Rekorder liefert alle zwei Sekunden ein Stück, das sofort in den Gerätespeicher (IndexedDB) geht: eine Aufnahme
+// übersteht ein Neuladen oder einen Absturz und lässt sich danach noch hochladen. Nach dem Beenden wird sie eine Datei;
+// erst wenn sie in der Kellerwolke liegt, verschwindet sie vom Gerät. Transkribiert wird nur, wenn der Nutzer es will.
+// Die Live-Mitschrift schneidet den Ton an Sprechpausen in Stücke (höchstens 15 s), wandelt sie in 16 kHz WAV und
+// schickt sie nacheinander an den Hördienst (POST /api/v1/hoeren); der Text erscheint, während weiter aufgenommen wird.
+// Während der Aufnahme bleibt der Bildschirm an (soweit der Browser das erlaubt) und die App lädt nicht neu.
+import { token } from "appkern-oberflaeche";
 import { arbeit } from "./arbeit.svelte";
 
 const DB_NAME = "transkription-aufnahmen";
 const STUECK_MS = 2000;
 const PEGEL = 40;
+const GERAET_MERKER = "transkription_mikrofon";
+const ZIEL_RATE = 16000;
+const LIVE_MIN_S = 5;
+const LIVE_MAX_S = 15;
+const STILLE_S = 0.45;
+const STILLE_PEGEL = 0.012;
 
 export interface Gespeichert {
   id: string;
@@ -18,6 +31,12 @@ export interface Gespeichert {
   groesse: number;
 }
 
+export interface LiveStueck {
+  start: number;
+  ende: number;
+  text: string;
+}
+
 export const aufnahme = $state({
   laeuft: false,
   pausiert: false,
@@ -26,11 +45,22 @@ export const aufnahme = $state({
   marker: [] as { zeit: number; titel: string }[],
   name: "",
   fehler: "",
+  geraete: [] as { id: string; name: string }[],
+  geraet: "",
+  live: true,
+  mitschrift: [] as LiveStueck[],
+  liveStand: "",
+  // nach dem Beenden: gespeichert, wartet auf die Entscheidung des Nutzers (transkribieren, Live-Text, fertig)
+  danach: null as null | { id: string; name: string; dauer_s: number; mitschrift: LiveStueck[] },
 });
 
 let rekorder: MediaRecorder | null = null;
 let strom: MediaStream | null = null;
 let ton: AudioContext | null = null;
+let quelle: MediaStreamAudioSourceNode | null = null;
+let analyse: AnalyserNode | null = null;
+let ziel: MediaStreamAudioDestinationNode | null = null;
+let abgriff: AudioWorkletNode | null = null;
 let wachbleiben: { release(): Promise<void> } | null = null;
 let aktuell: Gespeichert | null = null;
 let takt: ReturnType<typeof setInterval> | null = null;
@@ -101,6 +131,54 @@ export async function verwerfen(id: string): Promise<void> {
   });
 }
 
+// --- Mikrofone --------------------------------------------------------------------------------------------------
+
+export async function geraeteLaden(): Promise<void> {
+  try {
+    aufnahme.geraet = localStorage.getItem(GERAET_MERKER) ?? "";
+  } catch {
+    // ohne Speicher das Standardgerät
+  }
+  if (!navigator.mediaDevices?.enumerateDevices) return;
+  const liste = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput");
+  aufnahme.geraete = liste.map((d, i) => ({ id: d.deviceId, name: d.label || (d.deviceId === "default" ? "Standard" : `Mikrofon ${i + 1}`) }));
+}
+
+async function mikrofon(geraet: string): Promise<MediaStream> {
+  const bedingung: MediaTrackConstraints = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+  if (geraet) bedingung.deviceId = { exact: geraet };
+  return navigator.mediaDevices.getUserMedia({ audio: bedingung });
+}
+
+function anschliessen(s: MediaStream): void {
+  if (!ton || !analyse || !ziel) return;
+  quelle?.disconnect();
+  quelle = ton.createMediaStreamSource(s);
+  quelle.connect(analyse);
+  quelle.connect(ziel);
+  if (abgriff) quelle.connect(abgriff);
+}
+
+// Quelle wechseln, auch während der Aufnahme (die Weiche bleibt, nur der Eingang wird getauscht).
+export async function quelleWechseln(geraet: string): Promise<void> {
+  aufnahme.geraet = geraet;
+  try {
+    localStorage.setItem(GERAET_MERKER, geraet);
+  } catch {
+    // nur für diese Seite
+  }
+  if (!aufnahme.laeuft) return;
+  try {
+    const neu = await mikrofon(geraet);
+    const alt = strom;
+    anschliessen(neu);
+    strom = neu;
+    alt?.getTracks().forEach((t) => t.stop());
+  } catch {
+    aufnahme.fehler = "Dieses Mikrofon lässt sich nicht öffnen; die Aufnahme läuft mit dem bisherigen weiter.";
+  }
+}
+
 // --- Aufnehmen --------------------------------------------------------------------------------------------------
 
 function format(): { mime: string; endung: string } {
@@ -123,18 +201,32 @@ export async function starten(): Promise<void> {
     return;
   }
   try {
-    strom = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
+    strom = await mikrofon(aufnahme.geraet);
   } catch {
-    aufnahme.fehler = "Kein Zugriff aufs Mikrofon (im Browser erlauben).";
-    return;
+    try {
+      strom = await mikrofon("");          // gemerktes Gerät nicht mehr da: das Standardgerät
+      aufnahme.geraet = "";
+    } catch {
+      aufnahme.fehler = "Kein Zugriff aufs Mikrofon (im Browser erlauben).";
+      return;
+    }
   }
+  await geraeteLaden();                     // erst nach der Erlaubnis kennt der Browser die Namen
+  ton = new AudioContext();
+  analyse = ton.createAnalyser();
+  analyse.fftSize = 512;
+  ziel = ton.createMediaStreamDestination();
+  await liveVorbereiten(ton);              // immer bereit; der Schalter entscheidet, ob Text kommt
+  anschliessen(strom);
   const { mime, endung } = format();
-  rekorder = new MediaRecorder(strom, mime ? { mimeType: mime } : undefined);
+  rekorder = new MediaRecorder(ziel.stream, mime ? { mimeType: mime } : undefined);
   const name = vorschlagName();
   aktuell = { id: `${Date.now()}`, name: `${name}${endung}`, typ: rekorder.mimeType || mime || "audio/webm",
     beginn: Date.now(), dauer_ms: 0, marker: [], groesse: 0 };
   aufnahme.name = name;
   aufnahme.marker = [];
+  aufnahme.mitschrift = [];
+  aufnahme.liveStand = "";
   await merken(aktuell);
   rekorder.ondataavailable = (e) => {
     if (!aktuell || !e.data.size) return;
@@ -144,11 +236,11 @@ export async function starten(): Promise<void> {
     schreiben = schreiben.then(() => stueckAblegen(a.id, e.data)).then(() => merken(a)).then(() => undefined);
   };
   rekorder.start(STUECK_MS);
-  pegelMessen(strom);
   aufnahme.laeuft = true;
   aufnahme.pausiert = false;
   aufnahme.dauer_ms = 0;
   arbeit.aufnahme = true;
+  pegelMessen();
   zuletzt = performance.now();
   takt = setInterval(() => {
     const jetzt = performance.now();
@@ -163,18 +255,16 @@ export async function starten(): Promise<void> {
   }
 }
 
-function pegelMessen(s: MediaStream): void {
-  ton = new AudioContext();
-  const analyse = ton.createAnalyser();
-  analyse.fftSize = 512;
-  ton.createMediaStreamSource(s).connect(analyse);
-  const werte = new Uint8Array(analyse.fftSize);
+function pegelMessen(): void {
+  if (!analyse) return;
+  const a = analyse;
+  const werte = new Uint8Array(a.fftSize);
   let letzte = 0;
   const schritt = (zeit: number) => {
     if (!aufnahme.laeuft) return;
     if (zeit - letzte > 100) {
       letzte = zeit;
-      analyse.getByteTimeDomainData(werte);
+      a.getByteTimeDomainData(werte);
       let spitze = 0;
       for (const w of werte) spitze = Math.max(spitze, Math.abs(w - 128));
       aufnahme.pegel = [...aufnahme.pegel.slice(1), aufnahme.pausiert ? 0 : Math.min(100, (spitze / 128) * 140)];
@@ -187,7 +277,10 @@ function pegelMessen(s: MediaStream): void {
 export function pause(): void {
   if (!rekorder || !aufnahme.laeuft) return;
   if (aufnahme.pausiert) rekorder.resume();
-  else rekorder.pause();
+  else {
+    rekorder.pause();
+    liveSchneiden(true);
+  }
   aufnahme.pausiert = !aufnahme.pausiert;
 }
 
@@ -207,6 +300,7 @@ export async function beenden(name: string): Promise<{ daten: Blob; info: Gespei
   r.stop();
   await fertig;
   await schreiben;
+  liveSchneiden(true);
   const a = aktuell;
   a.dauer_ms = aufnahme.dauer_ms;
   const endung = a.name.slice(a.name.lastIndexOf("."));
@@ -218,12 +312,17 @@ export async function beenden(name: string): Promise<{ daten: Blob; info: Gespei
 
 function aufraeumen(): void {
   strom?.getTracks().forEach((t) => t.stop());
+  abgriff?.port.close();
   void ton?.close();
   void wachbleiben?.release().catch(() => {});
   if (takt) clearInterval(takt);
   rekorder = null;
   strom = null;
   ton = null;
+  quelle = null;
+  analyse = null;
+  ziel = null;
+  abgriff = null;
   wachbleiben = null;
   aktuell = null;
   takt = null;
@@ -231,4 +330,130 @@ function aufraeumen(): void {
   aufnahme.pausiert = false;
   aufnahme.pegel = Array<number>(PEGEL).fill(0);
   arbeit.aufnahme = false;
+}
+
+// --- Live-Mitschrift --------------------------------------------------------------------------------------------
+
+const ABGRIFF = `class Abgriff extends AudioWorkletProcessor {
+  process(eingaenge) { const k = eingaenge[0] && eingaenge[0][0]; if (k) this.port.postMessage(k.slice(0)); return true; }
+}
+registerProcessor("abgriff", Abgriff);`;
+
+let puffer: Float32Array[] = [];
+let pufferLaenge = 0;
+let stilleSeit = 0;
+let stueckBeginn = 0;                   // Sekunden ab Beginn der Aufnahme
+let rate = 48000;
+let warteschlange: Promise<void> = Promise.resolve();
+
+async function liveVorbereiten(t: AudioContext): Promise<void> {
+  rate = t.sampleRate;
+  puffer = [];
+  pufferLaenge = 0;
+  stilleSeit = 0;
+  stueckBeginn = 0;
+  try {
+    const adresse = URL.createObjectURL(new Blob([ABGRIFF], { type: "text/javascript" }));
+    await t.audioWorklet.addModule(adresse);
+    URL.revokeObjectURL(adresse);
+    abgriff = new AudioWorkletNode(t, "abgriff");
+    abgriff.port.onmessage = (e: MessageEvent<Float32Array>) => aufnehmenLive(e.data);
+    // stumm an den Ausgang: so verarbeitet der Browser den Abgriff sicher, zu hören ist nichts
+    const stumm = t.createGain();
+    stumm.gain.value = 0;
+    abgriff.connect(stumm).connect(t.destination);
+  } catch {
+    abgriff = null;
+    aufnahme.liveStand = "Live-Mitschrift geht in diesem Browser nicht; die Aufnahme läuft.";
+  }
+}
+
+function aufnehmenLive(werte: Float32Array): void {
+  if (!aufnahme.live || aufnahme.pausiert || !aufnahme.laeuft) return;
+  puffer.push(werte);
+  pufferLaenge += werte.length;
+  let summe = 0;
+  for (const w of werte) summe += w * w;
+  const leise = Math.sqrt(summe / werte.length) < STILLE_PEGEL;
+  stilleSeit = leise ? stilleSeit + werte.length / rate : 0;
+  const laenge = pufferLaenge / rate;
+  if ((laenge >= LIVE_MIN_S && stilleSeit >= STILLE_S) || laenge >= LIVE_MAX_S) liveSchneiden(false);
+}
+
+function liveSchneiden(alles: boolean): void {
+  if (!pufferLaenge || (!alles && pufferLaenge / rate < 1)) return;
+  const roh = new Float32Array(pufferLaenge);
+  let pos = 0;
+  for (const p of puffer) {
+    roh.set(p, pos);
+    pos += p.length;
+  }
+  const beginn = stueckBeginn;
+  const laenge = pufferLaenge / rate;
+  stueckBeginn += laenge;
+  puffer = [];
+  pufferLaenge = 0;
+  stilleSeit = 0;
+  if (laenge < 0.8) return;
+  const wav = alsWav(herunterrechnen(roh, rate));
+  warteschlange = warteschlange.then(() => hoeren(wav, beginn, laenge));
+}
+
+function herunterrechnen(roh: Float32Array, von: number): Float32Array {
+  if (von === ZIEL_RATE) return roh;
+  const faktor = von / ZIEL_RATE;
+  const aus = new Float32Array(Math.floor(roh.length / faktor));
+  for (let i = 0; i < aus.length; i++) {
+    const a = Math.floor(i * faktor);
+    const b = Math.min(roh.length, Math.floor((i + 1) * faktor));
+    let summe = 0;
+    for (let j = a; j < b; j++) summe += roh[j];
+    aus[i] = summe / Math.max(1, b - a);
+  }
+  return aus;
+}
+
+function alsWav(werte: Float32Array): Blob {
+  const puffer = new ArrayBuffer(44 + werte.length * 2);
+  const v = new DataView(puffer);
+  const text = (o: number, s: string) => [...s].forEach((z, i) => v.setUint8(o + i, z.charCodeAt(0)));
+  text(0, "RIFF");
+  v.setUint32(4, 36 + werte.length * 2, true);
+  text(8, "WAVE");
+  text(12, "fmt ");
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
+  v.setUint32(24, ZIEL_RATE, true);
+  v.setUint32(28, ZIEL_RATE * 2, true);
+  v.setUint16(32, 2, true);
+  v.setUint16(34, 16, true);
+  text(36, "data");
+  v.setUint32(40, werte.length * 2, true);
+  for (let i = 0; i < werte.length; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, werte[i])) * 0x7fff, true);
+  return new Blob([puffer], { type: "audio/wav" });
+}
+
+async function hoeren(wav: Blob, beginn: number, laenge: number): Promise<void> {
+  const form = new FormData();
+  form.append("datei", wav, "live.wav");
+  aufnahme.liveStand = "hört ...";
+  try {
+    const antwort = await fetch("/api/v1/hoeren", { method: "POST", body: form, headers: { "X-Kellerwolke-Sitzung": token() } });
+    if (!antwort.ok) {
+      let meldung = `Fehler ${antwort.status}`;
+      try {
+        meldung = (await antwort.json()).detail ?? meldung;
+      } catch {
+        // Text bleibt
+      }
+      aufnahme.liveStand = antwort.status === 503 ? `wartet auf den Hördienst (${meldung})` : meldung;
+      return;
+    }
+    const daten = (await antwort.json()) as { text: string };
+    if (daten.text.trim()) aufnahme.mitschrift = [...aufnahme.mitschrift, { start: beginn, ende: beginn + laenge, text: daten.text.trim() }];
+    aufnahme.liveStand = "";
+  } catch {
+    aufnahme.liveStand = "keine Verbindung zur App";
+  }
 }

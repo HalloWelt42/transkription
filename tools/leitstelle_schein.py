@@ -55,7 +55,12 @@ def antworten(request: httpx.Request, *, gespraech: bool = False) -> httpx.Respo
     """Die Antworten der Schein-Leitstelle. `gespraech`: längere, abwechslungsreiche Texte (Vorführen)."""
     pfad = request.url.path
     if pfad == "/v1/models":
-        return httpx.Response(200, json={"data": [{"id": "klein"}]})
+        return httpx.Response(200, json={"data": [
+            {"id": "klein", "x-leitstelle": {"name": "Kleines Sprachmodell (Schein)", "faehigkeiten": ["text"], "geladen": True}},
+            {"id": "klangwerk-hoeren", "x-leitstelle": {"name": "Klangwerk Hören (Schein)", "faehigkeiten": ["hoeren"]}},
+            {"id": "klangwerk-sprecher", "x-leitstelle": {"name": "Klangwerk Sprechermerkmal (Schein)", "faehigkeiten": ["sprecher_erkennen"]}},
+            {"id": "klangwerk-trennen", "x-leitstelle": {"name": "Klangwerk Sprechertrennung (Schein)", "faehigkeiten": ["sprecher_trennen"]}},
+        ]})
     if pfad.endswith("/stt"):
         if gespraech:
             saetze = [(GESPRAECH[i % len(GESPRAECH)], i * 9.0, i * 9.0 + 7.5) for i in range(6)]

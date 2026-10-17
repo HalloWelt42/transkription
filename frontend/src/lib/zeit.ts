@@ -1,12 +1,12 @@
 // Zeiten und Größen zum Lesen.
 
-// Zeitmarke: "4:12", ab einer Stunde "1:02:05".
+// Zeitmarke: "04:12", ab einer Stunde "1:02:05".
 export function marke(sekunden: number): string {
   const s = Math.max(0, Math.floor(sekunden));
   const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
+  const m = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
   const r = String(s % 60).padStart(2, "0");
-  return h ? `${h}:${String(m).padStart(2, "0")}:${r}` : `${m}:${r}`;
+  return h ? `${h}:${m}:${r}` : `${m}:${r}`;
 }
 
 // Zeitmarke mit Zehnteln zum Bearbeiten: "4:12,5".

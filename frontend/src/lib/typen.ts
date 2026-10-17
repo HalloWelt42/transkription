@@ -109,6 +109,7 @@ export interface Aufnahme {
   art: "ton" | "video";
   groesse: number | null;
   inhaltstyp: string | null;
+  dauer_s: number | null;
   geaendert_am: string;
   stand: AufnahmeStand;
   transkripte: { id: string; name: string }[];

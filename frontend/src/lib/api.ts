@@ -32,6 +32,9 @@ export const verzeichnis = (o: { suche?: string; sprache?: string | null; sprech
 
 export const sprecherNamen = () => hole<string[]>("/transkripte/sprecher-namen");
 
+export const ausMitschrift = (e: { quelle_id: string; name: string; sprache: string; stuecke: { start: number; ende: number; text: string }[] }) =>
+  hole<TranskriptAntwort>("/transkripte", { method: "POST", ...json(e) });
+
 export const transkript = (id: string) => hole<TranskriptAntwort>(`/transkripte/${id}`);
 
 export interface Aenderungen {

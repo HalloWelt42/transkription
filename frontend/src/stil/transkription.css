@@ -89,6 +89,8 @@
 .profil { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 16px;
           background: var(--flaeche); border-radius: var(--r3); box-shadow: var(--schatten); margin-bottom: 8px; border: 2px solid transparent; }
 .profil .bild { width: 48px; height: 48px; border-radius: 24px; display: grid; place-items: center; color: #fff; font-weight: 600; font-size: 18px; }
+.profil > div { min-width: 0; }
+.profil .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profil .unter { font-size: var(--klein); color: var(--text-3); margin-top: 2px; }
 .profil.gewaehlt { border-color: var(--akzent); }
 
@@ -121,16 +123,7 @@
 .mobil .t-treffer mark { background: var(--warn-weich); color: var(--text); border-radius: 3px; }
 .seiten-kopf h1.titel-lang { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* ----- Umsetzung: Auswahl, Rekorder, Uploads ----- */
-.auswahl { position: relative; display: inline-flex; }
-.auswahl .ordnerwahl { cursor: pointer; font: inherit; font-size: var(--klein); color: var(--text); }
-.auswahl-text { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.auswahl-liste { position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; min-width: 100%; max-height: 320px; overflow-y: auto;
-                 background: var(--flaeche); border-radius: var(--r2); box-shadow: var(--schatten), 0 8px 28px rgba(20, 30, 45, .18);
-                 display: flex; flex-direction: column; padding: 4px; }
-.auswahl-liste button { border: 0; background: transparent; font: inherit; font-size: var(--klein); text-align: left; padding: 8px 12px;
-                        border-radius: var(--r1); cursor: pointer; color: var(--text); white-space: nowrap; }
-.auswahl-liste button:hover, .auswahl-liste button.aktiv { background: var(--akzent-weich); color: var(--akzent); }
+/* ----- Umsetzung: Rekorder, Uploads ----- */
 .rekorder .t-uhr, .rekorder .t-pegel, .rekorder .t-steuer { font-family: inherit; }
 .rekorder .t-uhr { font-family: ui-monospace, monospace; font-size: 54px; font-weight: 600; text-align: center; margin: 18px 0 6px; }
 .rekorder-stand { text-align: center; margin: 0 0 6px; color: var(--text-3); font-size: var(--klein); }
@@ -175,3 +168,60 @@
 .geruest-innen { display: grid; grid-template-columns: minmax(0, 1fr) 380px; flex: 1; min-height: 0; }
 .geruest-innen > .seite { min-height: 0; }
 .rund.aktiv { background: var(--akzent-weich); color: var(--akzent); }
+
+/* ----- Leiste des Transkripts (nach Entwurf) ----- */
+.leiste-inhalt { padding: 0; }
+.leiste .gruppe .knopfreihe { margin-top: 8px; align-items: center; }
+.leiste .beschriftung { font-size: var(--klein); color: var(--text-2); }
+.sprecher-zeile .eingabe.klein-eingabe, .eingabe.klein-eingabe { height: 36px; gap: 8px; }
+.schalter-zeile { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: var(--klein); color: var(--text-2); }
+.lauf-zeile { margin: 8px 0 0; font-size: var(--klein); color: var(--akzent); }
+.hilfe-zeile { margin: 8px 0 0; font-size: var(--klein); color: var(--text-3); }
+.hinweis-zeile { font-size: var(--klein); color: var(--text-2); }
+.hinweis-zeile i { color: var(--akzent); }
+.leer-zeile { margin: 2px 0 6px; font-size: var(--klein); color: var(--text-3); }
+.liste-klein .marker-eintrag { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; }
+.marker-eintrag .zeit { border: 0; background: none; padding: 0; font: inherit; font-family: ui-monospace, monospace; color: var(--text-3); cursor: pointer; text-align: left; }
+.marker-eintrag .weg { border: 0; background: none; color: var(--text-3); cursor: pointer; padding: 2px 4px; opacity: 0; }
+.marker-eintrag:hover .weg, .marker-eintrag .weg:focus-visible { opacity: 1; }
+.marker-titel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vorlagen { display: flex; flex-direction: column; gap: 6px; }
+.vorlage { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 12px; border-radius: var(--r2);
+           border: 1px solid var(--rand); background: var(--flaeche); font: inherit; color: var(--text); cursor: pointer; }
+.vorlage:hover { border-color: var(--akzent); }
+.vorlage span { font-size: var(--klein); color: var(--text-3); }
+.versionen { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.version-zeile { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; font-size: var(--klein); }
+.version-zeile .zeit { font-family: ui-monospace, monospace; color: var(--text-3); }
+.version-text { color: var(--text); }
+.version-text b { font-weight: 600; }
+
+/* ----- Breiten: Seite mit Leiste (wie die Schale, siehe Appkern schale.css) ----- */
+.nur-schmal { display: none; }
+@media (max-width: 1279px) {
+  .geruest-innen { grid-template-columns: minmax(0, 1fr); }
+  .nur-schmal { display: inline-flex; }
+}
+@media (max-width: 999px) {
+  .beitrag { grid-template-columns: 56px 120px minmax(0, 1fr); gap: 10px; }
+  .vorschlag { margin-left: 0; }
+  .spieler { grid-template-columns: auto minmax(0, 1fr) auto; padding: 10px 16px; }
+  .spieler .knopfreihe, .spieler > .knopf { display: none; }
+}
+
+/* ----- Rekorder: Live-Mitschrift und Entscheidung nach dem Beenden ----- */
+.mitschrift { max-width: 760px; margin: 14px auto 0; background: var(--flaeche); border-radius: var(--r3); box-shadow: var(--schatten); overflow: hidden; }
+.rekorder.kompakt .mitschrift { box-shadow: none; background: var(--flaeche-2); }
+.mitschrift-kopf { display: flex; gap: 8px; align-items: center; padding: 10px 14px; font-size: var(--klein); font-weight: 600; color: var(--text-2);
+                   border-bottom: 1px solid var(--rand); }
+.mitschrift-stand { margin-left: auto; font-weight: 400; color: var(--text-3); }
+.mitschrift-text { max-height: 220px; overflow-y: auto; padding: 8px 14px 12px; }
+.mitschrift-text p { margin: 6px 0; line-height: 1.55; }
+.mitschrift-text .zeit { font-family: ui-monospace, monospace; font-size: var(--klein); color: var(--text-3); margin-right: 10px; }
+.mitschrift-leer { color: var(--text-3); font-size: var(--klein); }
+.rekorder-gespeichert { display: flex; gap: 12px; align-items: flex-start; max-width: 760px; margin: 16px auto 0; font-size: var(--gross); }
+.rekorder-gespeichert > i { color: var(--gut); font-size: 22px; margin-top: 2px; }
+.entscheidung { max-width: 760px; margin: 16px auto 4px; display: flex; flex-direction: column; gap: 14px; }
+.entscheidung-optionen { display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: center; }
+.entscheidung-optionen label { display: inline-flex; gap: 8px; align-items: center; font-size: var(--klein); color: var(--text-2); }
+.t-aufnehmen .auswahl { margin-top: 4px; }

@@ -2,9 +2,9 @@
   // Ein Beitrag (Segment): Zeit, Sprecher, Text. Beim Mitlesen bekommt nur der laufende Beitrag die Zeit (`jetzt`),
   // so zeichnen die übrigen bei jedem Takt nicht neu. Klick auf ein Wort oder die Zeit springt dorthin. Im
   // Bearbeiten: Textfeld, Sprecher, Zeiten, am Cursor teilen, mit dem nächsten zusammenführen, Marker.
+  import { Auswahl } from "appkern-oberflaeche";
   import type { Segment, Sprecher } from "../lib/typen";
   import { farbe, genau, lesen, marke } from "../lib/zeit";
-  import Auswahl from "./Auswahl.svelte";
 
   let {
     seg,

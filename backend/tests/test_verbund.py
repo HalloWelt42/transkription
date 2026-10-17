@@ -96,6 +96,7 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert [(m["zeit"], m["titel"]) for m in t["transkript"]["marker"]] == [(4.5, "Wichtig")]
                 eintrag = (await c.get("/api/v1/aufnahmen", headers=h, params={"suche": name})).json()["eintraege"][0]
                 assert eintrag["stand"] == "transkribiert" and eintrag["transkripte"][0]["id"] == tid
+                assert eintrag["dauer_s"] == pytest.approx(150, abs=1)
                 protokoll = (await c.get("/api/v1/protokoll", headers=h, params={"ereignis": "sprecher"})).json()
                 assert any("ohne_trennung" in e["ereignis"] for e in protokoll["eintraege"])
 
@@ -168,6 +169,16 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 app_kopf = {"Authorization": f"Bearer {W['KELLERWOLKE_SCHLUESSEL']}"}
                 assert (await c.get(f"/api/v1/transkripte/{tid}", headers=app_kopf)).status_code == 200
                 assert (await c.get("/api/v1/einstellungen", headers=app_kopf)).status_code == 403
+
+                # Aus der Live-Mitschrift ein Transkript (ohne neues Hören)
+                r = await c.post("/api/v1/transkripte", headers=h, json={"quelle_id": aufnahme["id"], "name": f"{name} live",
+                                                                         "stuecke": [{"start": 0, "ende": 5.5, "text": "Erstes Stück"},
+                                                                                     {"start": 5.5, "ende": 12, "text": "Zweites Stück hier"}]})
+                assert r.status_code == 201, r.text
+                live = r.json()
+                angelegt.append(live["id"])
+                assert [s["text"] for s in live["transkript"]["segmente"]] == ["Erstes Stück", "Zweites Stück hier"]
+                assert live["transkript"]["segmente"][1]["woerter"][0]["start"] == 5.5 and live["transkript"]["marker"][0]["titel"] == "Wichtig"
 
                 # Löschen: in den Papierkorb, aus dem Index
                 assert (await c.delete(f"/api/v1/transkripte/{tid}", headers=h)).status_code == 204

@@ -24,7 +24,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from appkern.auftraege import Art, Kontext, Phase
-from appkern.kellerwolke import StandVeraltet
+from appkern.kellerwolke import KellerwolkeFehler, StandVeraltet
 from appkern.leitstelle import DienstFehler, DienstWeg, Halt, NichtErreichbar, NichtGefunden
 
 from . import auswertung, export, korrektur
@@ -159,6 +159,11 @@ def arten(teile: Teile) -> list[Art]:
             wav, dauer = await ton_holen(k, quelle.id, ordner)
             plan = await abschnitte(k, wav, dauer)
             wellenform = await teile.ton.wellenform(wav)
+            if quelle.felder.get(orte.FELD_DAUER) is None:
+                try:          # für die Liste der Aufnahmen; in nur lesbaren Ordnern geht es nicht, das ist kein Fehler
+                    await kw.felder_setzen(quelle.id, {orte.FELD_DAUER: round(dauer, 1)})
+                except KellerwolkeFehler:
+                    pass
 
             fertig: dict[str, dict] = dict(k.zwischenstand.get("hoeren", {}))
             await k.fortschritt(len(fertig) / max(len(plan), 1), "Hören", phase="hoeren")

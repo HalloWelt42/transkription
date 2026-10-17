@@ -17,7 +17,7 @@ from .. import auswertung, export
 from ..ablage import orte
 from ..arten import AuswertenEingabe, KorrigierenEingabe, SprecherEingabe
 from ..modell.sprecherprofil import Probe, Profil
-from ..modell.transkript import Aenderung, Marker, Segment, Sprecher, Transkript, woerter_angleichen
+from ..modell.transkript import Aenderung, Marker, Quelle, Segment, Sprecher, Transkript, woerter_angleichen
 from ..suchindex import Notiz, Seite
 from ..teile import Teile
 from ..vorschlaege import Entscheidung, OffenerVorschlag
@@ -47,6 +47,21 @@ class Aenderungen(BaseModel):
     marker: list[Marker] | None = None
     was: str | None = Field(None, max_length=300, description="Notiz zur Version; leer: wird beschrieben")
     vorschlaege: list[Entscheidung] = Field(default_factory=list, description="übernommene und verworfene Vorschläge")
+
+
+class LiveStueck(BaseModel):
+    start: float = Field(ge=0)
+    ende: float = Field(ge=0)
+    text: str = Field(min_length=1)
+
+
+class AusMitschrift(BaseModel):
+    """Ein Transkript aus der Live-Mitschrift einer Aufnahme (ohne Sprecher; genauer wird es mit Transkribieren)."""
+
+    quelle_id: UUID
+    name: str = Field(min_length=1, max_length=200)
+    sprache: str = "de"
+    stuecke: list[LiveStueck] = Field(min_length=1)
 
 
 class StandEingabe(BaseModel):
@@ -132,6 +147,24 @@ def router(teile: Teile) -> APIRouter:
                     ab: int = Query(0, ge=0), anzahl: int = Query(20, ge=1, le=100)) -> Seite:
         return await teile.index.seite(suche=suche.strip(), sprache=sprache or None, sprecher=sprecher, ab=ab,
                                        anzahl=anzahl)
+
+    @r.post("", status_code=201, response_model=TranskriptAntwort)
+    async def aus_mitschrift(e: AusMitschrift, konto: Konto = g.pflicht) -> TranskriptAntwort:
+        """Legt ein Transkript aus der Live-Mitschrift an; die Wortzeiten werden über jedes Stück verteilt."""
+        kw = teile.transkripte.kw
+        quelle = await kw.knoten(e.quelle_id)
+        if orte.art_der_aufnahme(quelle) is None:
+            raise HTTPException(422, f"{quelle.name} ist keine Ton- oder Videodatei")
+        segmente = [woerter_angleichen(Segment(start=x.start, ende=max(x.ende, x.start), text=x.text.strip())) for x in e.stuecke]
+        marker = [Marker(zeit=m["zeit"], titel=m["titel"]) for m in quelle.felder.get(orte.FELD_MARKER) or []
+                  if isinstance(m, dict) and "zeit" in m and m.get("titel")]
+        t = Transkript(name=e.name, quelle=Quelle(knoten_id=quelle.id, pfad=quelle.pfad, etag=quelle.etag), sprache=e.sprache,
+                       dauer_s=round(max(x.ende for x in e.stuecke), 3), segmente=segmente, marker=marker,
+                       aenderung=Aenderung(was="aus der Live-Mitschrift", wer=konto.name, app=konto.app))
+        knoten = await teile.transkripte.anlegen(t, quelle)
+        neu, knoten = await lesen(knoten.id)
+        await teile.index.eintragen(neu, knoten)
+        return _antwort(neu, knoten)
 
     @r.get("/sprecher-namen", response_model=list[str])
     async def sprecher_namen() -> list[str]:

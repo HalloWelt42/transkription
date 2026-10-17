@@ -51,6 +51,7 @@ class Aufnahme(BaseModel):
     art: Literal["ton", "video"]
     groesse: int | None
     inhaltstyp: str | None
+    dauer_s: float | None = None
     geaendert_am: datetime
     stand: Stand
     transkripte: list[TranskriptVerweis]
@@ -112,9 +113,10 @@ def router(teile: Teile) -> APIRouter:
             auftrag = laufend.get(str(k.id))
             stand: Stand = ("laeuft" if auftrag.zustand == "laeuft" else "wartet") if auftrag else \
                 ("transkribiert" if verweise else "ohne")
+            dauer = k.felder.get(orte.FELD_DAUER) or next((e.dauer_s for e in transkripte.get(str(k.id), []) if e.dauer_s), None)
             alle.append(Aufnahme(
                 id=k.id, name=k.name, pfad=k.pfad, art=orte.art_der_aufnahme(k), groesse=k.groesse,
-                inhaltstyp=k.inhaltstyp, geaendert_am=k.geaendert_am, stand=stand, transkripte=verweise,
+                inhaltstyp=k.inhaltstyp, dauer_s=dauer, geaendert_am=k.geaendert_am, stand=stand, transkripte=verweise,
                 auftrag=AuftragKurz(id=auftrag.id, zustand=auftrag.zustand, fortschritt=auftrag.fortschritt,
                                     schritt=auftrag.schritt, phase=auftrag.phase) if auftrag else None))
         zahlen = {"alle": len(alle), "ohne": sum(a.stand != "transkribiert" for a in alle),

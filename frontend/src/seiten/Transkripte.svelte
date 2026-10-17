@@ -3,11 +3,10 @@
   // Sprecher, seitenweise; mit einer Kennung in der Adresse (/transkripte/<kennung>[/<sekunden>]) das Transkript selbst.
   // Entwurf: mockups/transkription.html (2) und transkription-mobil.html (4).
   import { onMount } from "svelte";
-  import { gehe, geraet, navigation, wann } from "appkern-oberflaeche";
+  import { Auswahl, gehe, geraet, navigation, wann } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import type { Verzeichnis } from "../lib/typen";
   import { marke, sprache as spracheName, SPRACHEN } from "../lib/zeit";
-  import Auswahl from "../teile/Auswahl.svelte";
   import TranskriptAnsicht from "../teile/TranskriptAnsicht.svelte";
 
   const SEITE = 20;

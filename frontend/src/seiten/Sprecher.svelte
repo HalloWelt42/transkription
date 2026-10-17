@@ -3,11 +3,10 @@
   // Transkripts), Umbenennen, Zusammenführen, Löschen (mit zweitem Klick). Schwellen kommen aus den Einstellungen.
   // Am Telefon: Liste, Antippen öffnet das Profil (/sprecher/<kennung>). Entwurf: mockups/transkription.html (5).
   import { onMount } from "svelte";
-  import { gehe, geraet, navigation, wann } from "appkern-oberflaeche";
+  import { Auswahl, gehe, geraet, Leiste, leisteOeffnen, navigation, wann } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import type { Profil } from "../lib/typen";
   import { farbe, marke } from "../lib/zeit";
-  import Auswahl from "../teile/Auswahl.svelte";
 
   const WENIGE = 3;
   let liste = $state<Profil[]>([]);
@@ -50,7 +49,10 @@
 
   function waehlen(p: Profil) {
     if (geraet.mobil) gehe(`sprecher/${p.id}`);
-    else gewaehltId = p.id;
+    else {
+      gewaehltId = p.id;
+      leisteOeffnen();
+    }
   }
 
   function umbenennen() {
@@ -145,13 +147,13 @@
           bestätigte Zuordnung schärft den Abdruck.</p>
       </div>
     </section>
-    <aside class="leiste">
+    <Leiste>
       {#if gewaehlt}
         <div class="leiste-kopf"><h2>{gewaehlt.name}</h2><span class="fassung">Stimmabdruck aus {gewaehlt.proben === 1 ? "einer Probe" : `${gewaehlt.proben} Proben`}</span></div>
         <div class="rollfeld">{@render detail(gewaehlt)}</div>
       {:else}
         <div class="leiste-kopf"><h2>Kein Profil gewählt</h2></div>
       {/if}
-    </aside>
+    </Leiste>
   </div>
 {/if}

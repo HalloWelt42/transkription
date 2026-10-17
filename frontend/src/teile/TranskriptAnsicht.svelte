@@ -4,7 +4,7 @@
   // unter ihrem Beitrag, Speichern legt eine neue Version an (nur mit dem gelesenen Stand; sonst neu laden).
   // Entwurf: mockups/transkription.html (3, 4) und transkription-mobil.html (3).
   import { onMount, tick } from "svelte";
-  import { gehe, geraet, navigation } from "appkern-oberflaeche";
+  import { gehe, geraet, Leiste, leisteOeffnen, navigation } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import { arbeit } from "../lib/arbeit.svelte";
   import type { Marker, Segment, Transkript, TranskriptAntwort, Vorschlag } from "../lib/typen";
@@ -287,7 +287,7 @@
                onaendern={(neu) => segmentAendern(i, neu)} onteilen={(p) => teilen(i, p)} onzusammen={() => zusammen(i)}
                onmarker={() => markerAmBeitrag(i)} />
     </div>
-    {#if !geraet.mobil && (bearbeiten || offeneVorschlaege.length)}
+    {#if bearbeiten && !geraet.mobil}
       {#each passendVorschlag(s) as v (v.id)}{@render vorschlagBox(v, s)}{/each}
     {/if}
   {/each}
@@ -310,7 +310,7 @@
   {#if mehr}
     <div class="karte" style="padding:0; margin-bottom:10px">
       <TranskriptLeiste {antwort} {zeit} onspringen={springen} onneu={(a) => (antwort = a)} onmarker={markerSpeichern}
-                        onvorschlaege={() => api.vorschlaege(id).then((v) => (vorschlaege = v))} />
+                        onvorschlaege={() => api.vorschlaege(id).then((v) => (vorschlaege = v))} onansehen={() => {}} />
     </div>
   {/if}
   {#if fehler}<div class="fehlertext">{fehler}</div>{/if}
@@ -332,6 +332,8 @@
             {#if suche && treffer}<span style="color:var(--text-3)">{treffer}</span>{/if}</label>
           <button class="knopf" onclick={bearbeitenBeginnen}><i class="fa-solid fa-pen"></i> Bearbeiten</button>
         {/if}
+        <button class="knopf nur-schmal" title="Sprecher, Marker, Export, KI, Versionen" onclick={leisteOeffnen}>
+          <i class="fa-solid fa-table-columns"></i> Leiste</button>
       </div>
       <Spieler bind:this={spieler} src={api.tonAdresse(id)} dauer={antwort.transkript.dauer_s} wellenform={antwort.transkript.wellenform}
                {spur} marker={(t?.marker ?? []).map((m) => m.zeit)} bind:zeit bind:laeuft
@@ -349,7 +351,7 @@
             <div class="fehlertext" style="margin-bottom:12px">{fehler}
               {#if konflikt}<button class="knopf klein" style="margin-left:10px" onclick={() => { bearbeitenBeenden(); void laden(); }}>Neu laden (eigene Änderungen verwerfen)</button>{/if}</div>
           {/if}
-          {#if offeneVorschlaege.length}
+          {#if bearbeiten && offeneVorschlaege.length}
             <div class="optionen">
               <span class="titel"><i class="fa-solid fa-wand-magic-sparkles"></i> KI-Korrektur</span>
               <span style="font-size:var(--klein); color:var(--text-2)">{vorschlaege.length} Vorschläge: {Object.values(entscheidungen).filter((z) => z === "uebernommen").length} übernommen,
@@ -373,9 +375,11 @@
         </div>
       </div>
     </section>
-    <aside class="leiste">
-      <TranskriptLeiste {antwort} {zeit} {bearbeiten} onspringen={springen} onneu={(a) => { antwort = a; if (bearbeiten) entwurf = structuredClone($state.snapshot(a.transkript)) as Transkript; }}
-                        onmarker={markerSpeichern} onvorschlaege={() => api.vorschlaege(id).then((v) => (vorschlaege = v))} />
-    </aside>
+    <Leiste>
+      <TranskriptLeiste {antwort} {zeit} {bearbeiten} vorschlaege={bearbeiten ? 0 : offeneVorschlaege.length} onspringen={springen}
+                        onneu={(a) => { antwort = a; if (bearbeiten) entwurf = structuredClone($state.snapshot(a.transkript)) as Transkript; }}
+                        onmarker={markerSpeichern} onvorschlaege={() => api.vorschlaege(id).then((v) => (vorschlaege = v))}
+                        onansehen={bearbeitenBeginnen} />
+    </Leiste>
   </div>
 {/if}

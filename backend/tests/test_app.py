@@ -46,6 +46,13 @@ async def test_einrichten_anmelden_und_schutz(client):
     seite = (await client.get("/api/v1/transkripte", headers=h)).json()
     assert seite == {"gesamt": 0, "ab": 0, "anzahl": 20, "eintraege": []}
     felder = {f["name"]: f for f in (await client.get("/api/v1/einstellungen", headers=h)).json()}
-    assert felder["sprache"]["beschriftungen"]["de"] == "Deutsch" and felder["sprecher_sicher"]["schritt"] == 0.05
+    assert felder["sprache"]["beschriftungen"]["de"] == "Deutsch" and felder["sprecher_sicher"]["schritt"] == 5
+    assert felder["sprecher_sicher"]["einheit"] == "% Ähnlichkeit" and felder["abschnitt_min"]["einheit"] == "Minuten"
+    # was das System kennt, kommt als Auswahl: Dienste und Modell aus der Leitstelle, ffmpeg mit Fundort
+    assert all(felder[n]["angebot"] for n in ("dienst_hoeren", "dienst_sprecher", "dienst_trennen", "ki_modell", "ffmpeg_ordner"))
+    angebot = (await client.get("/api/v1/einstellungen/angebot/ffmpeg_ordner", headers=h)).json()
+    assert angebot["stand"].startswith("gefunden: ") and angebot["optionen"][0]["titel"] == "Automatisch finden"
+    hoeren = (await client.get("/api/v1/einstellungen/angebot/dienst_hoeren", headers=h)).json()
+    assert hoeren["stand"].startswith("Leitstelle noch nicht eingerichtet")
     assert (await client.post("/api/v1/transkribieren", headers=h, json={"quelle_id": "x"})).status_code == 422
     assert (await client.get("/api/v1/aufnahmen", headers=h)).status_code == 404          # Schein kennt keine Ablage

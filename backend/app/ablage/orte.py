@@ -14,6 +14,7 @@ PROFILE = "profile.json"
 ENDUNG = ".transkript.json"
 INHALTSTYP = "application/json"
 FELD_MARKER = "marker"   # an einer Aufnahme: beim Aufnehmen gesetzte Marker [{zeit, titel}]
+FELD_DAUER = "dauer_s"   # an einer Aufnahme: Dauer in Sekunden, sobald bekannt (beim Transkribieren gemessen)
 
 TON = {".wav", ".mp3", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".flac", ".wma", ".aif", ".aiff", ".caf", ".amr"}
 VIDEO = {".mp4", ".m4v", ".mov", ".mkv", ".avi", ".webm", ".mpg", ".mpeg", ".wmv", ".3gp"}

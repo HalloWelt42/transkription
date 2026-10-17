@@ -3,13 +3,12 @@
   // Ziehen), Aufnehmen im Browser, Auswahl transkribieren. Am Telefon: großer Aufnahmeknopf, Datei wählen, die letzten.
   // Entwurf: mockups/transkription.html (1) und transkription-mobil.html (1, 2).
   import { onMount } from "svelte";
-  import { beiAuftrag, gehe, geraet, hole, json, wann } from "appkern-oberflaeche";
+  import { Auswahl, beiAuftrag, gehe, geraet, hole, json, sitzung, wann } from "appkern-oberflaeche";
   import * as api from "../lib/api";
-  import { alsDatei, aufnahme, gespeicherte, starten as aufnehmen, verwerfen, type Gespeichert } from "../lib/aufnahme.svelte";
+  import { alsDatei, aufnahme, geraeteLaden, gespeicherte, quelleWechseln, starten as aufnehmen, verwerfen, type Gespeichert } from "../lib/aufnahme.svelte";
   import { entfernen, hochladen, uploads } from "../lib/hochladen.svelte";
   import type { Aufnahme, AufnahmenSeite, Ordner } from "../lib/typen";
   import { groesse, marke, SPRACHEN } from "../lib/zeit";
-  import Auswahl from "../teile/Auswahl.svelte";
   import Rekorder from "../teile/Rekorder.svelte";
 
   type Filter = "alle" | "ohne" | "transkribiert";
@@ -58,6 +57,7 @@
       }
       await laden();
       liegen = await gespeicherte();
+      await geraeteLaden();
     })();
     return beiAuftrag((a) => {
       if (a.art !== "transkribieren" || !seite) return;
@@ -69,6 +69,16 @@
         zeile.auftrag = { id: a.id, zustand: a.zustand, fortschritt: a.fortschritt, schritt: a.schritt, phase: a.phase };
       } else void laden();
     });
+  });
+
+  // Sobald eine Aufnahme gespeichert ist (noch vor der Entscheidung), steht sie in der Liste.
+  let zuletztGespeichert = "";
+  $effect(() => {
+    const d = aufnahme.danach;
+    if (d && d.id !== zuletztGespeichert) {
+      zuletztGespeichert = d.id;
+      void laden();
+    }
   });
 
   let suchTakt: ReturnType<typeof setTimeout>;
@@ -176,6 +186,13 @@
     ...[2, 3, 4, 5, 6].map((n) => ({ wert: n as number | null, titel: `${n} Sprecher` }))];
   const ART = { ton: "fa-file-audio", video: "fa-file-video" };
 
+  // "2:14:08 · M4A · 186 MB · heute 08:12" wie im Entwurf; die Dauer, sobald sie bekannt ist
+  function metazeile(a: Aufnahme): string {
+    const format = a.name.includes(".") ? a.name.slice(a.name.lastIndexOf(".") + 1).toUpperCase() : "";
+    const teile = [a.dauer_s ? marke(a.dauer_s) : "", a.name.startsWith("Sprachnotiz") ? "aufgenommen" : format, groesse(a.groesse), wann(a.geaendert_am)];
+    return teile.filter(Boolean).join(" · ");
+  }
+
   function standText(a: Aufnahme): string {
     if (a.stand === "transkribiert") return a.transkripte.length > 1 ? `${a.transkripte.length} Transkripte` : "transkribiert";
     if (a.stand === "laeuft") return `${a.auftrag?.schritt?.split(",")[0] || "läuft"}${a.auftrag?.fortschritt != null ? ` ${Math.round(a.auftrag.fortschritt * 100)} %` : ""}`;
@@ -193,7 +210,7 @@
     <span class="art"><i class="fa-solid {a.name.startsWith('Sprachnotiz') ? 'fa-microphone' : ART[a.art]}"></i></span>
     <div style="min-width:0">
       <div class="name">{a.name}</div>
-      <div class="meta">{groesse(a.groesse)} · {wann(a.geaendert_am)}</div>
+      <div class="meta">{metazeile(a)}</div>
     </div>
     <span class="stand {a.stand === 'transkribiert' ? 'fertig' : a.stand === 'laeuft' ? 'laeuft' : 'offen'}">
       {#if a.stand === "laeuft"}<i class="fa-solid fa-circle-notch fa-spin"></i>{/if} {standText(a)}</span>
@@ -232,14 +249,18 @@
 {/if}
 
 {#if geraet.mobil}
-  {#if aufnahme.laeuft}
+  {#if aufnahme.laeuft || aufnahme.danach}
     <Rekorder onfertig={aufnahmeFertig} />
   {:else}
     {@render liegendeListe()}
     <div class="t-aufnehmen">
       <button class="rot" title="Aufnahme starten" onclick={aufnehmen}><i class="fa-solid fa-microphone"></i></button>
       <div><b>Aufnehmen</b></div>
-      <div class="unter">Landet in Aufnahmen und wird danach transkribiert, wenn du willst.</div>
+      <div class="unter">Landet in Aufnahmen; transkribiert wird erst, wenn du es danach entscheidest.</div>
+      {#if aufnahme.geraete.length > 1}
+        <Auswahl wert={aufnahme.geraet} titel="Mikrofon" symbol="fa-microphone" onwahl={(g) => quelleWechseln(g)}
+                 optionen={[{ wert: "", titel: "Standard des Systems" }, ...aufnahme.geraete.filter((g) => g.id && g.id !== "default").map((g) => ({ wert: g.id, titel: g.name }))]} />
+      {/if}
     </div>
     {#if aufnahme.fehler}<div class="fehlertext">{aufnahme.fehler}</div>{/if}
     <div class="t-zweit">
@@ -291,13 +312,13 @@
     <label class="suche" style="min-width:200px"><i class="fa-solid fa-magnifying-glass"></i>
       <input class="eingabe-roh" placeholder="Name suchen" bind:value={suche} oninput={suchen} /></label>
     <span class="knopfzeile" style="margin-left:auto">
-      <button class="knopf" onclick={aufnehmen} disabled={aufnahme.laeuft}><i class="fa-solid fa-circle-dot" style="color:var(--gefahr)"></i> Aufnehmen</button>
+      <button class="knopf" onclick={aufnehmen} disabled={aufnahme.laeuft || !!aufnahme.danach}><i class="fa-solid fa-circle-dot" style="color:var(--gefahr)"></i> Aufnehmen</button>
       <button class="knopf primaer" onclick={() => eingabe.click()}><i class="fa-solid fa-upload"></i> Hochladen</button>
     </span>
   </div>
   <div class="rollfeld" role="region" aria-label="Aufnahmen"
        ondragover={(e) => { e.preventDefault(); ueber = true; }} ondragleave={() => (ueber = false)} ondrop={ablegen}>
-    {#if aufnahme.laeuft}<Rekorder kompakt onfertig={aufnahmeFertig} />{/if}
+    {#if aufnahme.laeuft || aufnahme.danach}<Rekorder kompakt onfertig={aufnahmeFertig} />{/if}
     {#if aufnahme.fehler}<div class="fehlertext" style="margin-bottom:12px">{aufnahme.fehler}</div>{/if}
     {@render liegendeListe()}
     <div class="ordnerzeile">
@@ -305,6 +326,10 @@
                       titel="Ordner, die du der App in der Kellerwolke freigegeben hast" />
       {#each stapel as o (o.id)}<span class="chip"><i class="fa-solid fa-folder-open"></i>{o.name}</span>{/each}
       {#if stapel.length}<button class="knopf still" onclick={hoch}><i class="fa-solid fa-arrow-up"></i> Hoch</button>{/if}
+      {#if sitzung.app?.kellerwolke}
+        <a class="knopf still" href="{sitzung.app.kellerwolke}/einstellungen/zugaenge" target="_blank" rel="noopener"
+           title="In der Kellerwolke unter Zugänge der App weitere Ordner freigeben"><i class="fa-solid fa-folder-plus"></i> Ordner freigeben</a>
+      {/if}
     </div>
     <div class="ablage" class:ueber><i class="fa-solid fa-cloud-arrow-up"></i> Dateien hierher ziehen: Ton (WAV, MP3, M4A, OGG,
       FLAC) oder Video (MP4, MOV, MKV).</div>
@@ -340,6 +365,11 @@
         <p class="leer">{suche ? "Nichts gefunden." : filter === "transkribiert" ? "Noch nichts transkribiert." : "Keine Aufnahmen in diesem Ordner. Hochladen, hierher ziehen oder aufnehmen."}</p>
       {/if}
     {/each}
+    {#if seite?.eintraege.length && filter === "ohne"}
+      <p class="leer" style="padding:14px">Bereits transkribierte Aufnahmen zeigt "Alle" oder "Transkribiert"; dort führt ein Klick zum Transkript.</p>
+    {:else if seite?.eintraege.some((a) => a.stand === "ohne")}
+      <p class="leer" style="padding:14px">Aufnahmen ohne Transkript anklicken, um sie zum Transkribieren zu wählen.</p>
+    {/if}
     {#if seite && seite.gesamt > SEITE}
       <div class="seitenzeile"><span>{ab + 1} bis {Math.min(ab + SEITE, seite.gesamt)} von {seite.gesamt}</span>
         <button class="knopf" disabled={ab === 0} onclick={() => { ab = Math.max(0, ab - SEITE); void laden(); }}><i class="fa-solid fa-chevron-left"></i> Zurück</button>

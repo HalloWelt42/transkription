@@ -9,7 +9,7 @@ Auswertung), Anmeldung mit dem Kellerwolke-Konto, gestartet vom Stellwerk.
 
 | Bereich | Inhalt |
 |---|---|
-| Aufnahmen | Ton- und Videodateien aus `Aufnahmen` und aus Ordnern, die du der App in der Kellerwolke freigibst; Hochladen (auch Ziehen und Ablegen), Aufnehmen im Browser (jedes Stück landet sofort im Gerätespeicher und übersteht ein Neuladen), Marker beim Aufnehmen |
+| Aufnahmen | Ton- und Videodateien aus `Aufnahmen` und aus Ordnern, die du der App in der Kellerwolke freigibst, mit Dauer und Format; Hochladen (auch Ziehen und Ablegen), Aufnehmen im Browser (Mikrofon wählbar, auch während der Aufnahme; jedes Stück landet sofort im Gerätespeicher und übersteht ein Neuladen), Marker beim Aufnehmen, Live-Mitschrift während der Aufnahme; danach entscheidest du: transkribieren, Live-Text als Transkript speichern oder nur speichern |
 | Transkribieren | als Auftrag in Abschnitten an Sprechpausen (Länge einstellbar); nach Abbruch oder Neustart geht es beim nächsten Abschnitt weiter; Sprache wählbar oder erkennen |
 | Sprecher | Sprechertrennung, ohne sie Gruppieren der Stimmabdrücke; Abgleich mit Sprecherprofilen (sicher oder als Vorschlag zum Bestätigen); ein Profil entsteht, wenn du einem Sprecher einen Namen als Profil gibst |
 | Lesen | Spieler mit Wellenform, Sprecherspur und Markern; Mitlesen Wort für Wort, Klick auf ein Wort springt hin; Suche im Text |
@@ -52,6 +52,7 @@ und Sprachmodell). ffmpeg muss auf dem Rechner sein.
 | Tests | `cd backend && .venv/bin/python -m pytest` |
 | Typen | `cd frontend && npm run check` |
 | Symbole | `python3 tools/symbole.py` nach einer Änderung an `frontend/public/symbol.svg` |
+| Ausrollen | `tools/ausrollen.sh` (nur gepushte Stände: Tests, Oberfläche bauen, im Stellwerk neu starten, Fassungen prüfen) |
 | Entwürfe | `python3 -m http.server` im Repo, dann `/mockups/transkription.html` und `/mockups/transkription-mobil.html` |
 
 Die Verbundtests (`test_ablage_verbund.py`, `test_verbund.py`) sprechen mit einer echten Kellerwolke und brauchen
