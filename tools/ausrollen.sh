@@ -102,6 +102,14 @@ for datei in favicon.ico:image/ favicon-32.png:image/png apple-touch-icon.png:im
   antwort="$(curl -s -o /dev/null -w '%{http_code} %{content_type}' --cacert "$HAUSSTELLE_MAC" "$ADRESSE/$pfad")"
   case "$antwort" in "200 $typ"*) ;; *) echo "Symbol $pfad: $antwort (erwartet 200 $typ)"; exit 1 ;; esac
 done
-echo "HTTP/2 über den Vorschaltdienst, Symbole und Manifest in Ordnung"
+# iOS nimmt für den Startbildschirm die Symbole aus dem Manifest; mit durchsichtigen Stellen zeigt es keins
+for datei in icon-192.png icon-512.png apple-touch-icon.png; do
+  curl -s --cacert "$HAUSSTELLE_MAC" "$ADRESSE/$datei" | python3 -c 'import io, sys
+from PIL import Image
+bild = Image.open(io.BytesIO(sys.stdin.buffer.read())).convert("RGBA")
+sys.exit(0 if bild.getchannel("A").getextrema()[0] == 255 else 1)' \
+    || { echo "Symbol $datei hat durchsichtige Stellen (iOS zeigt dann keins): python3 tools/symbole.py"; exit 1; }
+done
+echo "HTTP/2 über den Vorschaltdienst, Symbole deckend, Manifest in Ordnung"
 echo
 echo "Transkription ausgerollt: $ADRESSE"
