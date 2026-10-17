@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="de" data-theme="hell">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Transkription - Entwürfe am Telefon</title>
+    <link rel="stylesheet" href="kopf.css" />
+  </head>
+  <body>
+    <!-- Eigene Telefonansicht der Schale: Reiter unten (Aufnahmen, Transkripte, Aufträge, Mehr; Sprecher unter Mehr). -->
+    <div class="buehne">
+
+      <div>
+        <p class="zustand-titel" style="margin-top:0">1. Aufnahmen: groß aufnehmen oder Datei wählen, darunter die letzten</p>
+        <div class="telefon"><div class="mobil">
+          <div class="t-kopf"><h1>Aufnahmen</h1><span class="pille aktiv"><i class="fa-solid fa-gears"></i>1</span></div>
+          <div class="t-inhalt">
+            <div class="t-aufnehmen">
+              <button class="rot" title="Aufnahme starten"><i class="fa-solid fa-microphone"></i></button>
+              <div><b>Aufnehmen</b></div>
+              <div class="unter">Landet in Apps/Transkription/Aufnahmen und wird danach transkribiert, wenn du willst.</div>
+            </div>
+            <div class="t-zweit">
+              <button class="knopf"><i class="fa-solid fa-file-audio"></i> Datei wählen</button>
+              <button class="knopf"><i class="fa-solid fa-folder-open"></i> Aus der Kellerwolke</button>
+            </div>
+            <div class="t-gruppe">Zuletzt</div>
+            <div class="t-liste">
+              <div class="t-zeile"><i class="fa-solid fa-microphone"></i><div class="t-text"><div class="t-name">Sprachnotiz 07-58</div><div class="t-meta">3:12 · Hören 40 %</div></div><span class="stand laeuft"><i class="fa-solid fa-circle-notch fa-spin"></i></span></div>
+              <div class="t-zeile"><i class="fa-solid fa-file-audio"></i><div class="t-text"><div class="t-name">Vortrag Stadtrat</div><div class="t-meta">2:14:08 · ohne Transkript</div></div><i class="fa-solid fa-chevron-right" style="color:var(--text-3)"></i></div>
+              <div class="t-zeile"><i class="fa-solid fa-file-lines"></i><div class="t-text"><div class="t-name">Folge 12: Hausverwaltung</div><div class="t-meta">45:12 · transkribiert</div></div><i class="fa-solid fa-chevron-right" style="color:var(--text-3)"></i></div>
+            </div>
+          </div>
+          <nav class="t-reiter">
+            <button class="aktiv"><i class="fa-solid fa-microphone-lines"></i>Aufnahmen</button>
+            <button><i class="fa-solid fa-file-lines"></i>Transkripte</button>
+            <button><i class="fa-solid fa-list-check"></i>Aufträge</button>
+            <button><i class="fa-solid fa-ellipsis"></i>Mehr</button>
+          </nav>
+        </div></div>
+      </div>
+
+      <div>
+        <p class="zustand-titel" style="margin-top:0">2. Aufnahme läuft: Zeit, Pegel, Anhalten und Beenden; Bildschirm bleibt an</p>
+        <div class="telefon"><div class="mobil">
+          <div class="t-kopf"><h1>Aufnahme</h1></div>
+          <div class="t-inhalt">
+            <div class="t-uhr">03:12</div>
+            <p style="text-align:center; margin:0; color:var(--text-3); font-size:var(--klein)"><i class="fa-solid fa-circle" style="color:var(--gefahr); font-size:10px"></i> nimmt auf · wird laufend gesichert</p>
+            <div class="t-pegel" id="pegel"></div>
+            <div class="t-steuer">
+              <button class="rund" title="Anhalten"><i class="fa-solid fa-pause"></i></button>
+              <button class="stopp" title="Beenden"><i class="fa-solid fa-stop"></i></button>
+              <button class="rund" title="Marker setzen"><i class="fa-solid fa-flag"></i></button>
+            </div>
+            <div class="t-liste">
+              <div class="t-zeile"><i class="fa-solid fa-pen"></i><div class="t-text"><div class="t-meta">Name</div><div class="t-name">Sprachnotiz 2026-10-17 08-31</div></div></div>
+              <div class="t-zeile"><i class="fa-solid fa-closed-captioning"></i><div class="t-text"><div class="t-name">Danach transkribieren</div><div class="t-meta">Deutsch, Sprecher erkennen</div></div><button class="schalter an"></button></div>
+            </div>
+          </div>
+          <nav class="t-reiter">
+            <button class="aktiv"><i class="fa-solid fa-microphone-lines"></i>Aufnahmen</button>
+            <button><i class="fa-solid fa-file-lines"></i>Transkripte</button>
+            <button><i class="fa-solid fa-list-check"></i>Aufträge</button>
+            <button><i class="fa-solid fa-ellipsis"></i>Mehr</button>
+          </nav>
+        </div></div>
+      </div>
+
+      <div>
+        <p class="zustand-titel" style="margin-top:0">3. Transkript lesen: Mitlesen Wort für Wort, Spieler über den Reitern</p>
+        <div class="telefon"><div class="mobil">
+          <div class="t-kopf"><button class="rund" aria-label="Zurück"><i class="fa-solid fa-chevron-left"></i></button><h1 style="font-size:21px">Folge 12: Hausverwaltung</h1><button class="rund" aria-label="Mehr"><i class="fa-solid fa-ellipsis-vertical"></i></button></div>
+          <div class="t-inhalt">
+            <div class="t-beitrag"><div class="wer"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:var(--s2)"></span>Herr Krüger<span class="zeit">04:31</span></div>
+              <div class="text">Das verstehe ich. Die Nebenkostenabrechnung für 2025 kam erst im September.</div></div>
+            <div class="t-beitrag jetzt"><div class="wer"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:var(--s2)"></span>Herr Krüger<span class="zeit">05:01</span></div>
+              <div class="text"><span class="wort gehoert">Grundsteuer</span> <span class="wort gehoert">und</span> <span class="wort jetzt">Müll</span> <span class="wort">sind in den Nebenkosten gestiegen, das liegt nicht an uns.</span></div></div>
+            <div class="t-beitrag"><div class="wer"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:var(--s3)"></span>Bernd<span class="zeit">05:19</span></div>
+              <div class="text">Dürfen wir die Belege auch vor Ort einsehen? Das steht uns ja zu.</div></div>
+            <div class="t-beitrag"><div class="wer"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:var(--s1)"></span>Anna<span class="zeit">05:34</span></div>
+              <div class="text">Gut. Dann machen wir für nächste Woche einen Termin aus.</div></div>
+          </div>
+          <div class="t-spieler">
+            <button class="gross"><i class="fa-solid fa-pause"></i></button>
+            <div class="welle" data-kopf="0.111" data-saeulen="60" data-spur="s1:8 s2:14 s1:5 s3:9 s2:20 s1:12 s3:6 s2:26" data-marker="0.0997"></div>
+            <span class="zeitangabe">05:01<br />45:12</span>
+          </div>
+          <nav class="t-reiter">
+            <button><i class="fa-solid fa-microphone-lines"></i>Aufnahmen</button>
+            <button class="aktiv"><i class="fa-solid fa-file-lines"></i>Transkripte</button>
+            <button><i class="fa-solid fa-list-check"></i>Aufträge</button>
+            <button><i class="fa-solid fa-ellipsis"></i>Mehr</button>
+          </nav>
+        </div></div>
+      </div>
+
+      <div>
+        <p class="zustand-titel" style="margin-top:0">4. Transkripte mit Suche: Treffer mit Zeit, Tippen springt in den Ton</p>
+        <div class="telefon"><div class="mobil">
+          <div class="t-kopf"><h1>Transkripte</h1></div>
+          <div class="t-inhalt">
+            <span class="suche" style="display:flex; color:var(--text); height:44px"><i class="fa-solid fa-magnifying-glass" style="color:var(--text-3)"></i>Nebenkosten<i class="fa-solid fa-xmark" style="margin-left:auto; color:var(--text-3)"></i></span>
+            <div class="t-gruppe">37 mit Treffern</div>
+            <div class="t-liste">
+              <div class="t-zeile"><i class="fa-solid fa-file-lines"></i><div class="t-text"><div class="t-name">Folge 12: Hausverwaltung</div><div class="t-meta">heute · 5 Treffer</div></div></div>
+              <div class="t-treffer"><span class="zeit">04:31</span>... die <mark>Nebenkosten</mark>abrechnung für 2025 ...</div>
+              <div class="t-zeile"><i class="fa-solid fa-file-lines"></i><div class="t-text"><div class="t-name">Eigentümerversammlung 2026</div><div class="t-meta">02.09.2026 · 12 Treffer</div></div></div>
+              <div class="t-treffer"><span class="zeit">32:10</span>... die <mark>Nebenkosten</mark>vorauszahlung um 30 Euro ...</div>
+              <div class="t-zeile"><i class="fa-solid fa-file-lines"></i><div class="t-text"><div class="t-name">Sprachnotiz Mieterverein</div><div class="t-meta">28.08.2026 · 1 Treffer</div></div></div>
+              <div class="t-treffer"><span class="zeit">00:18</span>... Widerspruch gegen die <mark>Nebenkosten</mark> ...</div>
+            </div>
+            <button class="knopf" style="width:100%; justify-content:center; margin-top:12px; height:46px">Weitere 20 laden</button>
+          </div>
+          <nav class="t-reiter">
+            <button><i class="fa-solid fa-microphone-lines"></i>Aufnahmen</button>
+            <button class="aktiv"><i class="fa-solid fa-file-lines"></i>Transkripte</button>
+            <button><i class="fa-solid fa-list-check"></i>Aufträge</button>
+            <button><i class="fa-solid fa-ellipsis"></i>Mehr</button>
+          </nav>
+        </div></div>
+      </div>
+
+    </div>
+    <script src="gemeinsam.js"></script>
+    <script>
+      // Pegel der laufenden Aufnahme (nur Entwurf)
+      const pegel = document.getElementById("pegel");
+      for (let i = 0; i < 40; i++) {
+        const s = document.createElement("span");
+        s.style.height = `${12 + 70 * Math.abs(Math.sin(i * 0.6) * Math.cos(i * 0.23))}%`;
+        pegel.append(s);
+      }
+    </script>
+  </body>
+</html>

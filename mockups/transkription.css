@@ -1,0 +1,121 @@
+/* Eigene Teile der Transkription (Spieler, Wellenform, Segmente, Wörter, Sprecher, Korrektur). Farben und Größen aus
+   der Schale; Sprecherfarben fest je Kennung. */
+
+:root {
+  --s1: #12938a; --s2: #c2410c; --s3: #7c3aed; --s4: #2f7ce0; --s5: #b45309; --s6: #db2777;
+}
+
+/* ----- Aufnahmen und Listen ----- */
+.zeile { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; gap: 14px; align-items: center;
+         padding: 12px 16px; background: var(--flaeche); border-radius: var(--r3); box-shadow: var(--schatten); margin-bottom: 8px; border: 2px solid transparent; }
+.zeile .art { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--flaeche-2); color: var(--text-2); font-size: 18px; }
+.zeile .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zeile .meta { font-size: var(--klein); color: var(--text-3); margin-top: 2px; }
+.zeile.gewaehlt { border-color: var(--akzent); }
+.stand { font-size: var(--marke); padding: 2px 10px; border-radius: 10px; white-space: nowrap; font-weight: 600; }
+.stand.fertig { background: var(--gut-weich); color: var(--gut); }
+.stand.laeuft { background: var(--akzent-weich); color: var(--akzent); }
+.stand.offen { background: var(--flaeche-2); color: var(--text-3); font-weight: 400; }
+.ablage { border: 2px dashed var(--rand); border-radius: var(--r3); padding: 18px; text-align: center; color: var(--text-3);
+          font-size: var(--klein); margin-bottom: 14px; }
+.optionen { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; padding: 14px 16px; background: var(--akzent-weich);
+            border-radius: var(--r3); margin-bottom: 14px; }
+.optionen .titel { font-weight: 600; }
+.optionen label { font-size: var(--klein); color: var(--text-2); display: inline-flex; gap: 8px; align-items: center; }
+.ordnerzeile { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: var(--klein); color: var(--text-2); }
+.ordnerwahl { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border-radius: var(--r2);
+              background: var(--flaeche); border: 1px solid var(--rand); font-size: var(--klein); }
+.treffer { margin: 6px 0 0 58px; display: flex; flex-direction: column; gap: 4px; }
+.treffer div { font-size: var(--klein); color: var(--text-2); }
+.treffer .zeit { font-family: ui-monospace, monospace; color: var(--akzent); margin-right: 8px; }
+.treffer mark { background: var(--warn-weich); color: var(--text); border-radius: 3px; }
+
+/* ----- Spieler ----- */
+.spieler { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; gap: 14px; align-items: center;
+           padding: 10px 22px 12px; background: var(--flaeche); box-shadow: 0 1px 0 var(--rand); }
+.spieler .gross { width: 46px; height: 46px; border-radius: 23px; border: 0; background: var(--akzent); color: #fff; font-size: 18px; }
+.spieler .zeitangabe { font-family: ui-monospace, monospace; font-size: var(--klein); color: var(--text-2); white-space: nowrap; }
+.welle { position: relative; height: 54px; }
+.welle .saeulen { position: absolute; inset: 8px 0 8px 0; display: flex; align-items: center; gap: 1px; }
+.welle .saeulen span { flex: 1; min-width: 1px; border-radius: 1px; background: var(--rand); }
+.welle .saeulen span.gespielt { background: var(--akzent); }
+.welle .abspielkopf { position: absolute; top: 2px; bottom: 2px; width: 2px; background: var(--text); }
+.welle .fahne { position: absolute; top: -2px; transform: translateX(-50%); font-size: 12px; color: var(--warn); }
+.welle .sprecherspur { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; display: flex; border-radius: 2px; overflow: hidden; }
+
+/* ----- Transkript: ein Beitrag ist ein Segment der Datei (Zeit, Sprecher, Text mit Wörtern) ----- */
+.text-flaeche { max-width: 980px; }
+.beitrag { display: grid; grid-template-columns: 70px 150px minmax(0, 1fr); gap: 14px; padding: 10px 12px; border-radius: var(--r2); }
+.beitrag + .beitrag { margin-top: 2px; }
+.beitrag .zeit { font-family: ui-monospace, monospace; font-size: var(--klein); color: var(--text-3); padding-top: 3px; cursor: pointer; }
+.beitrag.jetzt { background: var(--flaeche); box-shadow: var(--schatten); }
+.beitrag .text { line-height: 1.65; }
+.wort.jetzt { background: var(--akzent); color: #fff; border-radius: 4px; padding: 0 3px; }
+.wort.gehoert { color: var(--text); }
+.beitrag.jetzt .wort:not(.gehoert):not(.jetzt) { color: var(--text-2); }
+.sprecher { display: inline-flex; align-items: center; gap: 7px; font-size: var(--klein); font-weight: 600; white-space: nowrap; height: 28px; }
+.sprecher .punkt { width: 10px; height: 10px; border-radius: 5px; flex: none; }
+.marker-zeile { display: flex; align-items: center; gap: 10px; margin: 8px 0 8px 84px; font-size: var(--klein); color: var(--warn); }
+.marker-zeile::after { content: ""; flex: 1; height: 1px; background: var(--warn-weich); }
+
+/* Bearbeiten */
+.beitrag.bearbeiten { background: var(--flaeche); box-shadow: 0 0 0 2px var(--akzent); }
+.beitrag .feld-text { border: 1px solid var(--rand); border-radius: var(--r2); padding: 8px 10px; background: var(--flaeche-2); line-height: 1.6; }
+.beitrag .werkzeuge { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.sprecherwahl { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 15px; border: 1px solid var(--rand);
+                background: var(--flaeche); font-size: var(--klein); }
+
+/* KI-Korrektur */
+.vorschlag { margin: 4px 0 4px 247px; padding: 10px 12px; border-radius: var(--r2); background: var(--flaeche); border: 1px dashed var(--akzent); }
+.vorschlag .kopfzeile { display: flex; align-items: center; gap: 10px; font-size: var(--klein); color: var(--text-2); margin-bottom: 6px; }
+.vorschlag del { background: var(--gefahr-weich); color: var(--gefahr); text-decoration: line-through; border-radius: 3px; padding: 0 2px; }
+.vorschlag ins { background: var(--gut-weich); color: var(--gut); text-decoration: none; border-radius: 3px; padding: 0 2px; }
+.vorschlag .aktionen { margin-left: auto; display: flex; gap: 6px; }
+
+/* Leiste rechts */
+.leiste .gruppe { padding: 14px 20px; border-bottom: 1px solid var(--rand); }
+.leiste .gruppe h3 { margin: 0 0 10px; font-size: var(--marke); text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); font-weight: 600; }
+.sprecher-zeile { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; padding: 6px 0; }
+.sprecher-zeile .anteil { font-size: var(--marke); color: var(--text-3); }
+.sprecher-zeile .vorschlag-chip { grid-column: 1 / -1; font-size: var(--klein); color: var(--text-2); display: flex; gap: 8px; align-items: center;
+                                   background: var(--flaeche-2); border-radius: var(--r2); padding: 6px 10px; }
+.knopfreihe { display: flex; flex-wrap: wrap; gap: 6px; }
+.knopf.klein { height: 32px; padding: 0 12px; }
+.liste-klein div { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; font-size: var(--klein); }
+.liste-klein .zeit { font-family: ui-monospace, monospace; color: var(--text-3); width: 60px; flex: none; }
+
+/* Sprecherprofile */
+.profil { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 16px;
+          background: var(--flaeche); border-radius: var(--r3); box-shadow: var(--schatten); margin-bottom: 8px; border: 2px solid transparent; }
+.profil .bild { width: 48px; height: 48px; border-radius: 24px; display: grid; place-items: center; color: #fff; font-weight: 600; font-size: 18px; }
+.profil .unter { font-size: var(--klein); color: var(--text-3); margin-top: 2px; }
+.profil.gewaehlt { border-color: var(--akzent); }
+
+/* ----- Telefon ----- */
+.mobil .t-aufnehmen { display: flex; flex-direction: column; align-items: center; gap: 12px; background: var(--flaeche); border-radius: 14px; padding: 22px 16px 18px; }
+.mobil .t-aufnehmen .rot { width: 84px; height: 84px; border-radius: 42px; border: 0; background: var(--gefahr); color: #fff; font-size: 30px;
+                           box-shadow: 0 0 0 8px var(--gefahr-weich); }
+.mobil .t-aufnehmen .unter { font-size: var(--klein); color: var(--text-3); text-align: center; }
+.mobil .t-zweit { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.mobil .t-zweit .knopf { height: 50px; justify-content: center; border-radius: 14px; }
+.mobil .t-uhr { font-family: ui-monospace, monospace; font-size: 54px; font-weight: 600; text-align: center; margin: 30px 0 6px; }
+.mobil .t-pegel { display: flex; align-items: center; justify-content: center; gap: 3px; height: 90px; }
+.mobil .t-pegel span { width: 5px; border-radius: 3px; background: var(--gefahr); }
+.mobil .t-steuer { display: flex; justify-content: center; align-items: center; gap: 28px; margin: 26px 0 18px; }
+.mobil .t-steuer .rund { width: 64px; height: 64px; border-radius: 32px; font-size: 22px; }
+.mobil .t-steuer .stopp { width: 84px; height: 84px; border-radius: 42px; border: 0; background: var(--gefahr); color: #fff; font-size: 28px; }
+.mobil .t-beitrag { padding: 10px 2px; }
+.mobil .t-beitrag + .t-beitrag { border-top: 1px solid var(--rand); }
+.mobil .t-beitrag .wer { display: flex; align-items: center; gap: 8px; font-size: var(--klein); font-weight: 600; }
+.mobil .t-beitrag .wer .zeit { margin-left: auto; font-weight: 400; color: var(--text-3); font-family: ui-monospace, monospace; }
+.mobil .t-beitrag .text { line-height: 1.6; margin-top: 4px; }
+.mobil .t-beitrag.jetzt { background: var(--flaeche); border-radius: 12px; padding: 10px 12px; border-top-color: transparent; }
+.mobil .t-spieler { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 16px;
+                    background: var(--flaeche); box-shadow: 0 -1px 0 var(--rand); }
+.mobil .t-spieler .gross { width: 46px; height: 46px; border-radius: 23px; border: 0; background: var(--akzent); color: #fff; font-size: 18px; }
+.mobil .t-spieler .welle { height: 40px; }
+.mobil .t-spieler .zeitangabe { font-family: ui-monospace, monospace; font-size: var(--marke); color: var(--text-2); }
+.mobil .t-treffer { font-size: var(--klein); color: var(--text-2); padding: 0 14px 12px 54px; margin-top: -4px; }
+.mobil .t-treffer .zeit { font-family: ui-monospace, monospace; color: var(--akzent); margin-right: 6px; }
+.mobil .t-treffer mark { background: var(--warn-weich); color: var(--text); border-radius: 3px; }
+.seiten-kopf h1.titel-lang { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

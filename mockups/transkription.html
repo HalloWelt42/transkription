@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="de" data-theme="hell">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Transkription - Entwürfe am Rechner</title>
+    <link rel="stylesheet" href="kopf.css" />
+  </head>
+  <body>
+    <!-- Kopf, Navigation und Aufträge kommen aus der Schale des Appkerns (freigegeben). Hier nur die Seiten der App. -->
+
+    <p class="zustand-titel" style="margin-top:0">1. Aufnahmen: Ton- und Videodateien aus der Kellerwolke (Ordner Aufnahmen und freigegebene Ordner), hochladen per Ziehen; zwei gewählt, Leiste zum Transkribieren</p>
+    <div class="fenster">
+      <header class="kopf" data-erzeugen></header>
+      <div></div>
+      <div class="geruest">
+        <nav class="nav" data-aktiv="aufnahmen"></nav>
+        <section class="seite">
+          <div class="seiten-kopf">
+            <h1>Aufnahmen</h1>
+            <span class="segment"><span>Alle 9</span><span class="aktiv">Ohne Transkript 4</span><span>Transkribiert</span></span>
+            <span class="suche" style="min-width:200px"><i class="fa-solid fa-magnifying-glass"></i>Name suchen</span>
+            <span style="margin-left:auto; display:flex; gap:8px">
+              <button class="knopf"><i class="fa-solid fa-circle-dot" style="color:var(--gefahr)"></i> Aufnehmen</button>
+              <button class="knopf primaer"><i class="fa-solid fa-upload"></i> Hochladen</button>
+            </span>
+          </div>
+          <div class="rollfeld">
+            <div class="ordnerzeile">Ordner <span class="ordnerwahl" title="Ordner, die du der App in der Kellerwolke freigegeben hast"><i class="fa-solid fa-folder"></i>Apps/Transkription/Aufnahmen<i class="fa-solid fa-chevron-down"></i></span><button class="knopf still"><i class="fa-solid fa-folder-plus"></i> Ordner freigeben</button></div>
+            <div class="ablage"><i class="fa-solid fa-cloud-arrow-up"></i> Dateien hierher ziehen: Ton (WAV, MP3, M4A, OGG, FLAC) oder Video (MP4, MOV, MKV). Große Dateien laden fortsetzbar hoch.</div>
+
+            <div class="optionen">
+              <span class="titel"><i class="fa-solid fa-closed-captioning"></i> 2 gewählt</span>
+              <label>Sprache <span class="ordnerwahl">Deutsch <i class="fa-solid fa-chevron-down"></i></span></label>
+              <label>Sprecher erkennen <button class="schalter an"></button></label>
+              <label>Anzahl <span class="ordnerwahl">von selbst <i class="fa-solid fa-chevron-down"></i></span></label>
+              <span style="margin-left:auto; display:flex; gap:8px">
+                <button class="knopf still">Auswahl aufheben</button>
+                <button class="knopf primaer"><i class="fa-solid fa-play"></i> Transkribieren</button>
+              </span>
+            </div>
+
+            <div class="zeile gewaehlt">
+              <span class="art"><i class="fa-solid fa-file-audio"></i></span>
+              <div style="min-width:0"><div class="name">Vortrag Stadtrat 2026-10-14.m4a</div><div class="meta">2:14:08 · M4A · 186 MB · heute 08:12</div></div>
+              <span class="stand offen">ohne Transkript</span>
+              <button class="knopf still" title="Anhören"><i class="fa-solid fa-play"></i></button>
+            </div>
+            <div class="zeile gewaehlt">
+              <span class="art"><i class="fa-solid fa-file-video"></i></span>
+              <div style="min-width:0"><div class="name">Elternabend Klasse 7b.mp4</div><div class="meta">1:32:40 · MP4 · 2,1 GB · gestern 21:05</div></div>
+              <span class="stand offen">ohne Transkript</span>
+              <button class="knopf still"><i class="fa-solid fa-play"></i></button>
+            </div>
+            <div class="zeile">
+              <span class="art"><i class="fa-solid fa-microphone"></i></span>
+              <div style="min-width:0"><div class="name">Sprachnotiz 2026-10-17 07-58.webm</div><div class="meta">0:03:12 · am Telefon aufgenommen · heute 07:58</div></div>
+              <span class="stand laeuft"><i class="fa-solid fa-circle-notch fa-spin"></i> Hören 40 %</span>
+              <button class="knopf still"><i class="fa-solid fa-play"></i></button>
+            </div>
+            <div class="zeile">
+              <span class="art"><i class="fa-solid fa-file-audio"></i></span>
+              <div style="min-width:0"><div class="name">Folge 13 Rohschnitt.wav</div><div class="meta">0:51:20 · WAV · 541 MB · 15.10.2026</div></div>
+              <span class="stand offen">wartet</span>
+              <button class="knopf still"><i class="fa-solid fa-play"></i></button>
+            </div>
+            <p class="leer" style="padding:14px">Bereits transkribierte Aufnahmen zeigt "Alle" oder "Transkribiert"; dort führt ein Klick zum Transkript.</p>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <p class="zustand-titel">2. Transkripte: Verzeichnis mit Volltextsuche (Treffer mit Zeit, Klick springt in den Ton), Filter nach Sprache und Sprecher, seitenweise</p>
+    <div class="fenster">
+      <header class="kopf" data-erzeugen></header>
+      <div></div>
+      <div class="geruest">
+        <nav class="nav" data-aktiv="transkripte"></nav>
+        <section class="seite">
+          <div class="seiten-kopf">
+            <h1>Transkripte</h1>
+            <span class="suche" style="min-width:320px; color:var(--text)"><i class="fa-solid fa-magnifying-glass" style="color:var(--text-3)"></i>Nebenkosten<i class="fa-solid fa-xmark" style="margin-left:auto; color:var(--text-3)"></i></span>
+            <span class="segment"><span class="aktiv">Alle Sprachen</span><span>Deutsch</span><span>Englisch</span></span>
+            <span class="chips"><span class="chip"><span class="punkt" style="width:9px;height:9px;border-radius:5px;background:var(--s1)"></span>Anna<button><i class="fa-solid fa-xmark"></i></button></span><span class="chip" style="color:var(--text-3)"><i class="fa-solid fa-plus"></i>Sprecher</span></span>
+          </div>
+          <div class="rollfeld">
+            <p style="margin:0 0 10px; font-size:var(--klein); color:var(--text-2)">37 Transkripte mit Treffern, sortiert nach Datum</p>
+            <div class="zeile">
+              <span class="art"><i class="fa-solid fa-file-lines"></i></span>
+              <div style="min-width:0"><div class="name">Folge 12: Gespräch mit der Hausverwaltung</div><div class="meta">45:12 · Deutsch · Anna, Herr Krüger, Sprecher 3 · geändert heute 10:12</div></div>
+              <span class="stand fertig">5 Treffer</span>
+              <button class="knopf still"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+            <div class="treffer">
+              <div><span class="zeit">04:31</span>... die <mark>Nebenkosten</mark>abrechnung für 2025 kam erst im September ...</div>
+              <div><span class="zeit">05:04</span>... Grundsteuer und Müll sind in den <mark>Nebenkosten</mark> gestiegen, das liegt nicht an uns ...</div>
+              <div style="color:var(--akzent)">3 weitere Treffer</div>
+            </div>
+            <div class="zeile" style="margin-top:10px">
+              <span class="art"><i class="fa-solid fa-file-lines"></i></span>
+              <div style="min-width:0"><div class="name">Eigentümerversammlung 2026</div><div class="meta">1:48:30 · Deutsch · 6 Sprecher · 02.09.2026</div></div>
+              <span class="stand fertig">12 Treffer</span>
+              <button class="knopf still"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+            <div class="treffer">
+              <div><span class="zeit">32:10</span>... Vorschlag: die <mark>Nebenkosten</mark>vorauszahlung um 30 Euro anheben ...</div>
+              <div><span class="zeit">1:02:44</span><i class="fa-solid fa-flag" style="color:var(--warn)"></i> Marker "<mark>Nebenkosten</mark> Abstimmung"</div>
+            </div>
+            <div class="zeile" style="margin-top:10px">
+              <span class="art"><i class="fa-solid fa-file-lines"></i></span>
+              <div style="min-width:0"><div class="name">Sprachnotiz Mieterverein</div><div class="meta">2:41 · Deutsch · Anna · 28.08.2026</div></div>
+              <span class="stand fertig">1 Treffer</span>
+              <button class="knopf still"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+            <div class="treffer"><div><span class="zeit">00:18</span>... Frist für den Widerspruch gegen die <mark>Nebenkosten</mark> ist zwölf Monate ...</div></div>
+            <div class="seitenzeile"><span>1 bis 20 von 37</span><button class="knopf" disabled><i class="fa-solid fa-chevron-left"></i> Zurück</button><button class="knopf">Weiter <i class="fa-solid fa-chevron-right"></i></button></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <p class="zustand-titel">3. Transkript lesen: Spieler mit Wellenform, Sprecherspur und Markern; Mitlesen Wort für Wort, Klick auf ein Wort oder eine Zeit springt hin; rechts Sprecher, Marker, Export, KI, Versionen. Adresse im Browser: /transkripte/folge-12</p>
+    <div class="fenster">
+      <header class="kopf" data-erzeugen></header>
+      <div></div>
+      <div class="geruest mit-leiste">
+        <nav class="nav" data-aktiv="transkripte"></nav>
+        <section class="seite">
+          <div class="seiten-kopf">
+            <button class="knopf still" style="padding:0 6px"><i class="fa-solid fa-chevron-left"></i> Transkripte</button>
+            <h1 class="titel-lang">Folge 12: Gespräch mit der Hausverwaltung</h1>
+            <span class="suche" style="min-width:180px"><i class="fa-solid fa-magnifying-glass"></i>Im Text suchen</span>
+            <button class="knopf"><i class="fa-solid fa-pen"></i> Bearbeiten</button>
+          </div>
+          <div class="spieler">
+            <button class="gross" title="Anhalten (Leertaste)"><i class="fa-solid fa-pause"></i></button>
+            <span class="knopfreihe"><button class="rund" title="5 s zurück"><i class="fa-solid fa-rotate-left"></i></button><button class="rund" title="5 s vor"><i class="fa-solid fa-rotate-right"></i></button></span>
+            <div class="welle" data-kopf="0.111" data-saeulen="110" data-spur="s1:8 s2:14 s1:5 s3:9 s2:20 s1:12 s3:6 s2:26" data-marker="0.0997 0.43 0.71"></div>
+            <span class="zeitangabe">05:01 / 45:12</span>
+            <button class="knopf" title="Tempo"><i class="fa-solid fa-gauge"></i> 100 %</button>
+          </div>
+          <div class="rollfeld" style="padding-top:14px">
+            <div class="text-flaeche">
+              <div class="beitrag"><span class="zeit">04:12</span><span class="sprecher"><span class="punkt" style="background:var(--s1)"></span>Anna</span>
+                <div class="text">Ich würde gern noch einmal über die Abrechnung sprechen. Die kam dieses Jahr sehr spät, und die Nachzahlung ist fast doppelt so hoch wie im Vorjahr.</div></div>
+              <div class="beitrag"><span class="zeit">04:31</span><span class="sprecher"><span class="punkt" style="background:var(--s2)"></span>Herr Krüger</span>
+                <div class="text">Das verstehe ich. Die Nebenkostenabrechnung für 2025 kam erst im September, weil der Versorger seine Zahlen so spät geliefert hat.</div></div>
+              <div class="marker-zeile"><i class="fa-solid fa-flag"></i>04:58 Kosten</div>
+              <div class="beitrag jetzt"><span class="zeit">05:01</span><span class="sprecher"><span class="punkt" style="background:var(--s2)"></span>Herr Krüger</span>
+                <div class="text"><span class="wort gehoert">Grundsteuer</span> <span class="wort gehoert">und</span> <span class="wort jetzt">Müll</span> <span class="wort">sind</span> <span class="wort">in</span> <span class="wort">den</span> <span class="wort">Nebenkosten</span> <span class="wort">gestiegen,</span> <span class="wort">das</span> <span class="wort">liegt</span> <span class="wort">nicht</span> <span class="wort">an</span> <span class="wort">uns.</span> <span class="wort">Ich</span> <span class="wort">schicke</span> <span class="wort">Ihnen</span> <span class="wort">die</span> <span class="wort">Bescheide</span> <span class="wort">gern</span> <span class="wort">mit.</span></div></div>
+              <div class="beitrag"><span class="zeit">05:19</span><span class="sprecher"><span class="punkt" style="background:var(--s3)"></span>Sprecher 3</span>
+                <div class="text">Dürfen wir die Belege auch vor Ort einsehen? Das steht uns ja zu.</div></div>
+              <div class="beitrag"><span class="zeit">05:26</span><span class="sprecher"><span class="punkt" style="background:var(--s2)"></span>Herr Krüger</span>
+                <div class="text">Selbstverständlich, nach Absprache in unserem Büro, dienstags und donnerstags.</div></div>
+              <div class="beitrag"><span class="zeit">05:34</span><span class="sprecher"><span class="punkt" style="background:var(--s1)"></span>Anna</span>
+                <div class="text">Gut. Dann machen wir für nächste Woche einen Termin aus, und ich bringe die Abrechnung vom Vorjahr mit.</div></div>
+            </div>
+          </div>
+        </section>
+        <aside class="leiste">
+          <div class="rollfeld" style="padding:0">
+            <div class="gruppe">
+              <h3>Sprecher</h3>
+              <div class="sprecher-zeile"><span class="sprecher"><span class="punkt" style="background:var(--s1)"></span>Anna</span><span class="anteil">41 %</span></div>
+              <div class="sprecher-zeile"><span class="sprecher"><span class="punkt" style="background:var(--s2)"></span>Herr Krüger</span><span class="anteil">47 %</span></div>
+              <div class="sprecher-zeile"><span class="sprecher"><span class="punkt" style="background:var(--s3)"></span>Sprecher 3</span><span class="anteil">12 %</span>
+                <div class="vorschlag-chip"><i class="fa-solid fa-user-check" style="color:var(--akzent)"></i><span>klingt wie <b>Bernd</b> (ähnlich 0,78)</span><button class="knopf klein" style="margin-left:auto">Übernehmen</button></div></div>
+              <div class="knopfreihe" style="margin-top:8px"><button class="knopf klein still"><i class="fa-solid fa-pen"></i> Umbenennen</button><button class="knopf klein still"><i class="fa-solid fa-rotate"></i> Neu erkennen</button></div>
+            </div>
+            <div class="gruppe">
+              <h3>Marker</h3>
+              <div class="liste-klein">
+                <div><span class="zeit">04:58</span><span><i class="fa-solid fa-flag" style="color:var(--warn)"></i> Kosten</span></div>
+                <div><span class="zeit">19:27</span><span><i class="fa-solid fa-flag" style="color:var(--warn)"></i> Belegeinsicht</span></div>
+                <div><span class="zeit">32:05</span><span><i class="fa-solid fa-flag" style="color:var(--warn)"></i> Termin</span></div>
+              </div>
+              <button class="knopf klein still" style="margin-top:6px"><i class="fa-solid fa-plus"></i> Marker bei 05:01</button>
+            </div>
+            <div class="gruppe">
+              <h3>Export</h3>
+              <div class="knopfreihe"><button class="knopf klein">Text</button><button class="knopf klein">Markdown</button><button class="knopf klein">Untertitel SRT</button><button class="knopf klein">WebVTT</button><button class="knopf klein">DOCX</button><button class="knopf klein">JSON</button></div>
+              <label style="display:flex; align-items:center; gap:10px; margin-top:10px; font-size:var(--klein); color:var(--text-2)"><button class="schalter"></button>zusätzlich neben das Transkript legen</label>
+            </div>
+            <div class="gruppe">
+              <h3>KI über die Leitstelle</h3>
+              <div class="knopfreihe">
+                <button class="knopf klein"><i class="fa-solid fa-wand-magic-sparkles"></i> Korrigieren</button>
+                <button class="knopf klein"><i class="fa-solid fa-list-ul"></i> Auswerten</button>
+              </div>
+              <p style="margin:8px 0 0; font-size:var(--klein); color:var(--text-3)">Korrigieren macht Vorschläge je Beitrag; übernommen wird nur, was du bestätigst.</p>
+            </div>
+            <div class="gruppe" style="border-bottom:0">
+              <h3>Versionen</h3>
+              <div class="liste-klein">
+                <div><span class="zeit">17.10.</span><span><b>4</b> 10:12 · Sprecher 2 heißt Herr Krüger</span></div>
+                <div><span class="zeit">16.10.</span><span><b>3</b> KI-Korrektur, 11 Vorschläge übernommen</span></div>
+                <div><span class="zeit">15.10.</span><span><b>1</b> erzeugt von klangwerk-hoeren</span></div>
+              </div>
+              <button class="knopf klein still" style="margin-top:6px"><i class="fa-solid fa-clock-rotate-left"></i> Alle Versionen</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <p class="zustand-titel">4. Bearbeiten mit KI-Vorschlägen: ein Beitrag offen (Text, Sprecher, Zeiten, Teilen, Zusammenführen, Marker), Vorschläge der Korrektur je Beitrag, Speichern legt eine neue Version an</p>
+    <div class="fenster">
+      <header class="kopf" data-erzeugen></header>
+      <div></div>
+      <div class="geruest">
+        <nav class="nav" data-aktiv="transkripte"></nav>
+        <section class="seite">
+          <div class="seiten-kopf">
+            <button class="knopf still" style="padding:0 6px"><i class="fa-solid fa-chevron-left"></i> Transkripte</button>
+            <h1 class="titel-lang">Folge 12: Gespräch mit der Hausverwaltung</h1>
+            <span class="pille aktiv"><i class="fa-solid fa-pen"></i>Bearbeiten</span>
+          </div>
+          <div class="spieler">
+            <button class="gross"><i class="fa-solid fa-play"></i></button>
+            <span class="knopfreihe"><button class="rund"><i class="fa-solid fa-rotate-left"></i></button><button class="rund"><i class="fa-solid fa-rotate-right"></i></button></span>
+            <div class="welle" data-kopf="0.111" data-saeulen="110" data-spur="s1:8 s2:14 s1:5 s3:9 s2:20 s1:12 s3:6 s2:26" data-marker="0.0997 0.43 0.71"></div>
+            <span class="zeitangabe">05:01 / 45:12</span>
+            <span class="segment"><span>Nur diesen Beitrag</span><span class="aktiv">Weiter</span></span>
+          </div>
+          <div class="rollfeld" style="padding-top:14px">
+            <div class="text-flaeche">
+              <div class="optionen">
+                <span class="titel"><i class="fa-solid fa-wand-magic-sparkles"></i> KI-Korrektur</span>
+                <span style="font-size:var(--klein); color:var(--text-2)">14 Vorschläge: 3 übernommen, 1 verworfen, 10 offen</span>
+                <span style="margin-left:auto; display:flex; gap:8px"><button class="knopf">Alle offenen übernehmen</button><button class="knopf still">Alle verwerfen</button></span>
+              </div>
+              <div class="beitrag"><span class="zeit">04:31</span><span class="sprecher"><span class="punkt" style="background:var(--s2)"></span>Herr Krüger</span>
+                <div class="text">Das verstehe ich. Die Nebenkostenabrechnung für 2025 kam erst im September, weil der Versorger seine Zahlen so spät geliefert hat.</div></div>
+              <div class="beitrag bearbeiten"><span class="zeit">05:01<br />05:19</span>
+                <span><span class="sprecherwahl"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:var(--s2)"></span>Herr Krüger<i class="fa-solid fa-chevron-down"></i></span></span>
+                <div><div class="feld-text">Grundsteuer und Müll sind in den Nebenkosten gestiegen, das liegt nicht an uns. Ich schicke Ihnen die Bescheide gern mit.|</div>
+                  <div class="werkzeuge">
+                    <button class="knopf klein"><i class="fa-solid fa-scissors"></i> Am Cursor teilen</button>
+                    <button class="knopf klein"><i class="fa-solid fa-object-group"></i> Mit nächstem zusammen</button>
+                    <button class="knopf klein"><i class="fa-solid fa-clock"></i> Zeiten</button>
+                    <button class="knopf klein"><i class="fa-solid fa-flag"></i> Marker</button>
+                    <button class="knopf klein still" style="margin-left:auto">Fertig</button>
+                  </div></div></div>
+              <div class="beitrag"><span class="zeit">05:19</span><span class="sprecher"><span class="punkt" style="background:var(--s3)"></span>Bernd</span>
+                <div class="text">Dürfen wir die Belege auch vor Ort ein sehen? Das steht uns ja zu.</div></div>
+              <div class="vorschlag">
+                <div class="kopfzeile"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--akzent)"></i>Vorschlag<span class="aktionen"><button class="knopf klein"><i class="fa-solid fa-check"></i> Übernehmen</button><button class="knopf klein still">Verwerfen</button></span></div>
+                Dürfen wir die Belege auch vor Ort <del>ein sehen</del><ins>einsehen</ins>? Das steht uns ja zu.
+              </div>
+              <div class="beitrag"><span class="zeit">05:26</span><span class="sprecher"><span class="punkt" style="background:var(--s2)"></span>Herr Krüger</span>
+                <div class="text">Selbstverständlich nach Absprache in unserem Büro dienstags und donnerstags.</div></div>
+              <div class="vorschlag">
+                <div class="kopfzeile"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--akzent)"></i>Vorschlag<span class="aktionen"><button class="knopf klein"><i class="fa-solid fa-check"></i> Übernehmen</button><button class="knopf klein still">Verwerfen</button></span></div>
+                Selbstverständlich<ins>,</ins> nach Absprache in unserem Büro<ins>,</ins> dienstags und donnerstags.
+              </div>
+              <div class="speicherleiste" style="margin-top:14px">
+                <span class="was"><b style="color:var(--text)">3 Änderungen</b> noch nicht gespeichert. Speichern legt Version 5 an; Version 4 bleibt abrufbar.</span>
+                <button class="knopf still">Verwerfen</button>
+                <button class="knopf primaer"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <p class="zustand-titel">5. Sprecher: Profile mit Stimmabdruck aus bestätigten Zuordnungen, Proben zum Anhören, Zusammenführen und Umbenennen</p>
+    <div class="fenster">
+      <header class="kopf" data-erzeugen></header>
+      <div></div>
+      <div class="geruest mit-leiste">
+        <nav class="nav" data-aktiv="sprecher"></nav>
+        <section class="seite">
+          <div class="seiten-kopf">
+            <h1>Sprecher</h1>
+            <span class="suche" style="min-width:200px"><i class="fa-solid fa-magnifying-glass"></i>Name suchen</span>
+          </div>
+          <div class="rollfeld">
+            <div class="profil gewaehlt">
+              <span class="bild" style="background:var(--s1)">A</span>
+              <div><div class="name">Anna</div><div class="unter">in 214 Transkripten · 61 Proben · zuletzt heute</div></div>
+              <span class="stand fertig">sicher</span>
+            </div>
+            <div class="profil">
+              <span class="bild" style="background:var(--s2)">K</span>
+              <div><div class="name">Herr Krüger</div><div class="unter">in 9 Transkripten · 12 Proben · zuletzt heute</div></div>
+              <span class="stand fertig">sicher</span>
+            </div>
+            <div class="profil">
+              <span class="bild" style="background:var(--s3)">B</span>
+              <div><div class="name">Bernd</div><div class="unter">in 31 Transkripten · 4 Proben · zuletzt 02.09.2026</div></div>
+              <span class="stand offen">wenige Proben</span>
+            </div>
+            <div class="profil">
+              <span class="bild" style="background:var(--s4)">M</span>
+              <div><div class="name">Moderatorin Radio</div><div class="unter">in 57 Transkripten · 18 Proben · zuletzt 11.10.2026</div></div>
+              <span class="stand fertig">sicher</span>
+            </div>
+            <p class="leer" style="padding:14px">Ein Profil entsteht, wenn du einem erkannten Sprecher einen Namen gibst; jede bestätigte Zuordnung schärft den Abdruck.</p>
+          </div>
+        </section>
+        <aside class="leiste">
+          <div class="leiste-kopf"><h2>Anna</h2><span class="fassung">Stimmabdruck aus 61 Proben, zuletzt geschärft heute 10:12</span></div>
+          <div class="rollfeld">
+            <div class="abschnitt">Name</div>
+            <span class="eingabe"><span class="wert">Anna</span></span>
+            <div class="abschnitt">Proben</div>
+            <div class="liste-klein">
+              <div><button class="rund" style="width:30px;height:30px"><i class="fa-solid fa-play"></i></button><span>Folge 12, 04:12 · "Ich würde gern noch einmal ..."</span></div>
+              <div><button class="rund" style="width:30px;height:30px"><i class="fa-solid fa-play"></i></button><span>Sprachnotiz Mieterverein, 00:05</span></div>
+              <div><button class="rund" style="width:30px;height:30px"><i class="fa-solid fa-play"></i></button><span>Folge 11, 12:40</span></div>
+            </div>
+            <div class="abschnitt">Erkennung</div>
+            <dl class="werte"><dt>Sicher ab</dt><dd>0,75 Ähnlichkeit (Einstellung)</dd><dt>Vorschlag ab</dt><dd>0,60, du bestätigst</dd></dl>
+            <div style="display:flex; gap:8px; margin-top:20px; flex-wrap:wrap">
+              <button class="knopf"><i class="fa-solid fa-object-group"></i> Zusammenführen mit ...</button>
+              <button class="knopf gefahr"><i class="fa-solid fa-trash"></i> Löschen</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <script src="gemeinsam.js"></script>
+  </body>
+</html>
