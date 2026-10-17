@@ -4,13 +4,14 @@ Versatz: WAV springt im Browser samplegenau, MP3 mit variabler Bitrate oder Aufn
 Index) nicht. Bewährtes Verfahren der alten txt2voice (dieselben ffmpeg-Parameter).
 
 Die Fassungen sind abgeleitet und jederzeit neu erzeugbar; sie liegen darum nicht in der Kellerwolke, sondern im
-Zwischenspeicher der App (`daten/abspielen`), je Quelle und Stand eine Datei. Wird der Speicher voller als erlaubt,
-gehen die am längsten nicht gespielten zuerst.
+Zwischenspeicher der App (`daten/abspielen`), je Quelle und Stand eine Datei, daneben ihre Wellenform. Wird der Speicher
+voller als erlaubt, gehen die am längsten nicht gespielten zuerst.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import time
 from collections.abc import Callable
@@ -56,12 +57,21 @@ class Abspielfassungen:
             finally:
                 roh.unlink(missing_ok=True)
 
+    async def wellenform(self, quelle: Knoten, kw: Kellerwolke) -> list[int]:
+        """Lautstärke für den Spieler, aus der Abspielfassung (eine Quelle für jede Ansicht, auch ohne Transkript)."""
+        merker = self.pfad(quelle).with_suffix(".welle.json")
+        if merker.is_file():
+            return json.loads(merker.read_text())
+        werte = await self._ton().wellenform(await self.holen(quelle, kw))
+        merker.write_text(json.dumps(werte))
+        return werte
+
     def _sperre(self, quelle: Knoten) -> asyncio.Lock:
         return self._sperren.setdefault(str(quelle.id), asyncio.Lock())
 
     async def _erzeugen(self, quelle: Knoten, roh: Path) -> Path:
         self.ordner.mkdir(parents=True, exist_ok=True)
-        for alt in self.ordner.glob(f"{quelle.id}-*.wav"):          # frühere Stände dieser Quelle
+        for alt in [*self.ordner.glob(f"{quelle.id}-*.wav"), *self.ordner.glob(f"{quelle.id}-*.welle.json")]:  # frühere Stände
             alt.unlink(missing_ok=True)
         ziel = await self._ton().abspielfassung(roh, self.pfad(quelle))
         self.aufraeumen()
@@ -81,3 +91,4 @@ class Abspielfassungen:
                 continue
             summe -= p.stat().st_size
             p.unlink(missing_ok=True)
+            p.with_suffix(".welle.json").unlink(missing_ok=True)

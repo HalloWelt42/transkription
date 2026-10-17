@@ -356,7 +356,7 @@
       {#each (alleVersionen ? versionen : versionen?.slice(0, 3)) ?? [] as v, i (v.id)}
         <div class="version-zeile">
           <span class="zeit">{tag(v.erstellt_am)}</span>
-          <span class="version-text"><b>{(versionen?.length ?? 0) - i}</b> {uhr(v.erstellt_am)} · {v.notiz?.was ?? "geändert"}</span>
+          <span class="version-text"><b>{(versionen?.length ?? 0) - i}</b> · {uhr(v.erstellt_am)} · {v.notiz?.was ?? "geändert"}</span>
           {#if !v.aktuell && !bearbeiten && alleVersionen}
             <button class="knopf klein still" title="Diese Fassung als neue Version zurückholen" onclick={() => zurueck(v)}>
               {zurueckFrage === v.id ? "Wirklich?" : "Zurückholen"}</button>

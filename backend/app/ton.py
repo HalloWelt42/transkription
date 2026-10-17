@@ -20,6 +20,9 @@ _STILLE_BEGINN = re.compile(r"silence_start: (-?[0-9.]+)")
 _STILLE_ENDE = re.compile(r"silence_end: (-?[0-9.]+)")
 
 
+WELLE_DB = 60.0  # so viele Dezibel unter Vollaussteuerung ist die Wellenform leer (wie der Pegel beim Aufnehmen)
+
+
 class TonFehler(Exception):
     """ffmpeg fehlt oder konnte die Datei nicht lesen."""
 
@@ -120,9 +123,10 @@ class Ton:
         return ziel
 
     async def wellenform(self, datei: Path, punkte: int = 800) -> list[int]:
-        """Lautstärke in `punkte` Abschnitten (0 bis 100, Spitzenwert je Abschnitt) für die Anzeige im Spieler. Aus
-        2000 Werten je Sekunde: genug für die Grundtöne der Stimme (weniger würde sie beim Umrechnen wegfiltern) und
-        klein genug für Stunden (zwei Stunden etwa 30 MB). Ausreißer zählen nicht: 100 ist das 99. Perzentil."""
+        """Lautstärke in `punkte` Abschnitten (0 bis 100) für die Anzeige im Spieler. Aus 2000 Werten je Sekunde: genug
+        für die Grundtöne der Stimme (weniger würde sie beim Umrechnen wegfiltern) und klein genug für Stunden (zwei
+        Stunden etwa 30 MB). In Dezibel mit festem Maßstab wie der Pegel beim Aufnehmen (0 dB voll, -WELLE_DB leer): leise
+        Sprache bleibt sichtbar, ein Knackser drückt sie nicht flach, eine stumme Aufnahme sieht stumm aus."""
         import numpy as np
 
         prozess = await asyncio.create_subprocess_exec(
@@ -136,8 +140,8 @@ class Ton:
             return []
         teile = np.array_split(werte, min(punkte, werte.size))
         spitzen = np.array([t.max() for t in teile])
-        hoch = float(np.percentile(spitzen, 99)) or float(spitzen.max()) or 1.0
-        return [int(min(100, round(100 * w / hoch))) for w in spitzen]
+        db = 20 * np.log10(np.maximum(spitzen, 1.0) / 32768.0)
+        return [int(round(v)) for v in np.clip(100 * (1 + db / WELLE_DB), 0, 100)]
 
     async def flac(self, datei: Path, ziel: Path) -> Path:
         """Verlustfrei kleiner (etwa die Hälfte) für Dienste, die die ganze Aufnahme brauchen (Sprechertrennung)."""

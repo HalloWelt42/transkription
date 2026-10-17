@@ -102,6 +102,8 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert [s["sprecher"] for s in segmente] == ["s1", "s2", "s1", "s2"]
                 assert all(s.get("abdruck") is None for s in t["transkript"]["sprecher"])
                 assert len(t["transkript"]["wellenform"]) == 800
+                welle = (await c.get(f"/api/v1/inhalt/aufnahmen/{aufnahme['id']}/wellenform", headers=h)).json()
+                assert len(welle) == 800 and max(welle) > 50 and min(welle) < 30      # aus dem Ton, Sprache und Pausen
                 assert [(m["zeit"], m["titel"]) for m in t["transkript"]["marker"]] == [(4.5, "Wichtig")]
                 eintrag = (await c.get("/api/v1/aufnahmen", headers=h, params={"suche": name})).json()["eintraege"][0]
                 assert eintrag["stand"] == "transkribiert" and eintrag["transkripte"][0]["id"] == tid

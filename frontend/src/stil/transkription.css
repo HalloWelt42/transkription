@@ -74,8 +74,10 @@
 .vorschlag .aktionen { margin-left: auto; display: flex; gap: 6px; }
 
 /* Leiste rechts */
-.leiste .gruppe { padding: 14px 20px; border-bottom: 1px solid var(--rand); }
-.leiste .gruppe h3 { margin: 0 0 10px; font-size: var(--marke); text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); font-weight: 600; }
+/* Gruppen der Leiste: gleich, ob sie rechts in der Seitenleiste stehen oder am Telefon in der Karte unter "Mehr" */
+.leiste .gruppe, .leiste-inhalt .gruppe { padding: 14px 20px; border-bottom: 1px solid var(--rand); }
+.leiste-inhalt .gruppe:last-child { border-bottom: 0; }
+.leiste .gruppe h3, .leiste-inhalt .gruppe h3 { margin: 0 0 10px; font-size: var(--marke); text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); font-weight: 600; }
 .sprecher-zeile { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; padding: 6px 0; }
 .sprecher-zeile .anteil { font-size: var(--marke); color: var(--text-3); }
 .sprecher-zeile .vorschlag-chip { grid-column: 1 / -1; font-size: var(--klein); color: var(--text-2); display: flex; gap: 8px; align-items: center;
@@ -107,12 +109,14 @@
 .mobil .t-steuer { display: flex; justify-content: center; align-items: center; gap: 28px; margin: 26px 0 18px; }
 .mobil .t-steuer .rund { width: 64px; height: 64px; border-radius: 32px; font-size: 22px; }
 .mobil .t-steuer .stopp { width: 84px; height: 84px; border-radius: 42px; border: 0; background: var(--gefahr); color: #fff; font-size: 28px; }
-.mobil .t-beitrag { padding: 10px 2px; }
+.mobil .t-beitrag { padding: 10px 12px; border-radius: 12px; }
 .mobil .t-beitrag + .t-beitrag { border-top: 1px solid var(--rand); }
 .mobil .t-beitrag .wer { display: flex; align-items: center; gap: 8px; font-size: var(--klein); font-weight: 600; }
 .mobil .t-beitrag .wer .zeit { margin-left: auto; font-weight: 400; color: var(--text-3); font-family: ui-monospace, monospace; }
 .mobil .t-beitrag .text { line-height: 1.6; margin-top: 4px; }
-.mobil .t-beitrag.jetzt { background: var(--flaeche); border-radius: 12px; padding: 10px 12px; border-top-color: transparent; }
+/* der laufende Beitrag bekommt nur den Grund; der Text bleibt bündig mit den anderen */
+.mobil .t-beitrag.jetzt { background: var(--flaeche); border-top-color: transparent; }
+.mobil .t-beitrag.jetzt + .t-beitrag { border-top-color: transparent; }
 .mobil .t-spieler { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 16px;
                     background: var(--flaeche); box-shadow: 0 -1px 0 var(--rand); }
 .mobil .t-spieler .gross { width: 46px; height: 46px; border-radius: 23px; border: 0; background: var(--akzent); color: #fff; font-size: 18px; }
@@ -127,6 +131,8 @@
 .rekorder .t-uhr, .rekorder .t-pegel, .rekorder .t-steuer { font-family: inherit; }
 .rekorder .t-uhr { font-family: ui-monospace, monospace; font-size: 54px; font-weight: 600; text-align: center; margin: 18px 0 6px; }
 .rekorder-stand { text-align: center; margin: 0 0 6px; color: var(--text-3); font-size: var(--klein); }
+.rekorder-warnung { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; margin: 0 0 6px;
+  color: var(--warn); font-size: var(--klein); text-align: center; }
 .rekorder .t-pegel { display: flex; align-items: center; justify-content: center; gap: 3px; height: 90px; }
 .rekorder .t-pegel span { width: 5px; border-radius: 3px; background: var(--gefahr); transition: height .1s; }
 .rekorder .t-steuer { display: flex; justify-content: center; align-items: center; gap: 28px; margin: 20px 0 16px; }
@@ -165,6 +171,9 @@
 .feld-text { width: 100%; font: inherit; color: var(--text); resize: vertical; min-height: 70px; }
 .werkzeuge .eingabe { height: 32px; font-size: var(--klein); }
 .mobil .t-spieler { position: sticky; bottom: -16px; margin: 8px -16px -16px; z-index: 2; }
+.mobil .t-ansicht { display: flex; flex-direction: column; min-height: 100%; }
+.mobil .t-ansicht > .t-spieler { margin-top: auto; }
+.mobil .t-ansicht > [role="region"] { padding-bottom: 8px; }
 /* Transkript am Rechner: Seite und Leiste nebeneinander im Bereich der Schale */
 .geruest-innen { display: grid; grid-template-columns: minmax(0, 1fr) 380px; flex: 1; min-height: 0; }
 .geruest-innen > .seite { min-height: 0; }
@@ -172,7 +181,10 @@
 
 /* ----- Leiste des Transkripts (nach Entwurf) ----- */
 .leiste-inhalt { padding: 0; }
-.leiste .gruppe .knopfreihe { margin-top: 8px; align-items: center; }
+.leiste .gruppe .knopfreihe, .leiste-inhalt .gruppe .knopfreihe { margin-top: 8px; align-items: center; }
+/* am Telefon sind auch stille Knöpfe als Knopf erkennbar und groß genug zum Tippen */
+.mobil .leiste-inhalt .gruppe { padding: 14px 16px; }
+.mobil .leiste-inhalt .knopf.still { background: var(--flaeche-2); box-shadow: 0 0 0 1px var(--rand); min-height: 40px; }
 .leiste .beschriftung { font-size: var(--klein); color: var(--text-2); }
 .sprecher-zeile .eingabe.klein-eingabe, .eingabe.klein-eingabe { height: 36px; gap: 8px; }
 .schalter-zeile { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: var(--klein); color: var(--text-2); }

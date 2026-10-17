@@ -20,6 +20,10 @@ const LIVE_MIN_S = 5;
 const LIVE_MAX_S = 15;
 const STILLE_S = 0.45;
 const STILLE_PEGEL = 0.012;
+// Pegel in Dezibel wie ein Aussteuerungsmesser: -60 dB ist leer, 0 dB voll; unter -50 dB gilt als still
+const PEGEL_UNTEN_DB = -60;
+const STILL_DB = -50;
+const STILL_MELDEN_MS = 3000;
 
 export interface Gespeichert {
   id: string;
@@ -50,6 +54,8 @@ export const aufnahme = $state({
   live: true,
   mitschrift: [] as LiveStueck[],
   liveStand: "",
+  // ob Ton ankommt: ok, still (seit Sekunden nichts vom Mikrofon) oder angehalten (der Browser hält den Ton zurück)
+  signal: "ok" as "ok" | "still" | "angehalten",
   // nach dem Beenden: gespeichert, wartet auf die Entscheidung des Nutzers (transkribieren, Live-Text, fertig)
   danach: null as null | { id: string; name: string; dauer_s: number; mitschrift: LiveStueck[] },
 });
@@ -145,7 +151,9 @@ export async function geraeteLaden(): Promise<void> {
 }
 
 async function mikrofon(geraet: string): Promise<MediaStream> {
-  const bedingung: MediaTrackConstraints = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+  // automatische Lautstärke an: ohne sie kommt etwa am iPhone die Stimme um -30 dB an (Pegel und Erkennung leiden);
+  // Echo- und Rauschunterdrückung aus, das Hörmodell bekommt den Ton möglichst unverfälscht
+  const bedingung: MediaTrackConstraints = { echoCancellation: false, noiseSuppression: false, autoGainControl: true };
   if (geraet) bedingung.deviceId = { exact: geraet };
   return navigator.mediaDevices.getUserMedia({ audio: bedingung });
 }
@@ -200,6 +208,9 @@ export async function starten(): Promise<void> {
     aufnahme.fehler = "Aufnehmen geht hier nicht (der Browser erlaubt das Mikrofon nur über HTTPS oder am Rechner selbst).";
     return;
   }
+  // noch im Klick anlegen und fortsetzen: einen später angelegten Ton-Kontext hält Safari an (Pegel flach, Aufnahme stumm)
+  ton = new AudioContext();
+  void ton.resume().catch(() => undefined);
   try {
     strom = await mikrofon(aufnahme.geraet);
   } catch {
@@ -208,11 +219,13 @@ export async function starten(): Promise<void> {
       aufnahme.geraet = "";
     } catch {
       aufnahme.fehler = "Kein Zugriff aufs Mikrofon (im Browser erlauben).";
+      void ton.close();
+      ton = null;
       return;
     }
   }
   await geraeteLaden();                     // erst nach der Erlaubnis kennt der Browser die Namen
-  ton = new AudioContext();
+  if (ton.state !== "running") await ton.resume().catch(() => undefined);
   analyse = ton.createAnalyser();
   analyse.fftSize = 512;
   ziel = ton.createMediaStreamDestination();
@@ -258,20 +271,31 @@ export async function starten(): Promise<void> {
 function pegelMessen(): void {
   if (!analyse) return;
   const a = analyse;
-  const werte = new Uint8Array(a.fftSize);
+  const werte = new Float32Array(a.fftSize);
   let letzte = 0;
+  let stillSeit = performance.now();
+  aufnahme.signal = "ok";
   const schritt = (zeit: number) => {
     if (!aufnahme.laeuft) return;
     if (zeit - letzte > 100) {
       letzte = zeit;
-      a.getByteTimeDomainData(werte);
+      a.getFloatTimeDomainData(werte);
       let spitze = 0;
-      for (const w of werte) spitze = Math.max(spitze, Math.abs(w - 128));
-      aufnahme.pegel = [...aufnahme.pegel.slice(1), aufnahme.pausiert ? 0 : Math.min(100, (spitze / 128) * 140)];
+      for (const w of werte) spitze = Math.max(spitze, Math.abs(w));
+      const db = spitze > 0 ? 20 * Math.log10(spitze) : -Infinity;
+      const anteil = Math.max(0, Math.min(100, ((db - PEGEL_UNTEN_DB) / -PEGEL_UNTEN_DB) * 100));
+      aufnahme.pegel = [...aufnahme.pegel.slice(1), aufnahme.pausiert ? 0 : anteil];
+      if (aufnahme.pausiert || db >= STILL_DB) stillSeit = zeit;
+      aufnahme.signal = ton && ton.state !== "running" ? "angehalten" : zeit - stillSeit > STILL_MELDEN_MS ? "still" : "ok";
     }
     requestAnimationFrame(schritt);
   };
   requestAnimationFrame(schritt);
+}
+
+/** Hält der Browser den Ton zurück (Signal "angehalten"), setzt ein Tippen ihn fort. */
+export async function tonFortsetzen(): Promise<void> {
+  await ton?.resume().catch(() => undefined);
 }
 
 export function pause(): void {

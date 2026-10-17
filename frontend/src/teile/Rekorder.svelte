@@ -6,7 +6,7 @@
   import { tick } from "svelte";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
-  import { aufnahme, beenden, markerSetzen, pause, quelleWechseln, verwerfen } from "../lib/aufnahme.svelte";
+  import { aufnahme, beenden, markerSetzen, pause, quelleWechseln, tonFortsetzen, verwerfen } from "../lib/aufnahme.svelte";
   import { hochladen } from "../lib/hochladen.svelte";
   import { marke, SPRACHEN } from "../lib/zeit";
 
@@ -111,6 +111,13 @@
       <i class="fa-solid fa-circle" style="color:var(--gefahr); font-size:10px"></i>
       {aufnahme.pausiert ? "angehalten" : "nimmt auf"} · wird laufend auf diesem Gerät gesichert
     </p>
+    {#if aufnahme.signal === "angehalten" && !aufnahme.pausiert}
+      <p class="rekorder-warnung"><i class="fa-solid fa-triangle-exclamation"></i> Der Browser hält den Ton zurück.
+        <button class="knopf klein" onclick={tonFortsetzen}>Ton freigeben</button></p>
+    {:else if aufnahme.signal === "still" && !aufnahme.pausiert}
+      <p class="rekorder-warnung"><i class="fa-solid fa-triangle-exclamation"></i> Seit Sekunden kommt kein Ton vom Mikrofon. Mikrofon prüfen
+        oder unten ein anderes wählen.</p>
+    {/if}
     <div class="t-pegel">
       {#each aufnahme.pegel as p, i (i)}<span style="height:{Math.max(4, p)}%"></span>{/each}
     </div>

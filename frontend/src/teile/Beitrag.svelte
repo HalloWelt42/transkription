@@ -129,7 +129,7 @@
   </div>
 {:else if mobil}
   <div class="t-beitrag" class:jetzt={jetzt != null}>
-    <div class="wer"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:{farbe(seg.sprecher)}"></span>{name}
+    <div class="wer">{#if seg.sprecher}<span class="punkt" style="width:10px;height:10px;border-radius:5px;background:{farbe(seg.sprecher)}"></span>{name}{/if}
       <button class="zeit" onclick={() => onspringen(seg.start)}>{marke(seg.start)}</button></div>
     <div class="text">{@render text()}</div>
   </div>
@@ -139,7 +139,7 @@
        onclick={(e) => (waehlbar ? onwaehlen?.(e) : bearbeiten ? onoeffnen?.() : onspringen(seg.start))}
        onkeydown={(e) => e.key === "Enter" && !waehlbar && onoeffnen?.()}>
     <button class="zeit" onclick={(e) => { e.stopPropagation(); onspringen(seg.start); }}>{marke(seg.start)}</button>
-    <span class="sprecher"><span class="punkt" style="background:{farbe(seg.sprecher)}"></span>{name}</span>
+    <span class="sprecher">{#if seg.sprecher}<span class="punkt" style="background:{farbe(seg.sprecher)}"></span>{name}{/if}</span>
     <div class="text">{@render text()}</div>
   </div>
 {/if}

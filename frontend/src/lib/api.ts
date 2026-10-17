@@ -62,6 +62,7 @@ export const exportAblegen = (id: string, format: ExportFormat) =>
   hole<{ id: string; pfad: string; name: string }>(`/transkripte/${id}/export`, { method: "POST", ...json({ format }) });
 
 export const exportAdresse = (id: string, format: ExportFormat) => `/api/v1/inhalt/transkripte/${id}/export?format=${format}`;
+export const wellenform = (aufnahmeId: string) => hole<number[]>(`/inhalt/aufnahmen/${aufnahmeId}/wellenform`);
 export const tonAdresse = (id: string) => `/api/v1/inhalt/transkripte/${id}/ton`;
 export const aufnahmeAdresse = (id: string) => `/api/v1/inhalt/aufnahmen/${id}`;
 

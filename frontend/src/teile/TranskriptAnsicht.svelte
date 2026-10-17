@@ -39,6 +39,7 @@
   let gewaehlt = $state<number[]>([]);
   let anker = $state<number | null>(null);
   let spielBis = $state<number | null>(null);
+  let welle = $state<number[] | null>(null);
   let ruhePause: ReturnType<typeof setTimeout>;
 
   const t = $derived(entwurf ?? antwort?.transkript ?? null);
@@ -99,6 +100,9 @@
     try {
       antwort = await api.transkript(id);
       navigation.titel = antwort.transkript.name;
+      // die Wellenform kommt aus dem Ton selbst (gleich für alte und neue Transkripte); bis dahin die gespeicherte
+      const quelle = antwort.transkript.quelle?.knoten_id;
+      if (quelle) void api.wellenform(quelle).then((w) => (welle = w)).catch(() => {});
       vorschlaege = await api.vorschlaege(id);
     } catch (f) {
       fehler = (f as Error).message;
@@ -420,6 +424,8 @@
     <div class="rollfeld"><div class="fehlertext">{fehler}</div></div>
   {:else}<div class="leer">Lädt ...</div>{/if}
 {:else if geraet.mobil}
+  <!-- über die ganze Höhe: der Spieler steht immer unten über den Reitern, auch bei wenig Text -->
+  <div class="t-ansicht">
   <div class="knopfzeile" style="margin-bottom:8px">
     <label class="suche" style="flex:1; min-width:0"><i class="fa-solid fa-magnifying-glass"></i>
       <input class="eingabe-roh" placeholder="Im Text suchen" bind:value={suche} onkeydown={(e) => e.key === "Enter" && weiterSuchen()} /></label>
@@ -433,8 +439,9 @@
   {/if}
   {#if fehler}<div class="fehlertext">{fehler}</div>{/if}
   <div bind:this={rollfeld} ontouchmove={selbstGerollt} onwheel={selbstGerollt} role="region" aria-label="Text">{@render text()}</div>
-  <Spieler bind:this={spieler} src={api.tonAdresse(id)} dauer={antwort.transkript.dauer_s} wellenform={antwort.transkript.wellenform}
+  <Spieler bind:this={spieler} src={api.tonAdresse(id)} dauer={antwort.transkript.dauer_s} wellenform={welle ?? antwort.transkript.wellenform}
            {spur} marker={antwort.transkript.marker.map((m) => m.zeit)} bind:zeit bind:laeuft kompakt />
+  </div>
 {:else}
   <div class="geruest-innen">
     <section class="seite">
@@ -462,7 +469,7 @@
         <button class="knopf nur-schmal" title="Sprecher, Marker, Export, KI, Versionen" onclick={leisteOeffnen}>
           <i class="fa-solid fa-table-columns"></i> Leiste</button>
       </div>
-      <Spieler bind:this={spieler} src={api.tonAdresse(id)} dauer={antwort.transkript.dauer_s} wellenform={antwort.transkript.wellenform}
+      <Spieler bind:this={spieler} src={api.tonAdresse(id)} dauer={antwort.transkript.dauer_s} wellenform={welle ?? antwort.transkript.wellenform}
                {spur} marker={(t?.marker ?? []).map((m) => m.zeit)} bind:zeit bind:laeuft
                stoppBei={bearbeiten && nurBeitrag && offen != null ? segmente[offen]?.ende ?? null : zuordnen ? spielBis : null} />
       {#if bearbeiten}
