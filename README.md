@@ -68,6 +68,7 @@ und Sprachmodell). ffmpeg muss auf dem Rechner sein.
 | Typen | `cd frontend && npm run check` |
 | Symbole | `python3 tools/symbole.py` nach einer Änderung an `frontend/public/symbol.svg` |
 | Ausrollen | `tools/ausrollen.sh` (auf den Pi, siehe oben) |
+| Pi im Browser ohne Zertifikat | `python3 tools/pi_durchleitung.py`, dann `http://127.0.0.1:8633` (prüft nach außen gegen die Hausstelle) |
 | Entwürfe | `python3 -m http.server` im Repo, dann `/mockups/transkription.html` und `/mockups/transkription-mobil.html` |
 
 Die Verbundtests (`test_ablage_verbund.py`, `test_verbund.py`) sprechen mit einer echten Kellerwolke und brauchen
