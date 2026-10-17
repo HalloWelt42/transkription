@@ -9,6 +9,11 @@
 
 :8631 {
 	tls /zertifikate/transkription.pem /zertifikate/transkription-schluessel.pem
+	# Zugriffe ins Protokoll des Containers (docker compose logs vorne): zeigt, was Geräte wirklich abfragen
+	log {
+		output stdout
+		format json
+	}
 	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy same-origin
