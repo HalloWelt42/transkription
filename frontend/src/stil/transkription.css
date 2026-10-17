@@ -52,6 +52,8 @@
 .beitrag.jetzt { background: var(--flaeche); box-shadow: var(--schatten); }
 .beitrag .text { line-height: 1.65; }
 .wort.jetzt { background: var(--akzent); color: #fff; border-radius: 4px; padding: 0 3px; }
+/* im dunklen Modus ist der Akzent hell: dunkle Schrift darauf (etwa 8:1 statt 2,5:1 mit Weiß) */
+:root[data-theme="dunkel"] .wort.jetzt { color: var(--hg); }
 .wort.gehoert { color: var(--text); }
 .beitrag.jetzt .wort:not(.gehoert):not(.jetzt) { color: var(--text-2); }
 .sprecher { display: inline-flex; align-items: center; gap: 7px; font-size: var(--klein); font-weight: 600; white-space: nowrap; height: 28px; }
