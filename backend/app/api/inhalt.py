@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from ..ablage import orte
+from ..ablage.transkripte import aufnahme_id
 from ..einstellungen import Sprache
 from ..export import FORMATE, Format, erzeugen
 from ..modell.transkript import Segment
@@ -46,11 +47,12 @@ def router(teile: Teile) -> APIRouter:
     async def ton(transkript_id: UUID, anfrage: UUID | None = None) -> Response:
         """Die Abspielfassung der Aufnahme (PCM-WAV, samplegenau springbar, ohne Versatz zum Text); fehlt sie, entsteht
         sie jetzt."""
-        t, _ = await teile.transkripte_fuer(anfrage).lesen(transkript_id)
-        if t.quelle is None:
+        t, knoten = await teile.transkripte_fuer(anfrage).lesen(transkript_id)
+        quelle = aufnahme_id(t, knoten)
+        if quelle is None:
             raise HTTPException(404, "Das Transkript nennt keine Aufnahme")
         kw = teile.zugang(anfrage)
-        datei = await teile.abspielen.holen(await kw.knoten(t.quelle.knoten_id), kw)
+        datei = await teile.abspielen.holen(await kw.knoten(quelle), kw)
         return FileResponse(datei, media_type="audio/wav", headers={"Cache-Control": "private, max-age=3600"})
 
     @r.get("/inhalt/aufnahmen/{knoten_id}/ton", dependencies=[g.lesen])

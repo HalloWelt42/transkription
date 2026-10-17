@@ -37,4 +37,9 @@ def app_bauen(daten: Path, transport: httpx.AsyncBaseTransport | None = None) ->
     return app
 
 
-app = app_bauen(Path(os.environ.get("TRANSKRIPTION_DATEN") or WURZEL / "daten"))
+def daten_ordner() -> Path:
+    """Wo die App ihre Daten hält: `TRANSKRIPTION_DATEN`, sonst daten/ im Repo (auch für die Werkzeuge)."""
+    return Path(os.environ.get("TRANSKRIPTION_DATEN") or WURZEL / "daten")
+
+
+app = app_bauen(daten_ordner())

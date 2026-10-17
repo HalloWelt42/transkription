@@ -19,7 +19,7 @@ from appkern.kellerwolke import Knoten, StandVeraltet
 
 from .. import auswertung, export
 from ..ablage import orte
-from ..ablage.transkripte import begleiter_ablegen
+from ..ablage.transkripte import aufnahme_id, begleiter_ablegen
 from ..arten import AuswertenEingabe, KorrigierenEingabe, SprecherEingabe
 from ..modell.sprecherprofil import Probe, Profil
 from ..modell.transkript import Aenderung, Marker, Quelle, Segment, Sprecher, Transkript, woerter_angleichen
@@ -251,8 +251,8 @@ def router(teile: Teile) -> APIRouter:
         t, knoten = await lesen(transkript_id, anfrage)
         kw = teile.zugang(anfrage)
         typ, endung = export.FORMATE[eingabe.format]
-        if t.quelle is not None:
-            datei = await begleiter_ablegen(kw, t.quelle.knoten_id, export.ROLLEN[eingabe.format], endung,
+        if (aufnahme := aufnahme_id(t, knoten)) is not None:
+            datei = await begleiter_ablegen(kw, aufnahme, export.ROLLEN[eingabe.format], endung,
                                             export.erzeugen(t, eingabe.format), typ)
             return {"id": str(datei.id), "pfad": datei.pfad, "name": datei.name}
         ordner = knoten.pfad.rsplit("/", 1)[0]          # ohne Aufnahme (frühere Ablage): neben das Transkript

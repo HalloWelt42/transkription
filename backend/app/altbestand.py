@@ -12,6 +12,7 @@ import asyncio
 import hashlib
 import ipaddress
 import json
+import math
 import re
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -19,8 +20,9 @@ from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from .modell.sprecherprofil import Profil, Profile
 from .modell.transkript import Aenderung, ErzeugtMit, Quelle, Segment, Sprecher, Transkript, Wort
 
 PORT = 10031                      # Vorgabe der alten App
@@ -79,6 +81,29 @@ def gruppieren(kurz: list[dict[str, Any]]) -> list[AltAufnahme]:
             staende=[AltStand(id=t["id"], erstellt_am=t.get("created_at") or "", segmente=t.get("segment_count") or 0,
                               sprecher=t.get("speaker_count") or 0, mit_woertern=bool(t.get("mit_woertern"))) for t in liste]))
     return sorted(aus, key=lambda a: a.staende[-1].erstellt_am, reverse=True)
+
+
+class AltesProfil(BaseModel):
+    """Ein Sprecherprofil der alten App (gleicher Stimmabdruck ECAPA mit 192 Werten wie das Klangwerk)."""
+    name: str = Field(min_length=1, max_length=120)
+    abdruck: list[float] = Field(min_length=1)
+    proben: int = Field(0, ge=0)
+
+
+def profile_einmischen(profile: Profile, alte: list[AltesProfil]) -> dict[str, list[str]]:
+    """Alte Profile kommen dazu, wenn es ihren Namen noch nicht gibt; ein vorhandenes gleichen Namens bleibt unberührt
+    (es ist das, was du hier schon gepflegt hast). Abdrücke auf Länge 1 wie die des Klangwerks."""
+    da = {p.name.casefold() for p in profile.profile}
+    neu, vorhanden = [], []
+    for a in alte:
+        if a.name.casefold() in da:
+            vorhanden.append(a.name)
+            continue
+        laenge = math.sqrt(sum(v * v for v in a.abdruck)) or 1.0
+        profile.profile.append(Profil(name=a.name, abdruck=[v / laenge for v in a.abdruck], proben=a.proben))
+        da.add(a.name.casefold())
+        neu.append(a.name)
+    return {"neu": neu, "vorhanden": vorhanden}
 
 
 class AlteApp:
@@ -171,7 +196,7 @@ def _zeit(wert: Any) -> float:
         return 0.0
 
 
-def in_transkript(alt: dict[str, Any], name: str, quelle: Quelle, dauer_s: float) -> Transkript:
+def in_transkript(alt: dict[str, Any], name: str, quelle: Quelle | None, dauer_s: float) -> Transkript:
     """Ein Transkript der alten App im Format transkript/1: Sprecher je Gruppe der alten Erkennung (Namen, Stimmabdruck),
     Segmente mit Wortzeiten, so weit vorhanden."""
     sprecher_alt = _liste(alt.get("speakers"))

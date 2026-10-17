@@ -219,3 +219,67 @@ async def test_uebernahme_von_hand(tmp_path: Path):
         await g.stoppen()
         server.should_exit = True
         faden.join(timeout=5)
+
+
+def test_profile_einmischen():
+    """Alte Profile kommen dazu, gleiche Namen bleiben unberührt, Abdrücke auf Länge 1."""
+    from app.modell.sprecherprofil import Profil, Profile
+    profile = Profile(profile=[Profil(name="Jens", abdruck=[1.0, 0.0])])
+    ergebnis = altbestand.profile_einmischen(profile, [altbestand.AltesProfil(name="jens", abdruck=[0.0, 3.0], proben=2),
+                                                       altbestand.AltesProfil(name="Heiko", abdruck=[3.0, 4.0], proben=2)])
+    assert ergebnis == {"neu": ["Heiko"], "vorhanden": ["jens"]}
+    assert profile.profile[0].abdruck == [1.0, 0.0] and profile.profile[1].abdruck == [0.6, 0.8]
+    assert profile.profile[1].proben == 2
+
+
+async def test_werkzeug_vorschau_einreihen_umwandeln(tmp_path: Path, capsys):
+    """Das Werkzeug am Rechner der App: Vorschau ändert nichts, Ausführen reiht je Aufnahme einen Auftrag und einen für
+    die Profile ein und trägt die alte App ein, ein zweiter Lauf reiht nichts doppelt; Umwandeln schreibt transkript/1."""
+    from app import werkzeug
+    from app.modell.transkript import Transkript
+    from appkern.datenbank import Datenbank
+
+    ton = tmp_path / "besprechung.mp3"
+    ton.write_bytes(b"ID3-probe")
+    port = frei()
+    server = uvicorn.Server(uvicorn.Config(alte_app(ton, {}), host="127.0.0.1", port=port, log_level="warning"))
+    threading.Thread(target=server.run, daemon=True).start()
+    for _ in range(100):
+        if server.started:
+            break
+        time.sleep(0.05)
+    adresse = f"http://127.0.0.1:{port}"
+    try:
+        plan = tmp_path / "plan.json"
+        plan.write_text(json.dumps({"adresse": adresse, "aufnahmen": [
+            {"quelle": "/d/storage/besprechung.mp3", "zielordner": "REKO/2026"},
+            {"quelle": "/d/storage/gibt-es-nicht.mp3", "name": "Gibt es nicht"}],
+            "profile": [{"name": "Jens", "abdruck": [0.1] * 192, "proben": 3}]}), encoding="utf-8")
+        daten = tmp_path / "daten"
+        assert await werkzeug.altbestand(plan, False, daten) == 1                 # eine fehlt in der alten App
+        ausgabe = capsys.readouterr().out
+        assert "neu              Aufnahmen/REKO/2026/Besprechung.mp3  (2 Stände" in ausgabe and "fehlt" in ausgabe
+        db = await Datenbank(daten / "transkription.sqlite").oeffnen()
+        try:
+            assert await db.zeilen("SELECT id FROM auftrag") == []               # die Vorschau ändert nichts
+        finally:
+            await db.schliessen()
+        await werkzeug.altbestand(plan, True, daten)
+        await werkzeug.altbestand(plan, True, daten)                             # nichts doppelt
+        db = await Datenbank(daten / "transkription.sqlite").oeffnen()
+        try:
+            arten = sorted(z["art"] for z in await db.zeilen("SELECT art FROM auftrag WHERE zustand='wartet'"))
+            adresse_gespeichert = (await db.zeilen("SELECT wert FROM einstellung WHERE schluessel='altbestand_adresse'"))[0]["wert"]
+        finally:
+            await db.schliessen()
+        assert arten == ["profile_uebernehmen", "uebernehmen"]
+        assert json.loads(adresse_gespeichert) == adresse
+
+        liste = tmp_path / "liste.json"
+        liste.write_text(json.dumps({"adresse": adresse, "eintraege": [
+            {"id": "alt2", "name": "Ansage", "dauer_s": 3.0, "datei": "Ansage.transkript.json"}]}), encoding="utf-8")
+        assert await werkzeug.umwandeln(liste, tmp_path / "aus") == 0
+        t = Transkript.model_validate_json((tmp_path / "aus" / "Ansage.transkript.json").read_text(encoding="utf-8"))
+        assert t.name == "Ansage" and t.quelle is None and t.segmente[0].text == "Guten Tag"
+    finally:
+        server.should_exit = True

@@ -35,6 +35,19 @@ SQLite-Datei der App hält nur Verzeichnis,
 Suchindex, Aufträge, Vorschläge und Protokoll und folgt der Kellerwolke über ihren Ereignisstrom. Sprecherprofile liegen
 in `Sprecher/profile.json`.
 
+## Übernahme aus der alten App
+
+Eigene Aufnahmen der alten App samt aller Transkript-Stände (als Versionen) und ihre Sprecherprofile übernimmt die App
+selbst. Den Plan baut `scripts/umzug_kellerwolke.py` der alten App; hier reiht ihn das Werkzeug am Rechner der App ein
+(ohne `--ausfuehren` nur Vorschau), danach die App neu starten:
+
+```bash
+docker exec transkription python -m app.werkzeug altbestand /app/daten/umzug/plan.json --ausfuehren
+```
+
+Einzelne Aufnahmen gehen auch von Hand unter Aufnahmen, Ordner, Altbestand. `python -m app.werkzeug umwandeln` bringt
+Transkripte der alten App ins Format `transkript/1` für Dateien, die nicht in diese App kommen (Sprachausgaben).
+
 ## Betrieb auf dem Pi
 
 Die Transkription läuft neben Kellerwolke und Leitstelle auf dem Pi, im Container (`Dockerfile`, `compose.pi.yml`),

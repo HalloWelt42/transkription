@@ -34,7 +34,7 @@ from appkern.leitstelle import DienstFehler, DienstWeg, Halt, NichtErreichbar, N
 
 from . import altbestand, auswertung, export, korrektur, umzug
 from .ablage import orte
-from .ablage.transkripte import begleiter_ablegen
+from .ablage.transkripte import aufnahme_id, begleiter_ablegen
 from .dienste import KeineLeitstelle, Wechsel
 from .einstellungen import Sprache, SprecherWeg
 from .fassung import FASSUNG
@@ -74,6 +74,11 @@ class UebernehmenAnfrage(BaseModel):
 
 
 class UebernehmenEingabe(UebernehmenAnfrage):
+    von: str | None = None
+
+
+class ProfileUebernehmenEingabe(BaseModel):
+    profile: list[altbestand.AltesProfil] = Field(min_length=1, max_length=200)
     von: str | None = None
 
 
@@ -352,13 +357,14 @@ def arten(teile: Teile) -> list[Art]:
         e: SprecherEingabe = k.eingabe
         transkripte = teile.transkripte_fuer(e.anfrage_id)
         t, knoten = await transkripte.lesen(e.transkript_id)
-        if t.quelle is None:
+        quelle = aufnahme_id(t, knoten)
+        if quelle is None:
             raise ValueError("Das Transkript nennt keine Aufnahme; ohne Ton keine Sprechererkennung")
         ordner = teile.arbeit / k.auftrag_id
         ordner.mkdir(parents=True, exist_ok=True)
         try:
             await k.fortschritt(0.0, "Vorbereiten", phase="vorbereiten")
-            wav, dauer = await ton_holen(k, t.quelle.knoten_id, ordner, teile.zugang(e.anfrage_id))
+            wav, dauer = await ton_holen(k, quelle, ordner, teile.zugang(e.anfrage_id))
             plan = await abschnitte(k, wav, dauer)
             gesammelt: dict[str, list] = dict(k.zwischenstand.get("abdruecke", {}))
             for a in plan:
@@ -428,9 +434,9 @@ def arten(teile: Teile) -> list[Art]:
             max_tokens=3000), "Auswertung")
         await k.fortschritt(None, "Speichern", phase="speichern")
         inhalt = f"# {t.name}: {auswertung.titel(e.vorlage)}\n\n{antwort.text.strip()}\n".encode()
-        if t.quelle is not None:
+        if (aufnahme := aufnahme_id(t, knoten)) is not None:
             # neben die Aufnahme, die Vorlage ist die Rolle (Runde.protokoll.md); erneut ausgewertet: neue Version
-            datei = await begleiter_ablegen(kw, t.quelle.knoten_id, e.vorlage, auswertung.zusatz(e.vorlage), inhalt,
+            datei = await begleiter_ablegen(kw, aufnahme, e.vorlage, auswertung.zusatz(e.vorlage), inhalt,
                                             "text/markdown; charset=utf-8")
             return {"transkript_id": str(e.transkript_id), "datei_id": str(datei.id), "pfad": datei.pfad,
                     "modell": antwort.modell}
@@ -454,6 +460,17 @@ def arten(teile: Teile) -> list[Art]:
         if g.leitstelle is None:
             raise KeineLeitstelle("Keine Leitstelle eingerichtet")
         return g.leitstelle
+
+    # --- profile_uebernehmen --------------------------------------------------------------------------------------
+
+    async def profile_uebernehmen(k: Kontext) -> dict:
+        """Sprecherprofile der alten App in die eigenen; vorhandene Namen bleiben, wie sie sind."""
+        e: ProfileUebernehmenEingabe = k.eingabe
+        await k.fortschritt(None, f"{len(e.profile)} Profile einmischen", phase="profile")
+        ergebnis = await teile.profile.aendern(lambda p: altbestand.profile_einmischen(p, e.profile))
+        await g.protokoll.eintragen("altbestand.profile", f"{len(ergebnis['neu'])} Sprecherprofile übernommen",
+                                    bezug_art="sprecher", bezug_name=e.von)
+        return ergebnis
 
     vorbereiten = Phase(schluessel="vorbereiten", titel="Vorbereiten", symbol="box-open")
     speichern = Phase(schluessel="speichern", titel="Speichern", symbol="floppy-disk")
@@ -480,6 +497,8 @@ def arten(teile: Teile) -> list[Art]:
                     Phase(schluessel="laden", titel="Original laden", symbol="download"),
                     Phase(schluessel="ablegen", titel="Ablegen", symbol="cloud-arrow-up"),
                     Phase(schluessel="staende", titel="Stände übernehmen", symbol="clock-rotate-left")]),
+        Art("profile_uebernehmen", "Sprecherprofile übernehmen", profile_uebernehmen, eingabe=ProfileUebernehmenEingabe,
+            phasen=[Phase(schluessel="profile", titel="Profile", symbol="user-group")]),
     ]
 
 
@@ -494,6 +513,6 @@ ANGEBOTE = [
 ]
 
 
-__all__ = ["ANGEBOTE", "AuswertenEingabe", "KorrigierenEingabe", "SprecherEingabe", "TranskribierenAnfrage", "TranskribierenEingabe",
+__all__ = ["ANGEBOTE", "AuswertenEingabe", "KorrigierenEingabe", "ProfileUebernehmenEingabe", "SprecherEingabe", "TranskribierenAnfrage", "TranskribierenEingabe",
            "UebernehmenAnfrage", "UebernehmenEingabe",
            "arten", "geduldig"]

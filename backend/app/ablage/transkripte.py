@@ -45,6 +45,12 @@ def zugang(liefern: Callable[[], Kellerwolke | None]) -> Kellerwolke:
     return kw
 
 
+def aufnahme_id(t: Transkript, knoten: Knoten) -> UUID | None:
+    """Die Aufnahme eines Transkripts: die Hauptdatei, deren Begleiter es ist (die Wahrheit, seit es eine Ablage gibt);
+    sonst die Angabe in der Datei (frühere Ablage, Transkripte ohne Gruppe)."""
+    return knoten.haupt_id or (t.quelle.knoten_id if t.quelle else None)
+
+
 async def begleiter_ablegen(kw: Kellerwolke, haupt_id: UUID | str, rolle: str, zusatz: str, inhalt: bytes,
                             inhaltstyp: str) -> Knoten:
     """Begleiter einer Rolle neben die Aufnahme: neu, oder eine neue Version des vorhandenen."""

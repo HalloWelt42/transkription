@@ -65,3 +65,27 @@ def test_profile_mitteln_finden_und_zusammenfuehren():
     assert ziel.proben == 3 and ziel.abdruck == pytest.approx([0.0, 1 / 3]) and [x.name for x in p.profile] == ["Anna"]
     with pytest.raises(ValueError):
         a.einmischen([1.0, 2.0, 3.0])
+
+
+def test_aufnahme_eines_transkripts():
+    """Die Begleiter-Beziehung geht vor der Angabe in der Datei; ohne beides gibt es keine Aufnahme."""
+    from datetime import datetime, timezone
+    from uuid import uuid4
+
+    from appkern.kellerwolke import Knoten
+
+    from app.ablage.transkripte import aufnahme_id
+    from app.modell.transkript import Quelle, Transkript
+
+    jetzt = datetime.now(timezone.utc)
+
+    def knoten(haupt=None) -> Knoten:
+        return Knoten(id=uuid4(), name="Runde.transkript.json", typ="datei", pfad="Apps/T/Runde.transkript.json",
+                      recht="schreiben", haupt_id=haupt, erstellt_am=jetzt, geaendert_am=jetzt)
+
+    haupt, alt = uuid4(), uuid4()
+    mit_quelle = Transkript(name="Runde", quelle=Quelle(knoten_id=alt, pfad="Transkripte/Runde.wav"))
+    assert aufnahme_id(mit_quelle, knoten(haupt)) == haupt
+    assert aufnahme_id(mit_quelle, knoten()) == alt
+    assert aufnahme_id(Transkript(name="Runde"), knoten(haupt)) == haupt
+    assert aufnahme_id(Transkript(name="Runde"), knoten()) is None
