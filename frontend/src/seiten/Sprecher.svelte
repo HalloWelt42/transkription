@@ -121,7 +121,7 @@
     <span class="bild" style="background:{farbe(`s${i + 1}`)}">{anfang(p.name)}</span>
     <div><div class="name">{p.name}</div>
       <div class="unter">in {p.transkripte} Transkript{p.transkripte === 1 ? "" : "en"} · {p.proben} Probe{p.proben === 1 ? "" : "n"} · zuletzt {wann(p.geaendert_am)}</div></div>
-    <span class="stand {p.proben < WENIGE ? 'offen' : 'fertig'}">{p.proben < WENIGE ? "wenige Proben" : "sicher"}</span>
+    <span class="stand-pille {p.proben < WENIGE ? 'offen' : 'fertig'}">{p.proben < WENIGE ? "wenige Proben" : "sicher"}</span>
   </div>
 {/snippet}
 

@@ -113,7 +113,7 @@
         <span class="art"><i class="fa-solid fa-file-lines"></i></span>
         <div style="min-width:0"><div class="name">{e.name}</div>
           <div class="meta">{marke(e.dauer_s)} · {spracheName(e.sprache)}{e.sprecher.length ? ` · ${e.sprecher.join(", ")}` : ""} · geändert {wann(e.geaendert_am)}</div></div>
-        {#if suche.trim()}<span class="stand fertig">{e.treffer} Treffer</span>{:else}<span></span>{/if}
+        {#if suche.trim()}<span class="stand-pille fertig">{e.treffer} Treffer</span>{:else}<span></span>{/if}
         <i class="fa-solid fa-chevron-right" style="color:var(--text-3); padding-right:10px"></i>
       </div>
       {#if e.fundstellen.length}

@@ -211,7 +211,7 @@
       <div class="name">{a.name}</div>
       <div class="meta">{metazeile(a)}</div>
     </div>
-    <span class="stand {a.stand === 'transkribiert' ? 'fertig' : a.stand === 'laeuft' ? 'laeuft' : 'offen'}">
+    <span class="stand-pille {a.stand === 'transkribiert' ? 'fertig' : a.stand === 'laeuft' ? 'laeuft' : 'offen'}">
       {#if a.stand === "laeuft"}<i class="fa-solid fa-circle-notch fa-spin"></i>{/if} {standText(a)}</span>
     <button class="knopf still" title={vorschau === a.id ? "Anhalten" : "Anhören"}
             onclick={(e) => { e.stopPropagation(); vorschau = vorschau === a.id ? null : a.id; }}>
@@ -291,8 +291,8 @@
         <button class="t-zeile" onclick={() => (a.stand === "ohne" ? api.transkribieren({ quelle_id: a.id }).then(laden) : waehlen(a))}>
           <i class="fa-solid {a.stand === 'transkribiert' ? 'fa-file-lines' : ART[a.art]}"></i>
           <span class="t-text"><span class="t-name">{a.name}</span><span class="t-meta">{standText(a)}</span></span>
-          {#if a.stand === "laeuft"}<span class="stand laeuft"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
-          {:else if a.stand === "ohne"}<span class="stand offen">Transkribieren</span>
+          {#if a.stand === "laeuft"}<span class="stand-pille laeuft"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
+          {:else if a.stand === "ohne"}<span class="stand-pille offen">Transkribieren</span>
           {:else}<i class="fa-solid fa-chevron-right" style="color:var(--text-3)"></i>{/if}
         </button>
       {:else}
