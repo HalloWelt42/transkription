@@ -3,10 +3,9 @@
   // Transkripts), Umbenennen, Zusammenführen, Löschen (mit zweitem Klick). Schwellen kommen aus den Einstellungen.
   // Am Telefon: Liste, Antippen öffnet das Profil (/sprecher/<kennung>). Entwurf: mockups/transkription.html (5).
   import { onMount } from "svelte";
-  import { Auswahl, gehe, geraet, Leiste, leisteOeffnen, navigation, wann } from "appkern-oberflaeche";
+  import { Auswahl, farbe, gehe, geraet, Leiste, leisteOeffnen, marke, navigation, wann } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import type { Profil } from "../lib/typen";
-  import { farbe, marke } from "../lib/zeit";
 
   const WENIGE = 3;
   let liste = $state<Profil[]>([]);

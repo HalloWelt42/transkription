@@ -4,10 +4,9 @@
   // aus der Kellerwolke geöffnet mit ihrer Anfrage (/transkripte/<kennung>/anfrage/<anfrage>).
   // Entwurf: mockups/transkription.html (2) und transkription-mobil.html (4).
   import { onMount } from "svelte";
-  import { Auswahl, gehe, geraet, navigation, wann } from "appkern-oberflaeche";
+  import { Auswahl, gehe, geraet, marke, navigation, sprache as spracheName, SPRACHEN, wann } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import type { Verzeichnis } from "../lib/typen";
-  import { marke, sprache as spracheName, SPRACHEN } from "../lib/zeit";
   import TranskriptAnsicht from "../teile/TranskriptAnsicht.svelte";
 
   const SEITE = 20;

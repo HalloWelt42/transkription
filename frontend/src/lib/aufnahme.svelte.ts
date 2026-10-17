@@ -8,8 +8,7 @@
 // Die Live-Mitschrift schneidet den Ton an Sprechpausen in Stücke (höchstens 15 s), wandelt sie in 16 kHz WAV und
 // schickt sie nacheinander an den Hördienst (POST /api/v1/hoeren); der Text erscheint, während weiter aufgenommen wird.
 // Während der Aufnahme bleibt der Bildschirm an (soweit der Browser das erlaubt) und die App lädt nicht neu.
-import { token } from "appkern-oberflaeche";
-import { arbeit } from "./arbeit.svelte";
+import { arbeit, token } from "appkern-oberflaeche";
 
 const DB_NAME = "transkription-aufnahmen";
 const STUECK_MS = 2000;

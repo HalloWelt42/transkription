@@ -3,11 +3,10 @@
   // was du wählst: Zielordner (vorhanden oder neu), Name, auf Wunsch neu transkribieren; die Vorschau sagt vorher, wo
   // alles landet und welche Versionen entstehen. Übernommene führen zur Aufnahme.
   import { onMount } from "svelte";
-  import { Auswahl, beiAuftrag, gehe } from "appkern-oberflaeche";
+  import { Auswahl, beiAuftrag, gehe, groesse, marke } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import { SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import type { AltbestandSeite, AltEintrag } from "../lib/typen";
-  import { groesse, marke } from "../lib/zeit";
 
   const NEU = "+neu";
 

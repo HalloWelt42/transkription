@@ -6,22 +6,18 @@
   // oder Ziffer; N legt einen neuen an, Leertaste spielt die Auswahl. Auch das sammelt sich im Entwurf.
   // Entwurf: mockups/transkription.html (3, 3b, 3c, 4) und transkription-mobil.html (3).
   import { onMount, tick } from "svelte";
-  import { gehe, geraet, Leiste, leisteOeffnen, navigation } from "appkern-oberflaeche";
+  import { AnfrageBand, arbeit, farbe, gehe, geraet, Leiste, leisteOeffnen, marke, navigation, Spieler,
+           zurueckZurKellerwolke } from "appkern-oberflaeche";
   import * as api from "../lib/api";
-  import { arbeit } from "../lib/arbeit.svelte";
   import type { Marker, Segment, Transkript, TranskriptAntwort, Vorschlag } from "../lib/typen";
-  import { farbe, marke } from "../lib/zeit";
   import Beitrag from "./Beitrag.svelte";
-  import Spieler from "./Spieler.svelte";
-  import { zurueckZurKellerwolke } from "../lib/herkunft";
-  import AnfrageBand from "./AnfrageBand.svelte";
   import TranskriptLeiste from "./TranskriptLeiste.svelte";
 
   // `anfrage`: aus der Kellerwolke geöffnet (Datei außerhalb der App); alles geht dann mit dem Recht dieser Anfrage.
   let { id, beginn = null, anfrage = null }: { id: string; beginn?: number | null; anfrage?: string | null } = $props();
 
   function zurueck() {
-    if (anfrage) zurueckZurKellerwolke(antwort ? herkunft(antwort) : "");
+    if (anfrage) zurueckZurKellerwolke(antwort ? herkunft(antwort) : "", "aufnahmen/kellerwolke");
     else gehe("transkripte");
   }
   const herkunft = (a: TranskriptAntwort) => a.transkript.quelle?.pfad ?? a.pfad;

@@ -5,11 +5,10 @@
   // diesem Transkript stehen in ihrem Abschnitt; fertige laden nach. Beim Zuordnen der Sprecher (3b) zeigt sie den Entwurf:
   // Umbenennen, Zusammenführen und neue Sprecher wirken dort und werden mit dem Entwurf gespeichert.
   import { onMount } from "svelte";
-  import { Auswahl, beiAuftrag, wann, type Auftrag } from "appkern-oberflaeche";
+  import { Auswahl, beiAuftrag, farbe, marke, wann, type Auftrag } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, ERKENNEN_WEGE, type ErkennenWeg } from "../lib/sprecherwahl";
   import type { ExportFormat, Marker, Profil, Transkript, TranskriptAntwort, Version, Vorlage } from "../lib/typen";
-  import { farbe, marke } from "../lib/zeit";
 
   let {
     antwort,

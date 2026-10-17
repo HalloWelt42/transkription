@@ -2,9 +2,6 @@
    der Schale; Sprecherfarben fest je Kennung. Einzige Quelle: die Oberfläche bindet sie ein, die Entwürfe in mockups/
    ebenso. */
 
-:root {
-  --s1: #12938a; --s2: #c2410c; --s3: #7c3aed; --s4: #2f7ce0; --s5: #b45309; --s6: #db2777;
-}
 
 /* ----- Aufnahmen und Listen ----- */
 .zeile { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; gap: 14px; align-items: center;
@@ -33,17 +30,6 @@
 .treffer mark { background: var(--warn-weich); color: var(--text); border-radius: 3px; }
 
 /* ----- Spieler ----- */
-.spieler { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; gap: 14px; align-items: center;
-           padding: 10px 22px 12px; background: var(--flaeche); box-shadow: 0 1px 0 var(--rand); }
-.spieler .gross { width: 46px; height: 46px; border-radius: 23px; border: 0; background: var(--akzent); color: #fff; font-size: 18px; }
-.spieler .zeitangabe { font-family: ui-monospace, monospace; font-size: var(--klein); color: var(--text-2); white-space: nowrap; }
-.welle { position: relative; height: 54px; }
-.welle .saeulen { position: absolute; inset: 8px 0 8px 0; display: flex; align-items: center; gap: 1px; }
-.welle .saeulen span { flex: 1; min-width: 1px; border-radius: 1px; background: var(--rand); }
-.welle .saeulen span.gespielt { background: var(--akzent); }
-.welle .abspielkopf { position: absolute; top: 2px; bottom: 2px; width: 2px; background: var(--text); }
-.welle .fahne { position: absolute; top: -2px; transform: translateX(-50%); font-size: 12px; color: var(--warn); }
-.welle .sprecherspur { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; display: flex; border-radius: 2px; overflow: hidden; }
 
 /* ----- Transkript: ein Beitrag ist ein Segment der Datei (Zeit, Sprecher, Text mit Wörtern) ----- */
 .text-flaeche { max-width: 980px; }
@@ -86,7 +72,6 @@
 .sprecher-zeile .anteil { font-size: var(--marke); color: var(--text-3); }
 .sprecher-zeile .vorschlag-chip { grid-column: 1 / -1; font-size: var(--klein); color: var(--text-2); display: flex; gap: 8px; align-items: center;
                                    background: var(--flaeche-2); border-radius: var(--r2); padding: 6px 10px; }
-.knopfreihe { display: flex; flex-wrap: wrap; gap: 6px; }
 .knopf.klein { height: 32px; padding: 0 12px; }
 .liste-klein div { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; font-size: var(--klein); }
 .liste-klein .zeit { font-family: ui-monospace, monospace; color: var(--text-3); width: 60px; flex: none; }
@@ -121,11 +106,6 @@
 /* der laufende Beitrag bekommt nur den Grund; der Text bleibt bündig mit den anderen */
 .mobil .t-beitrag.jetzt { background: var(--flaeche); border-top-color: transparent; }
 .mobil .t-beitrag.jetzt + .t-beitrag { border-top-color: transparent; }
-.mobil .t-spieler { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 16px;
-                    background: var(--flaeche); box-shadow: 0 -1px 0 var(--rand); }
-.mobil .t-spieler .gross { width: 46px; height: 46px; border-radius: 23px; border: 0; background: var(--akzent); color: #fff; font-size: 18px; }
-.mobil .t-spieler .welle { height: 40px; }
-.mobil .t-spieler .zeitangabe { font-family: ui-monospace, monospace; font-size: var(--marke); color: var(--text-2); }
 .mobil .t-treffer { font-size: var(--klein); color: var(--text-2); padding: 0 14px 12px 54px; margin-top: -4px; }
 .mobil .t-treffer .zeit { font-family: ui-monospace, monospace; color: var(--akzent); margin-right: 6px; }
 .mobil .t-treffer mark { background: var(--warn-weich); color: var(--text); border-radius: 3px; }
@@ -133,17 +113,10 @@
 
 /* ----- Umsetzung: Rekorder, Uploads ----- */
 .rekorder.kompakt { background: var(--flaeche); border-radius: var(--r3); box-shadow: var(--schatten); padding: 6px 16px 16px; margin-bottom: 14px; }
-.upload { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 14px;
-          background: var(--flaeche); border-radius: var(--r2); margin-bottom: 6px; font-size: var(--klein); }
-.upload .balken { grid-column: 2 / -1; }
 .ablage.ueber { border-color: var(--akzent); background: var(--akzent-weich); color: var(--akzent); }
 .zeile { cursor: pointer; }
 .zeile.ordner-zeile .art { color: var(--akzent); }
 .knopfzeile { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.welle .leinwand { position: absolute; inset: 6px 0 8px 0; width: 100%; height: calc(100% - 14px); cursor: pointer; touch-action: none; }
-.welle .sprecherspur { position: absolute; }
-.welle .fahne { pointer-events: none; }
-.welle .abspielkopf { pointer-events: none; }
 .beitrag .zeit, .t-beitrag .zeit { border: 0; background: transparent; font: inherit; font-family: ui-monospace, monospace;
                                    font-size: var(--klein); color: var(--text-3); text-align: left; cursor: pointer; padding: 3px 0 0; }
 .t-beitrag .wer .zeit { margin-left: auto; padding: 0; }
@@ -155,14 +128,12 @@
 .beitrag mark, .t-beitrag mark { background: var(--warn-weich); color: var(--text); border-radius: 3px; }
 .feld-text { width: 100%; font: inherit; color: var(--text); resize: vertical; min-height: 70px; }
 .werkzeuge .eingabe { height: 32px; font-size: var(--klein); }
-.mobil .t-spieler { position: sticky; bottom: -16px; margin: 8px -16px -16px; z-index: 2; }
 .mobil .t-ansicht { display: flex; flex-direction: column; min-height: 100%; }
 .mobil .t-ansicht > .t-spieler { margin-top: auto; }
 .mobil .t-ansicht > [role="region"] { padding-bottom: 8px; }
 /* Transkript am Rechner: Seite und Leiste nebeneinander im Bereich der Schale */
 .geruest-innen { display: grid; grid-template-columns: minmax(0, 1fr) 380px; flex: 1; min-height: 0; }
 .geruest-innen > .seite { min-height: 0; }
-.rund.aktiv { background: var(--akzent-weich); color: var(--akzent); }
 
 /* ----- Leiste des Transkripts (nach Entwurf) ----- */
 .leiste-inhalt { padding: 0; }
@@ -244,10 +215,6 @@ kbd.taste { font-family: ui-monospace, monospace; font-size: var(--marke); color
 .sprecher-zeile .aktionen .rund { width: 30px; height: 30px; }
 
 /* Rückfrage vor dem Löschen, im Ablauf statt als Fenster */
-.rueckfrage { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 14px; margin: 4px 0 10px;
-  background: var(--flaeche-2); border-radius: var(--r2); box-shadow: 0 0 0 1px var(--rand); font-size: var(--klein); }
-.rueckfrage .frage { font-weight: 600; color: var(--text); }
-.rueckfrage .aktionen { display: flex; gap: 8px; margin-left: auto; }
 /* Aufnahme ohne Transkript: an der Stelle des Textes */
 .ohne-text { max-width: 980px; padding: 22px; background: var(--flaeche); border-radius: var(--r3); box-shadow: var(--schatten); }
 .ohne-text h2 { margin: 0 0 6px; font-size: 1.15em; }
@@ -313,11 +280,6 @@ kbd.taste { font-family: ui-monospace, monospace; font-size: var(--marke); color
 .rek { flex: 1; }
 
 /* Verbund mit der Kellerwolke (Entwurf mockups/verbund.html): Hinweis zur Herkunft, Quelle Kellerwolke, Zusammenführen */
-.hinweis-band { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 12px; border-radius: var(--r2, 10px);
-  background: var(--akzent-weich); color: var(--text); font-size: var(--klein); }
-.hinweis-band > i { color: var(--akzent); }
-.hinweis-band b { font-weight: 600; }
-.hinweis-band .knopfzeile { margin-left: auto; flex: none; }
 .zeile.nicht-waehlbar { opacity: .55; cursor: default; }
 .umzug-liste { margin: 0 0 14px; border-radius: 10px; background: var(--flaeche); overflow: hidden; }
 .umzug-liste .u-zeile { display: grid; grid-template-columns: 22px minmax(0, 1fr) 24px minmax(0, 1fr) auto; gap: 10px; align-items: center;
@@ -328,4 +290,3 @@ kbd.taste { font-family: ui-monospace, monospace; font-size: var(--marke); color
 .umzug-liste .u-zeile .fa-arrow-right { color: var(--text-3); }
 .umzug-liste .u-kopf { font-weight: 600; color: var(--text-2); background: var(--flaeche-2, var(--hg)); }
 .umzug-liste .u-mehr { display: block; color: var(--text-3); }
-.mobil .t-spieler.t-wahlleiste { display: flex; justify-content: space-between; }

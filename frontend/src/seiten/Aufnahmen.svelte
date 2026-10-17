@@ -4,18 +4,16 @@
   // Als Quelle auch alle Dateien der Kellerwolke (/aufnahmen/kellerwolke[/<ordner>]), jede Datei einzeln per Anfrage.
   // Entwurf: mockups/transkription.html (1), transkription-mobil.html (1, 2) und verbund.html (6a, 6b, 6e).
   import { onMount } from "svelte";
-  import { Auswahl, beiAuftrag, gehe, geraet, hole, json, navigation, wann, type WahlSeite } from "appkern-oberflaeche";
+  import { Auswahl, beiAuftrag, gehe, geraet, groesse, hole, json, marke, navigation, Rueckfrage, SPRACHEN,
+           uploadEntfernen, uploads, wann, type WahlSeite } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import { alsDatei, aufnahme, geraeteLaden, gespeicherte, quelleWechseln, starten as aufnehmen, verwerfen, type Gespeichert } from "../lib/aufnahme.svelte";
-  import { entfernen, hochladen, uploads } from "../lib/hochladen.svelte";
   import type { Aufnahme, AufnahmenSeite, Ordner } from "../lib/typen";
-  import { groesse, marke, SPRACHEN } from "../lib/zeit";
   import Altbestand from "../teile/Altbestand.svelte";
   import AufnahmeAnsicht from "../teile/AufnahmeAnsicht.svelte";
   import KellerwolkeQuelle from "../teile/KellerwolkeQuelle.svelte";
   import Rekorder from "../teile/Rekorder.svelte";
-  import Rueckfrage from "../teile/Rueckfrage.svelte";
   import Zusammenfuehren from "../teile/Zusammenfuehren.svelte";
 
   type Filter = "alle" | "ohne" | "transkribiert";
@@ -186,7 +184,7 @@
     meldung = "";
     for (const d of Array.from(dateien)) {
       try {
-        await hochladen(d, d.name);
+        await api.aufnahmeHochladen(d, d.name);
       } catch {
         // steht in der Liste der Uploads
       }
@@ -212,7 +210,7 @@
     const fertig = await alsDatei(g.id);
     if (!fertig) return;
     try {
-      const datei = await hochladen(fertig.daten, g.name);
+      const datei = await api.aufnahmeHochladen(fertig.daten, g.name);
       if (g.marker.length) await hole(`/aufnahmen/${datei.id}/marker`, { method: "PUT", ...json(g.marker) });
       await verwerfen(g.id);
       liegen = await gespeicherte();
@@ -296,7 +294,7 @@
          style="color:{u.fehler ? 'var(--gefahr)' : u.fertig ? 'var(--gut)' : 'var(--akzent)'}"></i>
       <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{u.name}</span>
       <span style="color:var(--text-3)">{u.fehler || (u.fertig ? "fertig" : `${Math.round((u.gesendet / Math.max(u.groesse, 1)) * 100)} %`)}
-        {#if u.fehler}<button class="knopf still" onclick={() => entfernen(u.id)} title="Ausblenden"><i class="fa-solid fa-xmark"></i></button>{/if}</span>
+        {#if u.fehler}<button class="knopf still" onclick={() => uploadEntfernen(u.id)} title="Ausblenden"><i class="fa-solid fa-xmark"></i></button>{/if}</span>
       {#if !u.fertig && !u.fehler}<div class="balken"><span style="width:{(u.gesendet / Math.max(u.groesse, 1)) * 100}%"></span></div>{/if}
     </div>
   {/each}

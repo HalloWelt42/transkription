@@ -3,7 +3,6 @@
   // Am Telefon sind Aufnahmen und Transkripte Reiter, Sprecher liegt unter Mehr.
   import { ereignisseBenennen, Schale, type Anfrage, type Bereich } from "appkern-oberflaeche";
   import * as api from "./lib/api";
-  import { ruhig } from "./lib/arbeit.svelte";
   import Aufnahmen from "./seiten/Aufnahmen.svelte";
   import Sprecher from "./seiten/Sprecher.svelte";
   import Transkripte from "./seiten/Transkripte.svelte";
@@ -30,4 +29,4 @@
   }
 </script>
 
-<Schale {bereiche} fassung={__APP_FASSUNG__} {ruhig} {oeffnen} />
+<Schale {bereiche} fassung={__APP_FASSUNG__} {oeffnen} />

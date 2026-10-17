@@ -3,9 +3,8 @@
   // so zeichnen die übrigen bei jedem Takt nicht neu. Klick auf ein Wort oder die Zeit springt dorthin. Im
   // Bearbeiten: Textfeld, Sprecher, Zeiten, am Cursor teilen, mit dem nächsten zusammenführen, Marker. Beim Zuordnen der
   // Sprecher ist der Beitrag wählbar: ein Klick wählt ihn (auch auf ein Wort), nur die Zeit springt in den Ton.
-  import { Auswahl } from "appkern-oberflaeche";
+  import { Auswahl, farbe, genau, lesen, marke } from "appkern-oberflaeche";
   import type { Segment, Sprecher } from "../lib/typen";
-  import { farbe, genau, lesen, marke } from "../lib/zeit";
 
   let {
     seg,

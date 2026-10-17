@@ -5,15 +5,11 @@
   // Aus der Kellerwolke geöffnet (`anfrage`, Entwurf mockups/verbund.html 6c): gleiche Ansicht mit Hinweis, woher die
   // Datei kommt; die App darf nur lesen und Begleiter schreiben, darum Marker nur ansehen und kein Papierkorb.
   import { onMount } from "svelte";
-  import { Auswahl, beiAuftrag, gehe, geraet, Leiste, leisteOeffnen, navigation, wann } from "appkern-oberflaeche";
+  import { AnfrageBand, Auswahl, beiAuftrag, gehe, geraet, groesse, Leiste, leisteOeffnen, marke, navigation,
+           Rueckfrage, Spieler, SPRACHEN, wann, zurueckZurKellerwolke } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import type { Aufnahme } from "../lib/typen";
-  import { groesse, marke, SPRACHEN } from "../lib/zeit";
-  import { zurueckZurKellerwolke } from "../lib/herkunft";
-  import AnfrageBand from "./AnfrageBand.svelte";
-  import Rueckfrage from "./Rueckfrage.svelte";
-  import Spieler from "./Spieler.svelte";
 
   let { id, anfrage = null }: { id: string; anfrage?: string | null } = $props();
 
@@ -115,7 +111,7 @@
   }
 
   const springen = (t: number) => spieler?.springe(t, true);
-  const zurueck = () => (anfrage ? zurueckZurKellerwolke(a?.pfad ?? "") : gehe("aufnahmen"));
+  const zurueck = () => (anfrage ? zurueckZurKellerwolke(a?.pfad ?? "", "aufnahmen/kellerwolke") : gehe("aufnahmen"));
   const transkriptOrt = (t: { id: string }) => (anfrage ? `transkripte/${t.id}/anfrage/${anfrage}` : `transkripte/${t.id}`);
 </script>
 

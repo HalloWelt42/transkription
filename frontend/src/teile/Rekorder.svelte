@@ -3,14 +3,11 @@
   // Telefon unten; Name, Mikrofon, Live-Mitschrift, Sicherung, Signal und Verwerfen als kleine Symbole an festen Plätzen,
   // ein Klick zeigt ihre Erklärung als Blase über dem Text; der Live-Text bekommt den Platz. Nach dem Beenden liegt die
   // Aufnahme in Aufnahmen; transkribiert wird erst, wenn der Nutzer es entscheidet (oder er verwirft sie).
-  import { Auswahl, geraet, hole, json } from "appkern-oberflaeche";
+  import { Auswahl, geraet, hole, json, marke, Rueckfrage, SPRACHEN } from "appkern-oberflaeche";
   import { tick } from "svelte";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import { abbrechen, aufnahme, beenden, markerSetzen, pause, quelleWechseln, tonFortsetzen, verwerfen } from "../lib/aufnahme.svelte";
-  import { hochladen } from "../lib/hochladen.svelte";
-  import { marke, SPRACHEN } from "../lib/zeit";
-  import Rueckfrage from "./Rueckfrage.svelte";
 
   let { kompakt = false, onfertig }: { kompakt?: boolean; onfertig?: (meldung: string) => void } = $props();
 
@@ -67,7 +64,7 @@
     try {
       const fertig = await beenden(name);
       if (!fertig) return;
-      const datei = await hochladen(fertig.daten, fertig.info.name);
+      const datei = await api.aufnahmeHochladen(fertig.daten, fertig.info.name);
       if (fertig.info.marker.length) await hole(`/aufnahmen/${datei.id}/marker`, { method: "PUT", ...json(fertig.info.marker) });
       await verwerfen(fertig.info.id);
       aufnahme.danach = { id: datei.id, name: name.trim() || aufnahme.name, dauer_s: fertig.info.dauer_ms / 1000,

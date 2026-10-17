@@ -4,12 +4,10 @@
   // Anfrage, mit deren Recht der Auftrag die Datei liest und das Transkript daneben legt. Transkribierte öffnet "Öffnen"
   // über eine Anfrage zum Ansehen und Bearbeiten. Begleiter erscheinen nicht als eigene Zeilen, nur als Stand der Datei.
   import { onMount } from "svelte";
-  import { Auswahl, beiAuftrag, gehe, geraet, hole, istMedium, navigation, waehlen, wahl, wann, type Auftrag, type Seite,
-           type WahlEintrag, type WahlSeite } from "appkern-oberflaeche";
+  import { Auswahl, beiAuftrag, daneben, gehe, geraet, groesse, hole, istMedium, navigation, SPRACHEN, waehlen,
+           wahl, wann, type Auftrag, type Seite, type WahlEintrag, type WahlSeite } from "appkern-oberflaeche";
   import * as api from "../lib/api";
-  import { daneben } from "../lib/herkunft";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
-  import { groesse, SPRACHEN } from "../lib/zeit";
 
   // `ordner`: der gezeigte Ordner (null: "Meine Dateien"); `kette` meldet den Weg dorthin an die Seite (Chips, Hoch).
   let { ordner, suche = "", kette = $bindable([]) }: { ordner: string | null; suche?: string; kette?: WahlSeite["kette"] } = $props();

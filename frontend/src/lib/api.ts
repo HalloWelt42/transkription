@@ -1,6 +1,6 @@
 // Aufrufe der Schnittstelle der Transkription (über `hole` der Schale: Anmeldung, Fehler, Verbindungsstand).
 import type { ErkennenWeg, SprecherWeg } from "./sprecherwahl";
-import { hole, json, type Auftrag } from "appkern-oberflaeche";
+import { hochladen, hole, json, type Auftrag } from "appkern-oberflaeche";
 import type {
   AltbestandSeite, Aufnahme, AufnahmenSeite, ExportFormat, Ordner, Profil, TranskriptAntwort, Verzeichnis, Version, Vorlage, Vorschlag,
   Marker, Segment, Transkript, Umzugsplan,
@@ -24,6 +24,10 @@ function mit(pfad: string, anfrage: AnfrageId): string {
 }
 
 // --- Aufnahmen --------------------------------------------------------------------------------------------------
+
+// Hochladen mit Fortschritt (Liste der laufenden: `uploads` aus dem Appkern)
+export const aufnahmeHochladen = (daten: Blob, name: string) =>
+  hochladen<Aufnahme>(`/api/v1/aufnahmen?name=${encodeURIComponent(name)}`, daten, name);
 
 export const ordnerListe = () => hole<Ordner[]>("/aufnahmen/ordner");
 
