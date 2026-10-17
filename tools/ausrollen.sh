@@ -79,7 +79,8 @@ ssh -o BatchMode=yes "$PI" "set -e
   echo \"Stand: \$(git log --oneline -1)\""
 
 schritt "Bauen und starten"
-ssh -o BatchMode=yes "$PI" "cd '$WURZEL' && docker compose -f compose.pi.yml build --quiet && docker compose -f compose.pi.yml up -d --remove-orphans"
+# Der Vorschaltdienst liest deploy/Caddyfile nur beim Start; eine geänderte Datei erkennt Docker nicht, darum immer neu starten
+ssh -o BatchMode=yes "$PI" "cd '$WURZEL' && docker compose -f compose.pi.yml build --quiet && docker compose -f compose.pi.yml up -d --remove-orphans && docker compose -f compose.pi.yml restart vorne"
 
 schritt "Prüfen"
 ssh -o BatchMode=yes "$PI" "cd '$WURZEL' && for i in \$(seq 1 30); do curl -sf --cacert zertifikate/rootCA.pem '$ADRESSE/api/v1/app' >/dev/null && break; sleep 2; done
