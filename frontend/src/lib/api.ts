@@ -2,7 +2,7 @@
 import type { ErkennenWeg, SprecherWeg } from "./sprecherwahl";
 import { hole, json, type Auftrag } from "appkern-oberflaeche";
 import type {
-  Aufnahme, AufnahmenSeite, ExportFormat, Ordner, Profil, TranskriptAntwort, Verzeichnis, Version, Vorlage, Vorschlag,
+  AltbestandSeite, Aufnahme, AufnahmenSeite, ExportFormat, Ordner, Profil, TranskriptAntwort, Verzeichnis, Version, Vorlage, Vorschlag,
   Marker, Segment, Transkript,
 } from "./typen";
 
@@ -101,3 +101,8 @@ export async function einstellung<T>(name: string): Promise<T | null> {
     return null;
   }
 }
+
+// --- Altbestand der alten App ------------------------------------------------------------------------------------
+export const altbestand = () => hole<AltbestandSeite>("/altbestand");
+export const altUebernehmen = (e: { schluessel: string; zielordner: string; name: string; neu_transkribieren: boolean;
+  sprache?: string; sprecher?: SprecherWeg }) => hole<Auftrag>("/altbestand/uebernehmen", { method: "POST", ...json(e) });

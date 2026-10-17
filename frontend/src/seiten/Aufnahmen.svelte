@@ -10,6 +10,7 @@
   import { entfernen, hochladen, uploads } from "../lib/hochladen.svelte";
   import type { Aufnahme, AufnahmenSeite, Ordner } from "../lib/typen";
   import { groesse, marke, SPRACHEN } from "../lib/zeit";
+  import Altbestand from "../teile/Altbestand.svelte";
   import AufnahmeAnsicht from "../teile/AufnahmeAnsicht.svelte";
   import Rekorder from "../teile/Rekorder.svelte";
   import Rueckfrage from "../teile/Rueckfrage.svelte";
@@ -20,6 +21,9 @@
   let ordnerListe = $state<Ordner[]>([]);
   let ordner = $state<string | null>(null);
   let stapel = $state<Ordner[]>([]);           // Unterordner, in die man hineingegangen ist
+  // der Altbestand der alten App erscheint als Quelle unter Ordner (am Rechner), sobald ihre Adresse eingetragen ist
+  const ALTBESTAND = "altbestand";
+  let alteApp = $state("");
   let filter = $state<Filter>("alle");
   let suche = $state("");
   let seite = $state<AufnahmenSeite | null>(null);
@@ -40,6 +44,7 @@
   const aktuellerOrdner = $derived(stapel.at(-1)?.id ?? ordner);
 
   async function laden() {
+    if (ordner === ALTBESTAND) return;          // der Altbestand lädt sich selbst
     fehler = "";
     try {
       seite = await api.aufnahmen({ ordner: aktuellerOrdner, filter, suche: suche.trim(), ab, anzahl: SEITE });
@@ -55,6 +60,7 @@
         ordnerListe = await api.ordnerListe();
         ordner = ordnerListe[0]?.id ?? null;
         sprache = (await api.einstellung<string>("sprache")) ?? "de";
+        alteApp = (await api.einstellung<string>("altbestand_adresse").catch(() => "")) ?? "";
         sprecher = (await api.einstellung<SprecherWeg>("sprecher_weg")) ?? "ohne";
       } catch (f) {
         fehler = (f as Error).message;
@@ -104,7 +110,7 @@
     ordner = id;
     stapel = [];
     ab = 0;
-    void laden();
+    if (id !== ALTBESTAND) void laden();
   }
 
   function hinein(o: Ordner) {
@@ -132,8 +138,9 @@
     }
   });
 
+  // am Telefon immer die Aufnahme selbst (dort Transkript öffnen und Papierkorb), am Rechner bei fertigen das Transkript
   function oeffnen(a: Aufnahme) {
-    gehe(a.stand === "transkribiert" ? `transkripte/${a.transkripte[0].id}` : `aufnahmen/${a.id}`);
+    gehe(a.stand === "transkribiert" && !geraet.mobil ? `transkripte/${a.transkripte[0].id}` : `aufnahmen/${a.id}`);
   }
 
   async function loeschen(a: Aufnahme, mitTranskripten: boolean) {
@@ -216,7 +223,8 @@
     if (e.dataTransfer?.files.length) void dateienSenden(e.dataTransfer.files);
   }
 
-  const ordnerOptionen = $derived(ordnerListe.map((o) => ({ wert: o.id as string | null, titel: o.pfad })));
+  const ordnerOptionen = $derived([...ordnerListe.map((o) => ({ wert: o.id as string | null, titel: o.pfad, hinweis: undefined as string | undefined })),
+    ...(alteApp && !geraet.mobil ? [{ wert: ALTBESTAND as string | null, titel: "Altbestand der alten App", hinweis: "nur lesen, übernehmen von Hand" }] : [])]);
   const sprachOptionen = Object.entries(SPRACHEN).map(([wert, titel]) => ({ wert, titel }));
   const ART = { ton: "fa-file-audio", video: "fa-file-video" };
 
@@ -350,17 +358,21 @@
 {:else}
   <div class="seiten-kopf">
     <h1>Aufnahmen</h1>
+    {#if ordner !== ALTBESTAND}
     <span class="segment">
       <button class:aktiv={filter === "alle"} onclick={() => filtern("alle")}>Alle {seite?.zahlen.alle ?? ""}</button>
       <button class:aktiv={filter === "ohne"} onclick={() => filtern("ohne")}>Ohne Transkript {seite?.zahlen.ohne ?? ""}</button>
       <button class:aktiv={filter === "transkribiert"} onclick={() => filtern("transkribiert")}>Transkribiert</button>
     </span>
+    {/if}
     <label class="suche" style="min-width:200px"><i class="fa-solid fa-magnifying-glass"></i>
       <input class="eingabe-roh" placeholder="Name suchen" bind:value={suche} oninput={suchen} /></label>
+    {#if ordner !== ALTBESTAND}
     <span class="knopfzeile" style="margin-left:auto">
       <button class="knopf" onclick={aufnehmen} disabled={aufnahme.laeuft || !!aufnahme.danach}><i class="fa-solid fa-circle-dot" style="color:var(--gefahr)"></i> Aufnehmen</button>
       <button class="knopf primaer" onclick={() => eingabe.click()}><i class="fa-solid fa-upload"></i> Hochladen</button>
     </span>
+    {/if}
   </div>
   <div class="rollfeld" role="region" aria-label="Aufnahmen"
        ondragover={(e) => { e.preventDefault(); ueber = true; }} ondragleave={() => (ueber = false)} ondrop={ablegen}>
@@ -370,13 +382,19 @@
     <div class="ordnerzeile">
       Ordner <Auswahl bind:wert={ordner} optionen={ordnerOptionen} symbol="fa-folder" onwahl={ordnerWaehlen}
                       titel="Ordner, die du der App in der Kellerwolke freigegeben hast" />
+      {#if ordner === ALTBESTAND}
+        <span style="font-size:var(--klein); color:var(--text-3)">alte App auf {(() => { try { return new URL(alteApp).host; } catch { return alteApp; } })()}, nur lesen</span>
+      {/if}
       {#each stapel as o (o.id)}<span class="chip"><i class="fa-solid fa-folder-open"></i>{o.name}</span>{/each}
       {#if stapel.length}<button class="knopf still" onclick={hoch}><i class="fa-solid fa-arrow-up"></i> Hoch</button>{/if}
-      {#if sitzung.app?.kellerwolke}
+      {#if sitzung.app?.kellerwolke && ordner !== ALTBESTAND}
         <a class="knopf still" href="{sitzung.app.kellerwolke}/einstellungen/zugaenge" target="_blank" rel="noopener"
            title="In der Kellerwolke unter Zugänge der App weitere Ordner freigeben"><i class="fa-solid fa-folder-plus"></i> Ordner freigeben</a>
       {/if}
     </div>
+    {#if ordner === ALTBESTAND}
+      <Altbestand {suche} />
+    {:else}
     <div class="ablage" class:ueber><i class="fa-solid fa-cloud-arrow-up"></i> Dateien hierher ziehen: Ton (WAV, MP3, M4A, OGG,
       FLAC) oder Video (MP4, MOV, MKV).</div>
     {@render uploadListe()}
@@ -420,6 +438,7 @@
         <button class="knopf" disabled={ab === 0} onclick={() => { ab = Math.max(0, ab - SEITE); void laden(); }}><i class="fa-solid fa-chevron-left"></i> Zurück</button>
         <button class="knopf" disabled={ab + SEITE >= seite.gesamt} onclick={() => { ab += SEITE; void laden(); }}>Weiter <i class="fa-solid fa-chevron-right"></i></button>
       </div>
+    {/if}
     {/if}
   </div>
 {/if}

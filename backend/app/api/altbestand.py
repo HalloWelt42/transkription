@@ -26,6 +26,7 @@ class Uebernommen(BaseModel):
 
 class AltEintrag(altbestand.AltAufnahme):
     uebernommen: Uebernommen | None = None
+    unvollstaendig: Uebernommen | None = None   # angefangen, aber nicht fertig: eine neue Übernahme setzt dort fort
     auftrag_id: str | None = None          # Übernahme läuft oder wartet
 
 
@@ -54,8 +55,10 @@ def router(teile: Teile) -> APIRouter:
         eintraege = []
         for a in aufnahmen:
             schon = await kw.suchen({altbestand.FELD_ALTBESTAND: a.quelle}, 1)
+            teil = [] if schon else await kw.suchen({altbestand.FELD_ALTBESTAND_TEIL: a.quelle}, 1)
             eintraege.append(AltEintrag(**a.model_dump(), auftrag_id=laufend.get(a.schluessel),
-                                        uebernommen=Uebernommen(aufnahme_id=schon[0].id, pfad=schon[0].pfad) if schon else None))
+                                        uebernommen=Uebernommen(aufnahme_id=schon[0].id, pfad=schon[0].pfad) if schon else None,
+                                        unvollstaendig=Uebernommen(aufnahme_id=teil[0].id, pfad=teil[0].pfad) if teil else None))
         return AltbestandSeite(adresse=adresse, eintraege=eintraege)
 
     @r.post("/uebernehmen", status_code=201, response_model=Auftrag)

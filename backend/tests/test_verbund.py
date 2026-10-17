@@ -264,9 +264,15 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 await c.post("/api/v1/anmeldung/abmelden", headers=h)
     finally:
         if g.kellerwolke is not None:
-            for k in angelegt:
-                try:
-                    await g.kellerwolke.loeschen(k)
-                except Exception:  # noqa: BLE001 - schon weg
-                    pass
+            # erst die Dateien, dann die (dann leeren) Ordner; ein Ordner bekommt einen zweiten Versuch
+            for runde in (0, 1):
+                for k in list(angelegt):
+                    try:
+                        await g.kellerwolke.loeschen(k)
+                        angelegt.remove(k)
+                    except Exception:  # noqa: BLE001 - schon weg oder (noch) nicht leer
+                        if runde == 1:
+                            angelegt.remove(k)
+                if angelegt:
+                    await asyncio.sleep(0.5)
         await g.stoppen()

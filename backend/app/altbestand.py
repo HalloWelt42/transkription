@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import ipaddress
+import json
 import re
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -23,7 +24,8 @@ from pydantic import BaseModel
 from .modell.transkript import Aenderung, ErzeugtMit, Quelle, Segment, Sprecher, Transkript, Wort
 
 PORT = 10031                      # Vorgabe der alten App
-FELD_ALTBESTAND = "altbestand"    # an der übernommenen Aufnahme: Pfad der Quelle in der alten App
+FELD_ALTBESTAND = "altbestand"            # an der Aufnahme, wenn die Übernahme fertig ist: Pfad der Quelle in der alten App
+FELD_ALTBESTAND_TEIL = "altbestand_teil"  # schon beim Hochladen: eine abgebrochene Übernahme setzt hier fort
 SPRACHEN = {"german": "de", "english": "en", "french": "fr", "spanish": "es", "italian": "it", "dutch": "nl"}
 
 
@@ -152,6 +154,16 @@ async def suchen(netze: list[str], client: httpx.AsyncClient, zeit: float = 0.4)
 _ROH_SPRECHER = re.compile(r"^SPEAKER_\d+$")
 
 
+def _liste(wert: Any) -> list[dict[str, Any]]:
+    """Die alte App liefert Segmente und Sprecher im Einzelabruf als JSON-Text, in der Datenbank als Liste."""
+    if isinstance(wert, str):
+        try:
+            wert = json.loads(wert or "[]")
+        except ValueError:
+            return []
+    return [w for w in wert if isinstance(w, dict)] if isinstance(wert, list) else []
+
+
 def _zeit(wert: Any) -> float:
     try:
         return max(0.0, round(float(wert), 3))
@@ -162,8 +174,8 @@ def _zeit(wert: Any) -> float:
 def in_transkript(alt: dict[str, Any], name: str, quelle: Quelle, dauer_s: float) -> Transkript:
     """Ein Transkript der alten App im Format transkript/1: Sprecher je Gruppe der alten Erkennung (Namen, Stimmabdruck),
     Segmente mit Wortzeiten, so weit vorhanden."""
-    sprecher_alt = alt.get("speakers") or []
-    segmente_alt = alt.get("segments") or []
+    sprecher_alt = _liste(alt.get("speakers"))
+    segmente_alt = _liste(alt.get("segments"))
     kennung: dict[Any, str] = {}
     sprecher: list[Sprecher] = []
 

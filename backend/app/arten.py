@@ -272,11 +272,20 @@ def arten(teile: Teile) -> list[Art]:
                 eintrag = next((a for a in await alte.aufnahmen() if a.schluessel == e.schluessel), None)
                 if eintrag is None:
                     raise ValueError("Diese Aufnahme gibt es in der alten App nicht (mehr)")
+                if "aufnahme_id" not in k.zwischenstand:
+                    if schon := await kw.suchen({altbestand.FELD_ALTBESTAND: eintrag.quelle}, 1):
+                        raise ValueError(f"Schon übernommen: {schon[0].pfad}")
+                    if teil := await kw.suchen({altbestand.FELD_ALTBESTAND_TEIL: eintrag.quelle}, 1):
+                        # eine abgebrochene Übernahme: die Aufnahme liegt schon da, vorhandene Stände zählen
+                        vorhanden = (await teile.index.zur_quelle([str(teil[0].id)])).get(str(teil[0].id), [])
+                        merken: dict = {"aufnahme_id": str(teil[0].id)}
+                        if vorhanden:
+                            merken |= {"transkript_id": str(vorhanden[0].id),
+                                       "staende_fertig": len(await teile.transkripte.versionen(vorhanden[0].id))}
+                        await k.merken(**merken)
                 if "aufnahme_id" in k.zwischenstand:
                     quelle = await kw.knoten(k.zwischenstand["aufnahme_id"])
                 else:
-                    if schon := await kw.suchen({altbestand.FELD_ALTBESTAND: eintrag.quelle}, 1):
-                        raise ValueError(f"Schon übernommen: {schon[0].pfad}")
                     await k.fortschritt(None, f"Original laden ({eintrag.name})", phase="laden")
                     roh = ordner / f"original{eintrag.endung}"
                     await alte.original(eintrag.staende[-1].id, roh)
@@ -292,7 +301,7 @@ def arten(teile: Teile) -> list[Art]:
                         n += 1
                     quelle = await kw.schreiben(orte.ort(ziel.pfad, f"{stamm}{f' ({n})' if n > 1 else ''}{eintrag.endung}"), roh,
                                                 nur_neu=True)
-                    quelle = await kw.felder_setzen(quelle.id, {altbestand.FELD_ALTBESTAND: eintrag.quelle,
+                    quelle = await kw.felder_setzen(quelle.id, {altbestand.FELD_ALTBESTAND_TEIL: eintrag.quelle,
                                                                 orte.FELD_DAUER: round(dauer, 3)})
                     roh.unlink(missing_ok=True)
                     await k.merken(aufnahme_id=str(quelle.id))
@@ -316,6 +325,7 @@ def arten(teile: Teile) -> list[Art]:
                     await k.merken(transkript_id=tid, staende_fertig=nummer + 1)
                 if t is not None and knoten is not None:
                     await teile.index.eintragen(t, knoten)
+                quelle = await kw.felder_setzen(quelle.id, {altbestand.FELD_ALTBESTAND: eintrag.quelle})   # erst jetzt fertig
             await g.protokoll.eintragen("altbestand.uebernommen", f"{eintrag.name} nach {quelle.pfad} ({len(eintrag.staende)} Stände)",
                                         bezug_art="aufnahme", bezug_name=e.von)
             folge = None

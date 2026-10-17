@@ -17,6 +17,7 @@
 .stand-pille.fertig { background: var(--gut-weich); color: var(--gut); }
 .stand-pille.laeuft { background: var(--akzent-weich); color: var(--akzent); }
 .stand-pille.offen { background: var(--flaeche-2); color: var(--text-3); font-weight: 400; }
+.stand-pille.warn { background: var(--warn-weich); color: var(--warn); }
 .ablage { border: 2px dashed var(--rand); border-radius: var(--r3); padding: 18px; text-align: center; color: var(--text-3);
           font-size: var(--klein); margin-bottom: 14px; }
 .optionen { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; padding: 14px 16px; background: var(--akzent-weich);

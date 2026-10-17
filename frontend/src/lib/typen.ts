@@ -160,3 +160,32 @@ export interface Profil {
 
 export type ExportFormat = "txt" | "md" | "srt" | "vtt" | "docx" | "json";
 export type Vorlage = "protokoll" | "zusammenfassung" | "aufgaben";
+
+// --- Altbestand der alten App ------------------------------------------------------------------------------------
+
+export interface AltStand {
+  id: string;
+  erstellt_am: string;
+  segmente: number;
+  sprecher: number;
+  mit_woertern: boolean;
+}
+
+export interface AltEintrag {
+  schluessel: string;
+  quelle: string;
+  name: string;
+  vorschlag: string;
+  endung: string;
+  groesse: number | null;
+  dauer_s: number;
+  staende: AltStand[];
+  uebernommen: { aufnahme_id: string; pfad: string } | null;
+  unvollstaendig: { aufnahme_id: string; pfad: string } | null;
+  auftrag_id: string | null;
+}
+
+export interface AltbestandSeite {
+  adresse: string;
+  eintraege: AltEintrag[];
+}

@@ -4,6 +4,7 @@ alte Stände als Versionen, neu transkribiert als jüngste Version, zweites Übe
 
 import asyncio
 import hashlib
+import json
 import secrets
 import socket
 import threading
@@ -57,8 +58,12 @@ def test_gruppieren_nur_eigene_aufnahmen():
     assert b.dauer_s == 61 and b.schluessel == altbestand.schluessel("/d/storage/x.mp3")
 
 
-def test_in_transkript():
-    t = altbestand.in_transkript(alt_transkript(2, True), "Besprechung", QUELLE, 3.0)
+@pytest.mark.parametrize("als_text", [False, True])
+def test_in_transkript(als_text: bool):
+    alt = alt_transkript(2, True)
+    if als_text:                         # so liefert sie der Einzelabruf der echten alten App
+        alt = {**alt, "segments": json.dumps(alt["segments"]), "speakers": json.dumps(alt["speakers"])}
+    t = altbestand.in_transkript(alt, "Besprechung", QUELLE, 3.0)
     assert t.sprache == "de" and [s.name for s in t.sprecher] == ["Sprecher 1", "Jens"]
     assert t.sprecher[0].abdruck is not None and len(t.sprecher[0].abdruck) == 192 and t.sprecher[1].abdruck is None
     assert [(s.text, s.sprecher) for s in t.segmente] == [("Guten Tag", "s1"), ("Hallo zusammen", "s2")]   # leere fallen weg
@@ -74,8 +79,9 @@ def frei() -> int:
     return port
 
 
-def alte_app(ton: Path) -> FastAPI:
-    """Die alte App zum Schein: zwei Stände einer eigenen Aufnahme und eine Tonspur eines Videos."""
+def alte_app(ton: Path, zustand: dict) -> FastAPI:
+    """Die alte App zum Schein: zwei Stände einer eigenen Aufnahme und eine Tonspur eines Videos. Mit
+    zustand["kaputt"] liefert sie keine Stände (Abbruch nach dem Hochladen)."""
     summe = hashlib.sha256(ton.read_bytes()).hexdigest()
     staende = {"alt1": alt_transkript(1, False), "alt2": alt_transkript(2, True)}
     a = FastAPI()
@@ -95,7 +101,11 @@ def alte_app(ton: Path) -> FastAPI:
     def transkript(alt_id: str):
         if alt_id not in staende:
             raise HTTPException(404)
-        return staende[alt_id]
+        if zustand.get("kaputt"):
+            raise HTTPException(500, "kaputt")
+        # wie die echte alte App: Segmente und Sprecher als JSON-Text
+        return {**staende[alt_id], "segments": json.dumps(staende[alt_id]["segments"]),
+                "speakers": json.dumps(staende[alt_id]["speakers"])}
 
     @a.get("/api/transcribe/{alt_id}/original")
     def original(alt_id: str):
@@ -116,7 +126,8 @@ async def test_uebernahme_von_hand(tmp_path: Path):
         "aevalsrc='0.4*sin(2*PI*330*t)':s=16000:d=4", str(ton))
     assert await erzeugen.wait() == 0
     port = frei()
-    server = uvicorn.Server(uvicorn.Config(alte_app(ton), host="127.0.0.1", port=port, log_level="warning"))
+    zustand = {"kaputt": True}
+    server = uvicorn.Server(uvicorn.Config(alte_app(ton, zustand), host="127.0.0.1", port=port, log_level="warning"))
     faden = threading.Thread(target=server.run, daemon=True)
     faden.start()
     for _ in range(100):
@@ -147,6 +158,15 @@ async def test_uebernahme_von_hand(tmp_path: Path):
 
             zielordner = f"Altbestand {secrets.token_hex(2)}"
             name = f"Probe Alt {secrets.token_hex(2)}"
+            # erst bricht die Übernahme nach dem Hochladen ab: unvollständig, nicht übernommen
+            abbruch = await warten(c, h, (await c.post("/api/v1/altbestand/uebernehmen", headers=h, json={
+                "schluessel": eintrag["schluessel"], "zielordner": zielordner, "name": name})).json()["id"])
+            assert abbruch["zustand"] == "fehler"
+            halb = (await c.get("/api/v1/altbestand", headers=h)).json()["eintraege"][0]
+            assert halb["uebernommen"] is None and halb["unvollstaendig"] is not None
+            angelegt.append(halb["unvollstaendig"]["aufnahme_id"])
+            zustand["kaputt"] = False
+            # eine neue Übernahme setzt mit derselben Aufnahme fort (nichts doppelt hochgeladen)
             a = (await c.post("/api/v1/altbestand/uebernehmen", headers=h, json={
                 "schluessel": eintrag["schluessel"], "zielordner": zielordner, "name": name, "neu_transkribieren": True,
                 "sprecher": "ohne"})).json()
@@ -155,6 +175,7 @@ async def test_uebernahme_von_hand(tmp_path: Path):
             erg = a["ergebnis"]
             angelegt += [erg["aufnahme_id"], erg["transkript_id"]]
             assert erg["pfad"].endswith(f"/Aufnahmen/{zielordner}/{name}.mp3") and erg["staende"] == 2
+            assert erg["aufnahme_id"] == halb["unvollstaendig"]["aufnahme_id"]
 
             # das Original kam unverändert an
             inhalt = await g.kellerwolke.lesen_ganz(erg["aufnahme_id"]) if hasattr(g.kellerwolke, "lesen_ganz") else None
@@ -184,11 +205,17 @@ async def test_uebernahme_von_hand(tmp_path: Path):
                     angelegt.append(str(k.id))
     finally:
         if g.kellerwolke is not None:
-            for k in angelegt:
-                try:
-                    await g.kellerwolke.loeschen(k)
-                except Exception:  # noqa: BLE001 - schon weg
-                    pass
+            # erst die Dateien, dann die (dann leeren) Ordner; ein Ordner bekommt einen zweiten Versuch
+            for runde in (0, 1):
+                for k in list(angelegt):
+                    try:
+                        await g.kellerwolke.loeschen(k)
+                        angelegt.remove(k)
+                    except Exception:  # noqa: BLE001 - schon weg oder (noch) nicht leer
+                        if runde == 1:
+                            angelegt.remove(k)
+                if angelegt:
+                    await asyncio.sleep(0.5)
         await g.stoppen()
         server.should_exit = True
         faden.join(timeout=5)
