@@ -1,6 +1,6 @@
 # Transkription: Entwurf
 
-Stand 17.10.2026, zur Freigabe. Grundlage: Bestandsaufnahme der alten txt2voice (Endpunkte, Daten, Abläufe,
+Stand 17.10.2026, freigegeben. Grundlage: Bestandsaufnahme der alten txt2voice (Endpunkte, Daten, Abläufe,
 Oberfläche) und die Regeln des Neubaus (`txt2voice/docs/NEUBAU.md`).
 
 Die Transkription macht aus Ton und Video Text mit Wortzeiten und Sprechern. Sie ist die erste App auf dem Appkern:
@@ -129,9 +129,9 @@ unter Mehr):
 Quellaufnahmen sind 74 GB. Ein Werkzeug mit Probelauf und Prüfsumme schreibt Transkriptdateien in die Kellerwolke; ob
 die Aufnahmen mitkommen oder dort bleiben, wo sie sind, entscheidet der Nutzer vor dem Lauf.
 
-## 7. Offene Fragen an den Nutzer
+## 7. Entscheidungen des Nutzers (17.10.2026)
 
-1. Freigabe der Entwürfe (Seiten am Rechner und am Telefon).
-2. App-zu-App: Fremde Apps melden sich mit ihrem App-Schlüssel der Kellerwolke an (Vorschlag) oder bekommen je App
-   einen eigenen Schlüssel in jeder Ziel-App.
-3. Repository: öffentlich wie Appkern und Leitstelle, oder privat.
+1. Entwürfe am Rechner und am Telefon: so übernehmen.
+2. App zu App: fremde Apps melden sich mit ihrem App-Schlüssel der Kellerwolke an (Appkern 0.10.0, `geruest.pflicht`;
+   Einstellungen nur für Menschen). Versionen liest die App über die Ablage der Kellerwolke (ab 0.76.0).
+3. Repository: öffentlich, wie Appkern und Leitstelle.
