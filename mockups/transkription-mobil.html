@@ -70,30 +70,11 @@
       </div>
 
       <div>
-        <p class="zustand-titel" style="margin-top:0">2. Aufnahme läuft (schlank): oben Zeit, Pegel und Symbole an festen Plätzen, Klick auf ein Symbol zeigt seine Erklärung (hier Mikrofon); darunter die Steuerung; der Rest für den Live-Text</p>
+        <p class="zustand-titel" style="margin-top:0">2. Aufnahme läuft: die Leiste unten wie der Spieler (Beenden, Anhalten, Pegel, Zeit, Marker), darüber kleine Symbole an festen Plätzen, Klick zeigt die Erklärung (hier Mikrofon); der Text hat den Platz</p>
         <div class="telefon"><div class="mobil">
           <div class="t-kopf"><h1>Aufnahme</h1></div>
           <div class="t-inhalt" style="display:flex; flex-direction:column">
-            <div class="rek-status">
-              <span class="rek-zeit"><span class="punkt"></span>03:12</span>
-              <span class="rek-pegel"><span style="height:12%"></span><span style="height:30%"></span><span style="height:55%"></span><span style="height:70%"></span><span style="height:42%"></span><span style="height:64%"></span><span style="height:88%"></span><span style="height:52%"></span><span style="height:34%"></span><span style="height:60%"></span><span style="height:76%"></span><span style="height:48%"></span><span style="height:22%"></span><span style="height:40%"></span><span style="height:66%"></span><span style="height:80%"></span><span style="height:58%"></span><span style="height:36%"></span><span style="height:24%"></span><span style="height:46%"></span><span style="height:72%"></span><span style="height:62%"></span><span style="height:38%"></span><span style="height:18%"></span><span style="height:30%"></span><span style="height:52%"></span><span style="height:68%"></span><span style="height:44%"></span><span style="height:26%"></span><span style="height:14%"></span></span>
-            </div>
-            <span class="rek-symbole">
-                <button class="rek-symbol" title="Name"><i class="fa-solid fa-pen"></i></button>
-                <button class="rek-symbol offen" title="Mikrofon"><i class="fa-solid fa-microphone"></i></button>
-                <button class="rek-symbol gut" title="Live-Mitschrift an"><i class="fa-solid fa-closed-captioning"></i></button>
-                <button class="rek-symbol gut" title="Wird laufend gesichert"><i class="fa-solid fa-floppy-disk"></i></button>
-                <button class="rek-symbol gut" title="Ton vom Mikrofon"><i class="fa-solid fa-wave-square"></i></button>
-                <div class="rek-blase"><b>Mikrofon</b>Wechselt sofort, auch mitten in der Aufnahme.
-                  <div class="knopfreihe"><span class="ordnerwahl">MacBook-Mikrofon <i class="fa-solid fa-chevron-down"></i></span></div>
-              </span>
-            </div>
-            <div class="rek-steuer">
-              <button class="rund" title="Verwerfen"><i class="fa-solid fa-trash-can"></i></button>
-              <button class="rund" title="Anhalten"><i class="fa-solid fa-pause"></i></button>
-              <button class="stopp" title="Beenden und speichern"><i class="fa-solid fa-stop"></i></button>
-              <button class="rund marken" title="Marker setzen"><i class="fa-solid fa-flag"></i><span class="zahl">2</span></button>
-            </div>
+            <div class="rek">
             <div class="rek-live">
               <div class="kopf-zeile"><i class="fa-solid fa-closed-captioning"></i> Live-Mitschrift<span style="margin-left:auto">hört ...</span></div>
               <div class="text">
@@ -103,6 +84,24 @@
                 <p><span class="zeit">00:41</span>Das stelle ich diese Woche um, dann räumt er alles ab, was älter als sieben Tage ist.</p>
                 <p><span class="zeit">00:58</span>Und für Freitag brauchen wir noch eine kurze Abstimmung mit Frank.</p>
               </div>
+            </div>
+            <span class="rek-symbole">
+                <button class="rek-symbol" title="Name"><i class="fa-solid fa-pen"></i></button>
+                <button class="rek-symbol offen" title="Mikrofon"><i class="fa-solid fa-microphone"></i></button>
+                <button class="rek-symbol gut" title="Live-Mitschrift an"><i class="fa-solid fa-closed-captioning"></i></button>
+                <button class="rek-symbol gut" title="Wird laufend gesichert"><i class="fa-solid fa-floppy-disk"></i></button>
+                <button class="rek-symbol gut" title="Ton vom Mikrofon"><i class="fa-solid fa-wave-square"></i></button>
+                <button class="rek-symbol" title="Verwerfen"><i class="fa-solid fa-trash-can"></i></button>
+                <div class="rek-blase"><b>Mikrofon</b>Wechselt sofort, auch mitten in der Aufnahme.<div class="knopfreihe"><span class="ordnerwahl">MacBook-Mikrofon <i class="fa-solid fa-chevron-down"></i></span></div></div>
+              </span>
+            <div class="rek-leiste">
+              <button class="stopp" title="Beenden und speichern"><i class="fa-solid fa-stop"></i></button>
+              <button class="rund pause" title="Anhalten"><i class="fa-solid fa-pause"></i></button>
+              <span class="rek-pegel"><span style="height:12%"></span><span style="height:30%"></span><span style="height:55%"></span><span style="height:70%"></span><span style="height:42%"></span><span style="height:64%"></span><span style="height:88%"></span><span style="height:52%"></span><span style="height:34%"></span><span style="height:60%"></span><span style="height:76%"></span><span style="height:48%"></span><span style="height:22%"></span><span style="height:40%"></span><span style="height:66%"></span><span style="height:80%"></span><span style="height:58%"></span><span style="height:36%"></span><span style="height:24%"></span><span style="height:46%"></span><span style="height:72%"></span><span style="height:62%"></span><span style="height:38%"></span><span style="height:18%"></span><span style="height:30%"></span><span style="height:52%"></span><span style="height:68%"></span><span style="height:44%"></span><span style="height:26%"></span><span style="height:14%"></span><span style="height:38%"></span><span style="height:56%"></span><span style="height:72%"></span><span style="height:48%"></span><span style="height:30%"></span><span style="height:20%"></span><span style="height:44%"></span><span style="height:64%"></span><span style="height:52%"></span><span style="height:28%"></span><span style="height:12%"></span><span style="height:30%"></span><span style="height:55%"></span><span style="height:70%"></span><span style="height:42%"></span><span style="height:64%"></span><span style="height:88%"></span><span style="height:52%"></span><span style="height:34%"></span><span style="height:60%"></span><span style="height:76%"></span><span style="height:48%"></span><span style="height:22%"></span><span style="height:40%"></span><span style="height:66%"></span><span style="height:80%"></span><span style="height:58%"></span><span style="height:36%"></span><span style="height:24%"></span><span style="height:46%"></span><span style="height:72%"></span><span style="height:62%"></span><span style="height:38%"></span><span style="height:18%"></span><span style="height:30%"></span><span style="height:52%"></span><span style="height:68%"></span><span style="height:44%"></span><span style="height:26%"></span><span style="height:14%"></span><span style="height:38%"></span><span style="height:56%"></span><span style="height:72%"></span><span style="height:48%"></span><span style="height:30%"></span><span style="height:20%"></span><span style="height:44%"></span><span style="height:64%"></span><span style="height:52%"></span><span style="height:28%"></span><span style="height:12%"></span><span style="height:30%"></span><span style="height:55%"></span><span style="height:70%"></span><span style="height:42%"></span><span style="height:64%"></span><span style="height:88%"></span><span style="height:52%"></span><span style="height:34%"></span><span style="height:60%"></span><span style="height:76%"></span><span style="height:48%"></span><span style="height:22%"></span><span style="height:40%"></span><span style="height:66%"></span><span style="height:80%"></span><span style="height:58%"></span><span style="height:36%"></span><span style="height:24%"></span><span style="height:46%"></span><span style="height:72%"></span><span style="height:62%"></span><span style="height:38%"></span><span style="height:18%"></span><span style="height:30%"></span><span style="height:52%"></span><span style="height:68%"></span><span style="height:44%"></span><span style="height:26%"></span><span style="height:14%"></span><span style="height:38%"></span><span style="height:56%"></span><span style="height:72%"></span><span style="height:48%"></span><span style="height:30%"></span><span style="height:20%"></span><span style="height:44%"></span><span style="height:64%"></span><span style="height:52%"></span><span style="height:28%"></span></span>
+              <span class="rek-zeit"><span class="punkt"></span>03:12</span>
+              <button class="rund marken" title="Marker setzen"><i class="fa-solid fa-flag"></i><span class="zahl">2</span></button>
+              
+            </div>
             </div>
           </div>
           <nav class="t-reiter">
@@ -115,26 +114,11 @@
       </div>
 
       <div>
-        <p class="zustand-titel" style="margin-top:0">2b. Aufnahme läuft: kein Ton kommt an (nur das Symbol färbt sich, Erklärung per Klick); Verwerfen tauscht die Steuerzeile gegen die Rückfrage, nichts springt</p>
+        <p class="zustand-titel" style="margin-top:0">2b. Kein Ton kommt an: nur das Symbol färbt sich (Erklärung per Klick); Verwerfen fragt in seiner Blase nach, nichts springt</p>
         <div class="telefon"><div class="mobil">
           <div class="t-kopf"><h1>Aufnahme</h1></div>
           <div class="t-inhalt" style="display:flex; flex-direction:column">
-            <div class="rek-status">
-              <span class="rek-zeit"><span class="punkt"></span>03:12</span>
-              <span class="rek-pegel"><span style="height:12%"></span><span style="height:30%"></span><span style="height:55%"></span><span style="height:70%"></span><span style="height:42%"></span><span style="height:64%"></span><span style="height:88%"></span><span style="height:52%"></span><span style="height:34%"></span><span style="height:60%"></span><span style="height:76%"></span><span style="height:48%"></span><span style="height:22%"></span><span style="height:40%"></span><span style="height:66%"></span><span style="height:80%"></span><span style="height:58%"></span><span style="height:36%"></span><span style="height:24%"></span><span style="height:46%"></span><span style="height:72%"></span><span style="height:62%"></span><span style="height:38%"></span><span style="height:18%"></span><span style="height:30%"></span><span style="height:52%"></span><span style="height:68%"></span><span style="height:44%"></span><span style="height:26%"></span><span style="height:14%"></span></span>
-            </div>
-            <span class="rek-symbole">
-                <button class="rek-symbol" title="Name"><i class="fa-solid fa-pen"></i></button>
-                <button class="rek-symbol" title="Mikrofon"><i class="fa-solid fa-microphone"></i></button>
-                <button class="rek-symbol gut" title="Live-Mitschrift an"><i class="fa-solid fa-closed-captioning"></i></button>
-                <button class="rek-symbol gut" title="Wird laufend gesichert"><i class="fa-solid fa-floppy-disk"></i></button>
-                <button class="rek-symbol warn" title="Ton vom Mikrofon"><i class="fa-solid fa-triangle-exclamation"></i></button>
-                <div class="rek-blase"><b>Kein Ton seit 4 Sekunden</b>Vom Mikrofon kommt nichts an. Prüfe es oder wähle beim Mikrofon-Symbol ein anderes.</div>
-              </span>
-            <div class="rek-frage">Verwerfen?
-              <button class="knopf still">Behalten</button>
-              <button class="knopf gefahr"><i class="fa-solid fa-trash-can"></i> Verwerfen</button>
-            </div>
+            <div class="rek">
             <div class="rek-live">
               <div class="kopf-zeile"><i class="fa-solid fa-closed-captioning"></i> Live-Mitschrift<span style="margin-left:auto">hört ...</span></div>
               <div class="text">
@@ -144,6 +128,24 @@
                 <p><span class="zeit">00:41</span>Das stelle ich diese Woche um, dann räumt er alles ab, was älter als sieben Tage ist.</p>
                 <p><span class="zeit">00:58</span>Und für Freitag brauchen wir noch eine kurze Abstimmung mit Frank.</p>
               </div>
+            </div>
+            <span class="rek-symbole">
+                <button class="rek-symbol" title="Name"><i class="fa-solid fa-pen"></i></button>
+                <button class="rek-symbol" title="Mikrofon"><i class="fa-solid fa-microphone"></i></button>
+                <button class="rek-symbol gut" title="Live-Mitschrift an"><i class="fa-solid fa-closed-captioning"></i></button>
+                <button class="rek-symbol gut" title="Wird laufend gesichert"><i class="fa-solid fa-floppy-disk"></i></button>
+                <button class="rek-symbol warn" title="Ton vom Mikrofon"><i class="fa-solid fa-triangle-exclamation"></i></button>
+                <button class="rek-symbol offen" title="Verwerfen"><i class="fa-solid fa-trash-can"></i></button>
+                <div class="rek-blase"><b>Aufnahme verwerfen?</b>Sie wird nicht gespeichert, auch nicht auf diesem Gerät.<div class="knopfreihe"><button class="knopf klein still">Behalten</button><button class="knopf klein gefahr"><i class="fa-solid fa-trash-can"></i> Verwerfen</button></div></div>
+              </span>
+            <div class="rek-leiste">
+              <button class="stopp" title="Beenden und speichern"><i class="fa-solid fa-stop"></i></button>
+              <button class="rund pause" title="Anhalten"><i class="fa-solid fa-pause"></i></button>
+              <span class="rek-pegel"><span style="height:12%"></span><span style="height:30%"></span><span style="height:55%"></span><span style="height:70%"></span><span style="height:42%"></span><span style="height:64%"></span><span style="height:88%"></span><span style="height:52%"></span><span style="height:34%"></span><span style="height:60%"></span><span style="height:76%"></span><span style="height:48%"></span><span style="height:22%"></span><span style="height:40%"></span><span style="height:66%"></span><span style="height:80%"></span><span style="height:58%"></span><span style="height:36%"></span><span style="height:24%"></span><span style="height:46%"></span><span style="height:72%"></span><span style="height:62%"></span><span style="height:38%"></span><span style="height:18%"></span><span style="height:30%"></span><span style="height:52%"></span><span style="height:68%"></span><span style="height:44%"></span><span style="height:26%"></span><span style="height:14%"></span><span style="height:38%"></span><span style="height:56%"></span><span style="height:72%"></span><span style="height:48%"></span><span style="height:30%"></span><span style="height:20%"></span><span style="height:44%"></span><span style="height:64%"></span><span style="height:52%"></span><span style="height:28%"></span><span style="height:12%"></span><span style="height:30%"></span><span style="height:55%"></span><span style="height:70%"></span><span style="height:42%"></span><span style="height:64%"></span><span style="height:88%"></span><span style="height:52%"></span><span style="height:34%"></span><span style="height:60%"></span><span style="height:76%"></span><span style="height:48%"></span><span style="height:22%"></span><span style="height:40%"></span><span style="height:66%"></span><span style="height:80%"></span><span style="height:58%"></span><span style="height:36%"></span><span style="height:24%"></span><span style="height:46%"></span><span style="height:72%"></span><span style="height:62%"></span><span style="height:38%"></span><span style="height:18%"></span><span style="height:30%"></span><span style="height:52%"></span><span style="height:68%"></span><span style="height:44%"></span><span style="height:26%"></span><span style="height:14%"></span><span style="height:38%"></span><span style="height:56%"></span><span style="height:72%"></span><span style="height:48%"></span><span style="height:30%"></span><span style="height:20%"></span><span style="height:44%"></span><span style="height:64%"></span><span style="height:52%"></span><span style="height:28%"></span><span style="height:12%"></span><span style="height:30%"></span><span style="height:55%"></span><span style="height:70%"></span><span style="height:42%"></span><span style="height:64%"></span><span style="height:88%"></span><span style="height:52%"></span><span style="height:34%"></span><span style="height:60%"></span><span style="height:76%"></span><span style="height:48%"></span><span style="height:22%"></span><span style="height:40%"></span><span style="height:66%"></span><span style="height:80%"></span><span style="height:58%"></span><span style="height:36%"></span><span style="height:24%"></span><span style="height:46%"></span><span style="height:72%"></span><span style="height:62%"></span><span style="height:38%"></span><span style="height:18%"></span><span style="height:30%"></span><span style="height:52%"></span><span style="height:68%"></span><span style="height:44%"></span><span style="height:26%"></span><span style="height:14%"></span><span style="height:38%"></span><span style="height:56%"></span><span style="height:72%"></span><span style="height:48%"></span><span style="height:30%"></span><span style="height:20%"></span><span style="height:44%"></span><span style="height:64%"></span><span style="height:52%"></span><span style="height:28%"></span></span>
+              <span class="rek-zeit"><span class="punkt"></span>03:12</span>
+              <button class="rund marken" title="Marker setzen"><i class="fa-solid fa-flag"></i><span class="zahl">2</span></button>
+              
+            </div>
             </div>
           </div>
           <nav class="t-reiter">
