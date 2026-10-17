@@ -9,7 +9,7 @@ from pathlib import PurePosixPath
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from ..ablage import orte
@@ -44,12 +44,15 @@ def router(teile: Teile) -> APIRouter:
         return await inhalt_reichen(kw, knoten, request)
 
     @r.get("/inhalt/transkripte/{transkript_id}/ton", dependencies=[g.lesen])
-    async def ton(transkript_id: UUID, request: Request) -> Response:
+    async def ton(transkript_id: UUID) -> Response:
+        """Die Abspielfassung der Aufnahme (PCM-WAV, samplegenau springbar, ohne Versatz zum Text); fehlt sie, entsteht
+        sie jetzt."""
         t, _ = await teile.transkripte.lesen(transkript_id)
         if t.quelle is None:
             raise HTTPException(404, "Das Transkript nennt keine Aufnahme")
         kw = zugang(lambda: g.kellerwolke)
-        return await inhalt_reichen(kw, await kw.knoten(t.quelle.knoten_id), request)
+        datei = await teile.abspielen.holen(await kw.knoten(t.quelle.knoten_id), kw)
+        return FileResponse(datei, media_type="audio/wav", headers={"Cache-Control": "private, max-age=3600"})
 
     @r.get("/inhalt/transkripte/{transkript_id}/export", dependencies=[g.lesen])
     async def herunterladen(transkript_id: UUID, format: Format = Query("txt")) -> Response:

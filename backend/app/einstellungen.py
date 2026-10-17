@@ -56,6 +56,11 @@ class AppEinstellungen(Grundeinstellungen):
                            description="Für Korrektur und Auswertung. Ohne eigene Wahl entscheidet die Kette der App in der "
                                        "Leitstelle.")
 
+    abspiel_speicher_gb: int = Field(20, ge=1, le=500, title="Speicher für Abspielfassungen",
+                                     json_schema_extra={**TECHNIK, "einheit": "GB"},
+                                     description="Der Spieler nutzt eine gewandelte Fassung jeder Aufnahme (dadurch ohne Versatz "
+                                                 "zum Text). Wird es mehr, gehen die am längsten nicht gespielten zuerst; sie "
+                                                 "entstehen bei Bedarf neu.")
     ffmpeg_ordner: str = Field("", title="Ordner von ffmpeg", json_schema_extra=TECHNIK,
                                description="ffmpeg wandelt und schneidet den Ton. Ohne Eintrag wird es im Suchpfad und an den "
                                            "üblichen Orten gesucht.")

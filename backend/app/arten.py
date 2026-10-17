@@ -102,6 +102,8 @@ def arten(teile: Teile) -> list[Art]:
     g = teile.geruest
 
     async def ton_holen(k: Kontext, quelle_id: UUID | str, ordner: Path) -> tuple[Path, float]:
+        """Original holen, für den Hördienst wandeln (16 kHz mono) und gleich die Abspielfassung erzeugen: beide aus
+        derselben Quelle mit demselben Dekoder, damit Wortzeiten und Wiedergabe gleich laufen."""
         kw = zugang(lambda: g.kellerwolke)
         quelle = await kw.knoten(quelle_id)
         roh = ordner / f"quelle{PurePosixPath(quelle.name).suffix.lower() or '.bin'}"
@@ -109,6 +111,8 @@ def arten(teile: Teile) -> list[Art]:
         await kw.herunterladen(quelle.id, roh)
         await k.fortschritt(None, "Ton wandeln")
         wav = await teile.ton.wandeln(roh, ordner / "ton.wav")
+        await k.fortschritt(None, "Abspielfassung erzeugen")
+        await teile.abspielen.aus_datei(quelle, roh)
         roh.unlink(missing_ok=True)
         return wav, await teile.ton.dauer(wav)
 

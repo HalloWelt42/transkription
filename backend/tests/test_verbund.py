@@ -161,9 +161,12 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert a["zustand"] == "fertig" and a["ergebnis"]["pfad"].endswith(f"{name} (Protokoll).md")
                 angelegt.append(a["ergebnis"]["datei_id"])
 
-                # Ton mit Bereichen
-                r = await c.get(f"/api/v1/inhalt/transkripte/{tid}/ton", headers={**h, "Range": "bytes=0-99"})
-                assert r.status_code == 206 and len(r.content) == 100 and r.headers["content-range"].startswith("bytes 0-99/")
+                # Ton zum Mitlesen: die Abspielfassung (PCM-WAV 44,1 kHz mono), mit Bereichen
+                r = await c.get(f"/api/v1/inhalt/transkripte/{tid}/ton", headers={**h, "Range": "bytes=0-43"})
+                assert r.status_code == 206 and r.headers["content-type"] == "audio/wav" and r.content[:4] == b"RIFF"
+                assert int.from_bytes(r.content[24:28], "little") == 44100 and int.from_bytes(r.content[22:24], "little") == 1
+                gesamt = int(r.headers["content-range"].split("/")[1])
+                assert gesamt == pytest.approx(44 + 150 * 44100 * 2, rel=0.01)          # 150 s, 16 Bit mono
 
                 # Eine andere App mit ihrem App-Schlüssel: Arbeit ja, Einstellungen nein
                 app_kopf = {"Authorization": f"Bearer {W['KELLERWOLKE_SCHLUESSEL']}"}

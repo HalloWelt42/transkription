@@ -11,6 +11,7 @@ from appkern.einstellungen import Angebot, Option
 from .ablage.profile import Sprecherprofile
 from .ablage.transkripte import Transkripte
 from .abgleich import Abgleich
+from .abspielen import Abspielfassungen
 from .dienste import Klangwerk
 from .einstellungen import AppEinstellungen
 from .sprechererkennung import Schwellen
@@ -27,6 +28,8 @@ class Teile(Begleiter):
         self.index = Suchindex(geruest.db)
         self.vorschlaege = Vorschlaege(geruest.db)
         self.abgleich = Abgleich(geruest, self.transkripte, self.index)
+        self.abspielen = Abspielfassungen(geruest.daten / "abspielen", lambda: self.ton,
+                                          lambda: float(self.einstellungen.abspiel_speicher_gb))
         e = lambda: geruest.einstellungen.stand  # noqa: E731
         self.klangwerk = Klangwerk(lambda: geruest.leitstelle,
                                    lambda: (e().dienst_hoeren, e().dienst_sprecher, e().dienst_trennen))

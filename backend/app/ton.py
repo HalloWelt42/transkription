@@ -92,6 +92,15 @@ class Ton:
         vorlaeufig.replace(ziel)
         return ziel
 
+    async def abspielfassung(self, quelle: Path, ziel: Path) -> Path:
+        """PCM-WAV 44,1 kHz mono für den Spieler (Parameter der bewährten alten App); erst vollständig, dann an seinen
+        Platz."""
+        vorlaeufig = ziel.with_name(f".{ziel.name}.teil.wav")
+        await _ausfuehren(programm("ffmpeg", self.ordner), "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                          "-i", str(quelle), "-vn", "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "1", str(vorlaeufig))
+        vorlaeufig.replace(ziel)
+        return ziel
+
     async def pausen(self, datei: Path, *, schwelle_db: float = -35.0, mindestens_s: float = 0.4) -> list[Pause]:
         _, protokoll = await _ausfuehren(programm("ffmpeg", self.ordner), "-nostdin", "-hide_banner", "-i", str(datei),
                                          "-af", f"silencedetect=noise={schwelle_db}dB:d={mindestens_s}", "-f", "null", "-")
