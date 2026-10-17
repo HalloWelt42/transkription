@@ -12,7 +12,9 @@ from appkern.app import Begleiter, Geruest
 from appkern.einstellungen import Angebot, Option
 
 from .ablage.profile import Sprecherprofile
-from .ablage.transkripte import Transkripte
+from appkern.kellerwolke import Kellerwolke
+
+from .ablage.transkripte import Transkripte, zugang
 from . import altbestand
 from .abgleich import Abgleich
 from .abspielen import Abspielfassungen
@@ -38,6 +40,15 @@ class Teile(Begleiter):
         self.klangwerk = Klangwerk(lambda: geruest.leitstelle,
                                    lambda: (e().dienst_hoeren, e().dienst_sprecher, e().dienst_trennen))
         self.angebote()
+
+    def zugang(self, anfrage: UUID | None = None) -> Kellerwolke:
+        """Der Zugang zur Kellerwolke; mit einer Anfrage (Datei außerhalb der App, aus der Kellerwolke angefragt) der
+        Zugang mit ihrem Recht: genau diese Datei und ihre Begleiter, solange die Anfrage offen ist."""
+        kw = zugang(lambda: self.geruest.kellerwolke)
+        return kw.mit_anfrage(anfrage) if anfrage else kw
+
+    def transkripte_fuer(self, anfrage: UUID | None = None) -> Transkripte:
+        return self.transkripte.fuer(self.zugang(anfrage)) if anfrage else self.transkripte
 
     @property
     def einstellungen(self) -> AppEinstellungen:
@@ -96,10 +107,10 @@ class Teile(Begleiter):
 
         g.einstellungen.anbieten("altbestand_adresse", alte_app)
 
-    async def transkript_wegraeumen(self, transkript_id: UUID | str, wer: str) -> None:
+    async def transkript_wegraeumen(self, transkript_id: UUID | str, wer: str, anfrage: UUID | None = None) -> None:
         """In den Papierkorb der Kellerwolke, aus Verzeichnis und Vorschlägen, mit Eintrag im Protokoll."""
         eintrag = await self.index.eintrag(transkript_id)
-        await self.transkripte.loeschen(transkript_id)
+        await self.transkripte_fuer(anfrage).loeschen(transkript_id)
         await self.index.entfernen(transkript_id)
         await self.vorschlaege.entfernen(transkript_id)
         await self.geruest.protokoll.eintragen("transkript.geloescht", f"{eintrag.name if eintrag else transkript_id} in den Papierkorb",

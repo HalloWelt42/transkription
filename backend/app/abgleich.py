@@ -1,4 +1,4 @@
-"""Abgleich des Suchindex mit dem Ordner Transkripte in der Kellerwolke (Begleiter des Gerüsts).
+"""Abgleich des Suchindex mit den Transkripten im Zweig der App in der Kellerwolke (Begleiter des Gerüsts).
 
 Beim Verbinden einmal vollständig (nur geänderte Dateien werden gelesen), danach über den Ereignisstrom der
 Kellerwolke: neue, geänderte, verschobene und gelöschte Transkripte kommen von selbst in den Index, auch wenn sie
@@ -58,7 +58,7 @@ class Abgleich(Begleiter):
             await asyncio.sleep(PAUSE_S)
 
     async def _folgen(self) -> None:
-        ordner = await self.transkripte.ordner()
+        ordner = await self.transkripte.zweig()
         seit = await self.index.abgleich_seit(ordner.id)
         if seit == 0:
             seit = await self._journal_ende(ordner.id)      # erst die Stelle merken, dann lesen: nichts geht verloren
@@ -93,7 +93,7 @@ class Abgleich(Begleiter):
             await self.index.entfernen(tid)
 
     async def nachlesen(self, knoten_id: UUID, ordner: Knoten) -> None:
-        """Eine geänderte Stelle: liegt dort (noch) ein Transkript irgendwo unter Transkripte, kommt es in den Index,
+        """Eine geänderte Stelle: liegt dort (noch) ein Transkript irgendwo im Zweig der App, kommt es in den Index,
         sonst heraus."""
         try:
             knoten = await self.transkripte.kw.knoten(knoten_id)

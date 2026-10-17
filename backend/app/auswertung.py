@@ -1,5 +1,5 @@
 """KI-Auswertung eines Transkripts über die Leitstelle: aus einer Vorlage (Protokoll, Zusammenfassung, Aufgaben) wird
-eine Markdown-Datei neben dem Transkript (`<Name> (Auswertung).md`). Grundlage ist der Markdown-Export mit Sprechern und
+eine Markdown-Datei neben der Aufnahme (Begleiter mit der Vorlage als Rolle: `Runde.protokoll.md`). Grundlage ist der Markdown-Export mit Sprechern und
 Zeiten; die KI soll nichts erfinden und die Namen der Sprecher verwenden."""
 
 from __future__ import annotations
@@ -32,4 +32,10 @@ def anfrage(vorlage: Vorlage, markdown: str) -> list[Nachricht]:
 
 
 def dateiname(name: str, vorlage: Vorlage) -> str:
+    """Nur für Transkripte ohne Aufnahme (Altbestand der früheren Ablage): Datei neben dem Transkript."""
     return f"{name} ({titel(vorlage)}).md"
+
+
+def zusatz(vorlage: Vorlage) -> str:
+    """Neben der Aufnahme: Stamm der Aufnahme und dieser Zusatz, die Vorlage ist die Rolle."""
+    return f".{vorlage}.md"

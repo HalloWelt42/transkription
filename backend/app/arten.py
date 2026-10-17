@@ -2,7 +2,10 @@
 
 transkribieren      Vorbereiten (Ton holen, wandeln, Abschnitte an Sprechpausen planen), Hören (je Abschnitt Text mit
                     Wortzeiten und Stimmabdrücke; nach Abbruch oder Neustart geht es beim nächsten Abschnitt weiter),
-                    Sprecher (Trennung oder Gruppieren, Abgleich mit den Profilen), Speichern (Datei, Herkunft, Index).
+                    Sprecher (Trennung oder Gruppieren, Abgleich mit den Profilen), Speichern (Begleiter der Aufnahme,
+                    neu oder als neue Version; Index).
+aus_anfrage         Transkribieren auf Anfrage aus der Kellerwolke (Dateimenü): die Aufnahme liegt außerhalb der App,
+                    gelesen und geschrieben wird nur mit dem Recht der Anfrage.
 sprecher_erkennen   für ein vorhandenes Transkript neu, auf Wunsch mit bekannter Sprecherzahl.
 korrigieren         KI-Korrektur in Fenstern von drei Segmenten; Ergebnis sind Vorschläge, nichts wird überschrieben.
 auswerten           KI-Auswertung nach Vorlage als Markdown-Datei neben dem Transkript.
@@ -24,13 +27,14 @@ from uuid import UUID
 import httpx
 from pydantic import BaseModel, Field
 
+from appkern.anfragen import AnfrageEingabe, Angebot
 from appkern.auftraege import Art, Kontext, Phase
-from appkern.kellerwolke import KellerwolkeFehler, StandVeraltet
+from appkern.kellerwolke import Aktion, Kellerwolke, KellerwolkeFehler, StandVeraltet
 from appkern.leitstelle import DienstFehler, DienstWeg, Halt, NichtErreichbar, NichtGefunden
 
-from . import altbestand, auswertung, export, korrektur
+from . import altbestand, auswertung, export, korrektur, umzug
 from .ablage import orte
-from .ablage.transkripte import zugang
+from .ablage.transkripte import begleiter_ablegen
 from .dienste import KeineLeitstelle, Wechsel
 from .einstellungen import Sprache, SprecherWeg
 from .fassung import FASSUNG
@@ -51,8 +55,8 @@ class TranskribierenAnfrage(BaseModel):
     sprecher: SprecherWeg | None = Field(None, description="ohne, Stimmen gruppieren oder mit Sprechertrennung; leer: Vorgabe "
                                                             "aus den Einstellungen (ab Werk ohne)")
     anzahl: int | None = Field(None, ge=1, le=20, description="bekannte Zahl der Sprecher")
-    ziel_id: UUID | None = Field(None, description="statt eines neuen Transkripts eine neue Version dieses (etwa nach "
-                                                  "einer Übernahme); die bisherigen Stände bleiben als Versionen")
+    anfrage_id: UUID | None = Field(None, description="Anfrage der Kellerwolke: die Aufnahme liegt außerhalb der App, die "
+                                                      "App darf sie nur für diesen Auftrag lesen")
 
 
 class TranskribierenEingabe(TranskribierenAnfrage):
@@ -75,6 +79,7 @@ class UebernehmenEingabe(UebernehmenAnfrage):
 
 class SprecherEingabe(BaseModel):
     transkript_id: UUID
+    anfrage_id: UUID | None = Field(None, description="Anfrage der Kellerwolke, wenn das Transkript außerhalb der App liegt")
     weg: Literal["stimmen", "trennung"] = Field("stimmen", description="Stimmen gruppieren oder erst die Sprechertrennung fragen")
     anzahl: int | None = Field(None, ge=1, le=20)
     von: str | None = None
@@ -82,11 +87,13 @@ class SprecherEingabe(BaseModel):
 
 class KorrigierenEingabe(BaseModel):
     transkript_id: UUID
+    anfrage_id: UUID | None = Field(None, description="Anfrage der Kellerwolke, wenn das Transkript außerhalb der App liegt")
     von: str | None = None
 
 
 class AuswertenEingabe(BaseModel):
     transkript_id: UUID
+    anfrage_id: UUID | None = Field(None, description="Anfrage der Kellerwolke, wenn das Transkript außerhalb der App liegt")
     vorlage: auswertung.Vorlage = "protokoll"
     von: str | None = None
 
@@ -120,10 +127,9 @@ def _segmente(roh: list[dict]) -> list[Segment]:
 def arten(teile: Teile) -> list[Art]:
     g = teile.geruest
 
-    async def ton_holen(k: Kontext, quelle_id: UUID | str, ordner: Path) -> tuple[Path, float]:
+    async def ton_holen(k: Kontext, quelle_id: UUID | str, ordner: Path, kw: Kellerwolke) -> tuple[Path, float]:
         """Original holen, für den Hördienst wandeln (16 kHz mono) und gleich die Abspielfassung erzeugen: beide aus
         derselben Quelle mit demselben Dekoder, damit Wortzeiten und Wiedergabe gleich laufen."""
-        kw = zugang(lambda: g.kellerwolke)
         quelle = await kw.knoten(quelle_id)
         roh = ordner / f"quelle{PurePosixPath(quelle.name).suffix.lower() or '.bin'}"
         await k.fortschritt(None, f"Ton holen ({quelle.name})")
@@ -174,15 +180,16 @@ def arten(teile: Teile) -> list[Art]:
         weg = e.sprecher or einst.sprecher_weg
         mit_sprechern = weg != "ohne"
         if "transkript_id" in k.zwischenstand:          # schon gespeichert, nur der Abschluss fehlte
-            return {"transkript_id": k.zwischenstand["transkript_id"]}
-        kw = zugang(lambda: g.kellerwolke)
+            return {"transkript_id": k.zwischenstand["transkript_id"], "ergebnis_id": k.zwischenstand["transkript_id"]}
+        kw = teile.zugang(e.anfrage_id)
+        transkripte = teile.transkripte_fuer(e.anfrage_id)
         quelle = await kw.knoten(e.quelle_id)
         name = e.name or orte.anzeigename(quelle.name)
         ordner = teile.arbeit / k.auftrag_id
         ordner.mkdir(parents=True, exist_ok=True)
         try:
             await k.fortschritt(0.0, "Vorbereiten", phase="vorbereiten")
-            wav, dauer = await ton_holen(k, quelle.id, ordner)
+            wav, dauer = await ton_holen(k, quelle.id, ordner, kw)
             plan = await abschnitte(k, wav, dauer)
             wellenform = await teile.ton.wellenform(wav)
             if quelle.felder.get(orte.FELD_DAUER) is None:
@@ -238,19 +245,21 @@ def arten(teile: Teile) -> list[Art]:
                            sprecher=sprecher, segmente=segmente, wellenform=wellenform,
                            erzeugt_mit=ErzeugtMit(dienst=einst.dienst_hoeren, modell=modell, app=FASSUNG),
                            aenderung=Aenderung(was="erzeugt", wer=e.von))
-            if e.ziel_id:
-                bisher, stand = await teile.transkripte.lesen(e.ziel_id)
-                t, knoten = await teile.transkripte.schreiben(
-                    e.ziel_id, t.model_copy(update={"name": bisher.name, "erstellt_am": bisher.erstellt_am}), stand.etag or "",
-                    Aenderung(was="neu transkribiert", wer=e.von))
-            else:
-                knoten = await teile.transkripte.anlegen(t, quelle)
+            t, knoten = await transkripte.speichern(t, quelle, Aenderung(was="erzeugt", wer=e.von),
+                                                    erneut=Aenderung(was="neu transkribiert", wer=e.von))
             await k.merken(transkript_id=str(knoten.id))
-            await teile.index.eintragen(t, knoten)
-            return {"transkript_id": str(knoten.id), "name": t.name, "pfad": knoten.pfad, "segmente": len(segmente),
-                    "sprecher": len(sprecher), "dauer_s": t.dauer_s}
+            if e.anfrage_id is None:                    # nur der eigene Baum steht im Verzeichnis der App
+                await teile.index.eintragen(t, knoten)
+            return {"transkript_id": str(knoten.id), "ergebnis_id": str(knoten.id), "name": t.name, "pfad": knoten.pfad,
+                    "segmente": len(segmente), "sprecher": len(sprecher), "dauer_s": t.dauer_s}
         finally:
             shutil.rmtree(ordner, ignore_errors=True)
+
+    async def aus_anfrage(k: Kontext) -> dict:
+        """Transkribieren auf Anfrage aus dem Dateimenü der Kellerwolke, mit den Vorgaben der Einstellungen."""
+        e: AnfrageEingabe = k.eingabe
+        k.eingabe = TranskribierenEingabe(quelle_id=e.knoten_id, anfrage_id=e.anfrage_id, von="Kellerwolke")
+        return await transkribieren(k)
 
     # --- uebernehmen (Altbestand der alten App) -------------------------------------------------------------------
 
@@ -262,7 +271,7 @@ def arten(teile: Teile) -> list[Art]:
         adresse = teile.einstellungen.altbestand_adresse
         if not adresse:
             raise ValueError("Keine alte App eingetragen (Einstellungen, Altbestand)")
-        kw = zugang(lambda: g.kellerwolke)
+        kw = teile.zugang()
         ordner = teile.arbeit / k.auftrag_id
         ordner.mkdir(parents=True, exist_ok=True)
         try:
@@ -317,7 +326,7 @@ def arten(teile: Teile) -> list[Art]:
                                                  Quelle(knoten_id=quelle.id, pfad=quelle.pfad, etag=quelle.etag),
                                                  float(quelle.felder.get(orte.FELD_DAUER) or eintrag.dauer_s))
                     if tid is None:
-                        knoten = await teile.transkripte.anlegen(t, quelle)
+                        t, knoten = await teile.transkripte.speichern(t, quelle, t.aenderung)
                         tid = str(knoten.id)
                     else:
                         _, bisher = await teile.transkripte.lesen(tid)
@@ -332,7 +341,7 @@ def arten(teile: Teile) -> list[Art]:
             if e.neu_transkribieren and tid:
                 folge = await g.auftraege.einreihen("transkribieren", TranskribierenEingabe(
                     quelle_id=quelle.id, name=e.name, sprache=e.sprache, sprecher=e.sprecher, anzahl=e.anzahl,
-                    ziel_id=UUID(tid), von=e.von), titel=f"{e.name}: neu transkribieren")
+                    von=e.von), titel=f"{e.name}: neu transkribieren")
             return {"aufnahme_id": str(quelle.id), "transkript_id": tid, "pfad": quelle.pfad, "staende": len(eintrag.staende),
                     "folgeauftrag": folge.id if folge else None}
         finally:
@@ -342,14 +351,15 @@ def arten(teile: Teile) -> list[Art]:
 
     async def sprecher_erkennen(k: Kontext) -> dict:
         e: SprecherEingabe = k.eingabe
-        t, knoten = await teile.transkripte.lesen(e.transkript_id)
+        transkripte = teile.transkripte_fuer(e.anfrage_id)
+        t, knoten = await transkripte.lesen(e.transkript_id)
         if t.quelle is None:
             raise ValueError("Das Transkript nennt keine Aufnahme; ohne Ton keine Sprechererkennung")
         ordner = teile.arbeit / k.auftrag_id
         ordner.mkdir(parents=True, exist_ok=True)
         try:
             await k.fortschritt(0.0, "Vorbereiten", phase="vorbereiten")
-            wav, dauer = await ton_holen(k, t.quelle.knoten_id, ordner)
+            wav, dauer = await ton_holen(k, t.quelle.knoten_id, ordner, teile.zugang(e.anfrage_id))
             plan = await abschnitte(k, wav, dauer)
             gesammelt: dict[str, list] = dict(k.zwischenstand.get("abdruecke", {}))
             for a in plan:
@@ -373,11 +383,12 @@ def arten(teile: Teile) -> list[Art]:
             neu = t.model_copy(update={"segmente": segmente, "sprecher": sprecher,
                                        "wellenform": t.wellenform or await teile.ton.wellenform(wav)})
             try:
-                neu, knoten = await teile.transkripte.schreiben(e.transkript_id, neu, knoten.etag,
-                                                                Aenderung(was="Sprecher neu erkannt", wer=e.von))
+                neu, knoten = await transkripte.schreiben(e.transkript_id, neu, knoten.etag,
+                                                          Aenderung(was="Sprecher neu erkannt", wer=e.von))
             except StandVeraltet as f:
                 raise RuntimeError("Das Transkript wurde inzwischen geändert; bitte die Erkennung neu starten") from f
-            await teile.index.eintragen(neu, knoten)
+            if e.anfrage_id is None:
+                await teile.index.eintragen(neu, knoten)
             return {"transkript_id": str(e.transkript_id), "sprecher": len(sprecher)}
         finally:
             shutil.rmtree(ordner, ignore_errors=True)
@@ -386,7 +397,7 @@ def arten(teile: Teile) -> list[Art]:
 
     async def korrigieren(k: Kontext) -> dict:
         e: KorrigierenEingabe = k.eingabe
-        t, _ = await teile.transkripte.lesen(e.transkript_id)
+        t, _ = await teile.transkripte_fuer(e.anfrage_id).lesen(e.transkript_id)
         bereiche = korrektur.fenster(len(t.segmente))
         gesammelt: list[dict] = list(k.zwischenstand.get("vorschlaege", []))
         erledigt = int(k.zwischenstand.get("fenster", 0))
@@ -410,16 +421,22 @@ def arten(teile: Teile) -> list[Art]:
 
     async def auswerten(k: Kontext) -> dict:
         e: AuswertenEingabe = k.eingabe
-        t, knoten = await teile.transkripte.lesen(e.transkript_id)
+        kw = teile.zugang(e.anfrage_id)
+        t, knoten = await teile.transkripte_fuer(e.anfrage_id).lesen(e.transkript_id)
         await k.fortschritt(None, auswertung.titel(e.vorlage), phase="auswerten")
         antwort = await geduldig(k, lambda: g_leitstelle().chat(
             auswertung.anfrage(e.vorlage, export.als_markdown(t)), modell=teile.einstellungen.ki_modell or None,
             titel=f"{t.name}, {auswertung.titel(e.vorlage)}", prioritaet="hintergrund", temperature=0.2,
             max_tokens=3000), "Auswertung")
         await k.fortschritt(None, "Speichern", phase="speichern")
-        kw = zugang(lambda: g.kellerwolke)
-        ordner = str(PurePosixPath(knoten.pfad).parent)
         inhalt = f"# {t.name}: {auswertung.titel(e.vorlage)}\n\n{antwort.text.strip()}\n".encode()
+        if t.quelle is not None:
+            # neben die Aufnahme, die Vorlage ist die Rolle (Runde.protokoll.md); erneut ausgewertet: neue Version
+            datei = await begleiter_ablegen(kw, t.quelle.knoten_id, e.vorlage, auswertung.zusatz(e.vorlage), inhalt,
+                                            "text/markdown; charset=utf-8")
+            return {"transkript_id": str(e.transkript_id), "datei_id": str(datei.id), "pfad": datei.pfad,
+                    "modell": antwort.modell}
+        ordner = str(PurePosixPath(knoten.pfad).parent)
         zusatz = 0
         while True:
             zusatz += 1
@@ -443,10 +460,12 @@ def arten(teile: Teile) -> list[Art]:
     vorbereiten = Phase(schluessel="vorbereiten", titel="Vorbereiten", symbol="box-open")
     speichern = Phase(schluessel="speichern", titel="Speichern", symbol="floppy-disk")
     sprecher_phase = Phase(schluessel="sprecher", titel="Sprecher", symbol="user-group")
+    hoeren_phasen = [vorbereiten, Phase(schluessel="hoeren", titel="Hören", symbol="ear-listen"), sprecher_phase, speichern]
     return [
         Art("transkribieren", "Transkribieren", transkribieren, eingabe=TranskribierenEingabe, fortsetzbar=True,
-            nach_neustart="fortsetzen",
-            phasen=[vorbereiten, Phase(schluessel="hoeren", titel="Hören", symbol="ear-listen"), sprecher_phase, speichern]),
+            nach_neustart="fortsetzen", phasen=hoeren_phasen),
+        Art("aus_anfrage", "Transkribieren (Kellerwolke)", aus_anfrage, eingabe=AnfrageEingabe, fortsetzbar=True,
+            nach_neustart="fortsetzen", phasen=hoeren_phasen),
         Art("sprecher_erkennen", "Sprecher erkennen", sprecher_erkennen, eingabe=SprecherEingabe, fortsetzbar=True,
             nach_neustart="fortsetzen",
             phasen=[vorbereiten, Phase(schluessel="abdruecke", titel="Stimmabdrücke", symbol="fingerprint"),
@@ -456,6 +475,8 @@ def arten(teile: Teile) -> list[Art]:
             phasen=[Phase(schluessel="korrigieren", titel="Korrigieren", symbol="wand-magic-sparkles")]),
         Art("auswerten", "Auswertung", auswerten, eingabe=AuswertenEingabe, nach_neustart="fortsetzen",
             phasen=[Phase(schluessel="auswerten", titel="Auswerten", symbol="list-ul"), speichern]),
+        Art("zusammenfuehren", "Ablage zusammenführen", lambda k: umzug.ausfuehren(teile, k), fortsetzbar=True,
+            nach_neustart="fortsetzen", phasen=[Phase(schluessel="umziehen", titel="Zusammenführen", symbol="code-merge")]),
         Art("uebernehmen", "Übernehmen", uebernehmen, eingabe=UebernehmenEingabe, fortsetzbar=True, nach_neustart="fortsetzen",
             phasen=[Phase(schluessel="lesen", titel="Altbestand lesen", symbol="box-archive"),
                     Phase(schluessel="laden", titel="Original laden", symbol="download"),
@@ -464,6 +485,17 @@ def arten(teile: Teile) -> list[Art]:
     ]
 
 
-__all__ = ["AuswertenEingabe", "KorrigierenEingabe", "SprecherEingabe", "TranskribierenAnfrage", "TranskribierenEingabe",
+# Was die App im Dateimenü der Kellerwolke anbietet (und in der eigenen Dateiwahl): Ton und Video transkribieren, im
+# Hintergrund als Auftrag aus_anfrage; öffnen führt in die Ansicht der App. Auch am Transkript erscheint Öffnen.
+MEDIEN = ("audio/*", "video/*")
+ANGEBOTE = [
+    Angebot(Aktion(kennung="oeffnen", titel="In Transkription öffnen", symbol="fa-up-right-from-square", typen=MEDIEN,
+                   art="oeffnen", rolle=orte.ROLLE)),
+    Angebot(Aktion(kennung="transkribieren", titel="Transkribieren", titel_erneut="Neu transkribieren",
+                   symbol="fa-closed-captioning", typen=MEDIEN, rolle=orte.ROLLE), auftrag="aus_anfrage"),
+]
+
+
+__all__ = ["ANGEBOTE", "AuswertenEingabe", "KorrigierenEingabe", "SprecherEingabe", "TranskribierenAnfrage", "TranskribierenEingabe",
            "UebernehmenAnfrage", "UebernehmenEingabe",
            "arten", "geduldig"]

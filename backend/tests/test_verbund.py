@@ -85,9 +85,11 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 a = (await c.post("/api/v1/transkribieren", headers=h, json={"quelle_id": aufnahme["id"], "name": f"{name} ohne"})).json()
                 a = await warten(c, h, a["id"])
                 assert a["zustand"] == "fertig", a.get("fehler")
-                angelegt.append(a["ergebnis"]["transkript_id"])
-                ohne = (await c.get(f"/api/v1/transkripte/{a['ergebnis']['transkript_id']}", headers=h)).json()["transkript"]
-                assert ohne["sprecher"] == [] and all(s["sprecher"] is None for s in ohne["segmente"])
+                erstes = a["ergebnis"]["transkript_id"]
+                angelegt.append(erstes)
+                ohne = (await c.get(f"/api/v1/transkripte/{erstes}", headers=h)).json()
+                assert ohne["transkript"]["sprecher"] == [] and all(s["sprecher"] is None for s in ohne["transkript"]["segmente"])
+                assert ohne["pfad"].endswith(f"/Aufnahmen/{name}.transkript.json")      # neben der Aufnahme
 
                 # Transkribieren mit gewählter Sprechertrennung: zwei Abschnitte; die Trennung fehlt, also gruppiert
                 a = (await c.post("/api/v1/transkribieren", headers=h, json={"quelle_id": aufnahme["id"], "name": name,
@@ -95,7 +97,7 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 a = await warten(c, h, a["id"])
                 assert a["zustand"] == "fertig", a.get("fehler")
                 tid = a["ergebnis"]["transkript_id"]
-                angelegt.append(tid)
+                assert tid == erstes                     # ein Transkript je Aufnahme: neu transkribiert ist eine Version
                 t = (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()
                 segmente = t["transkript"]["segmente"]
                 assert len(segmente) == 4 and segmente[2]["start"] > 100 and segmente[0]["woerter"][0]["wort"] == "Hallo"
@@ -126,9 +128,9 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert (await c.patch(f"/api/v1/transkripte/{tid}", headers=h, json={"stand": stand, "name": "x"})).status_code == 409
                 versionen = (await c.get(f"/api/v1/transkripte/{tid}/versionen", headers=h)).json()
                 # s1 kann schon über ein vorhandenes Profil Anna heißen; s2 bekommt den Namen hier
-                assert len(versionen) == 2 and "Sprecher 2 heißt Bernd" in versionen[0]["notiz"]["was"]
+                assert len(versionen) == 3 and "Sprecher 2 heißt Bernd" in versionen[0]["notiz"]["was"]
                 assert [x["name"] for x in neu["transkript"]["sprecher"]] == ["Anna", "Bernd"]
-                assert versionen[1]["notiz"]["was"] == "erzeugt"
+                assert versionen[1]["notiz"]["was"] == "neu transkribiert" and versionen[2]["notiz"]["was"] == "erzeugt"
 
                 # Zurückholen und wieder vor
                 r = await c.post(f"/api/v1/transkripte/{tid}/versionen/{versionen[1]['id']}/zurueck", headers=h,
@@ -153,12 +155,14 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert r.status_code == 422
                 stand = zugeordnet["stand"]
 
-                # Export: Download und als Datei daneben
+                # Export: Download und als Begleiter neben die Aufnahme
                 r = await c.get(f"/api/v1/inhalt/transkripte/{tid}/export", headers=h, params={"format": "srt"})
                 assert r.status_code == 200 and "00:00:00,000 --> 00:00:02,600" in r.text and "filename*=UTF-8''" in r.headers["content-disposition"]
                 r = await c.post(f"/api/v1/transkripte/{tid}/export", headers=h, json={"format": "docx"})
                 assert r.status_code == 201 and r.json()["name"] == f"{name}.docx"
                 angelegt.append(r.json()["id"])
+                r = await c.post(f"/api/v1/transkripte/{tid}/export", headers=h, json={"format": "docx"})
+                assert r.status_code == 201 and r.json()["name"] == f"{name}.docx"            # erneut: neue Version
 
                 # Profil: Sprecher 1 wird zum neuen Profil
                 profilname = f"Probe {secrets.token_hex(2)}"
@@ -184,9 +188,9 @@ async def test_ganzer_ablauf(tmp_path: Path):
                                    + [{"id": v["id"], "zustand": "verworfen"} for v in vorschlaege[1:]]})
                 assert r.status_code == 200 and (await c.get(f"/api/v1/transkripte/{tid}/vorschlaege", headers=h)).json() == []
 
-                # Auswertung als Markdown-Datei daneben
+                # Auswertung als Markdown-Begleiter neben der Aufnahme (Runde.protokoll.md)
                 a = await warten(c, h, (await c.post(f"/api/v1/transkripte/{tid}/auswerten", headers=h, json={"vorlage": "protokoll"})).json()["id"])
-                assert a["zustand"] == "fertig" and a["ergebnis"]["pfad"].endswith(f"{name} (Protokoll).md")
+                assert a["zustand"] == "fertig" and a["ergebnis"]["pfad"].endswith(f"/Aufnahmen/{name}.protokoll.md"), a
                 angelegt.append(a["ergebnis"]["datei_id"])
 
                 # Ton zum Mitlesen: die Abspielfassung (PCM-WAV 44,1 kHz mono), mit Bereichen
@@ -201,23 +205,18 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert (await c.get(f"/api/v1/transkripte/{tid}", headers=app_kopf)).status_code == 200
                 assert (await c.get("/api/v1/einstellungen", headers=app_kopf)).status_code == 403
 
-                # Aus der Live-Mitschrift ein Transkript (ohne neues Hören)
+                # Aus der Live-Mitschrift (ohne neues Hören): bei vorhandenem Transkript eine neue Version
                 r = await c.post("/api/v1/transkripte", headers=h, json={"quelle_id": aufnahme["id"], "name": f"{name} live",
                                                                          "stuecke": [{"start": 0, "ende": 5.5, "text": "Erstes Stück"},
                                                                                      {"start": 5.5, "ende": 12, "text": "Zweites Stück hier"}]})
                 assert r.status_code == 201, r.text
                 live = r.json()
-                angelegt.append(live["id"])
+                assert live["id"] == tid
                 assert [s["text"] for s in live["transkript"]["segmente"]] == ["Erstes Stück", "Zweites Stück hier"]
                 assert live["transkript"]["segmente"][1]["woerter"][0]["start"] == 5.5 and live["transkript"]["marker"][0]["titel"] == "Wichtig"
 
-                # Löschen: in den Papierkorb, aus dem Index
-                assert (await c.delete(f"/api/v1/transkripte/{tid}", headers=h)).status_code == 204
-                angelegt.remove(tid)
-                assert (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).status_code == 404
-
-                # Unterordner: Aufnahme dort hochgeladen, ihr Transkript im selben Unterordner von Transkripte, gefunden in
-                # Liste und Suche, auch nach dem vollständigen Abgleich
+                # Unterordner: Aufnahme dort hochgeladen, ihr Transkript daneben, gefunden in Liste und Suche, auch nach dem
+                # vollständigen Abgleich
                 unter = f"Unter {secrets.token_hex(2)}"
                 r = await c.post("/api/v1/aufnahmen", params={"name": f"{name} unten.mp3", "ordner": f"../{unter}"},
                                  content=ton.read_bytes(), headers={**h, "Content-Type": "audio/mpeg"})
@@ -226,7 +225,7 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 angelegt.append(unten["id"])
                 a = await warten(c, h, (await c.post("/api/v1/transkribieren", headers=h, json={"quelle_id": unten["id"]})).json()["id"])
                 assert a["zustand"] == "fertig", a.get("fehler")
-                assert f"/Transkripte/{unter}/" in a["ergebnis"]["pfad"]
+                assert a["ergebnis"]["pfad"].endswith(f"/Aufnahmen/{unter}/{name} unten.transkript.json")
                 angelegt.append(a["ergebnis"]["transkript_id"])
                 im_verzeichnis = lambda seite: a["ergebnis"]["transkript_id"] in [e["id"] for e in seite["eintraege"]]  # noqa: E731
                 assert im_verzeichnis((await c.get("/api/v1/transkripte", headers=h, params={"anzahl": 100})).json())
@@ -244,13 +243,19 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 r = await c.get(f"/api/v1/inhalt/aufnahmen/{aufnahme['id']}/ton", headers={**h, "Range": "bytes=0-43"})
                 assert r.status_code == 206 and r.content[:4] == b"RIFF" and int.from_bytes(r.content[24:28], "little") == 44100
 
-                # Aufnahme in den Papierkorb: einmal ohne, einmal mit ihren Transkripten
+                # Aufnahme in den Papierkorb: einmal ohne (das Transkript bleibt mit seinem Text), einmal mit ihm
                 zweite = (await c.post("/api/v1/aufnahmen", params={"name": f"{name} zwei.mp3"}, content=ton.read_bytes(),
                                        headers={**h, "Content-Type": "audio/mpeg"})).json()
                 angelegt.append(zweite["id"])
+                r = await c.post("/api/v1/transkripte", headers=h, json={"quelle_id": zweite["id"], "name": f"{name} zwei",
+                                                                         "stuecke": [{"start": 0, "ende": 2, "text": "Bleibt"}]})
+                bleibt = r.json()["id"]
+                angelegt.append(bleibt)
                 assert (await c.delete(f"/api/v1/aufnahmen/{zweite['id']}", headers=h)).status_code == 204
                 angelegt.remove(zweite["id"])
                 assert (await c.get(f"/api/v1/aufnahmen/{zweite['id']}", headers=h)).status_code == 404
+                behalten = await g.kellerwolke.knoten(bleibt)
+                assert behalten.haupt_id is None and (await c.get(f"/api/v1/transkripte/{bleibt}", headers=h)).status_code == 200
                 verweise = [t["id"] for t in eine["transkripte"]]
                 assert (await c.delete(f"/api/v1/aufnahmen/{aufnahme['id']}", headers=h, params={"mit_transkripten": True})).status_code == 204
                 for k in [aufnahme["id"], *verweise]:
@@ -258,6 +263,7 @@ async def test_ganzer_ablauf(tmp_path: Path):
                         angelegt.remove(k)
                 for t in verweise:
                     assert (await c.get(f"/api/v1/transkripte/{t}", headers=h)).status_code == 404
+                assert tid in verweise
                 protokoll = (await c.get("/api/v1/protokoll", headers=h, params={"ereignis": "aufnahme.geloescht"})).json()
                 assert any(name in (e.get("text") or "") for e in protokoll["eintraege"])
             finally:

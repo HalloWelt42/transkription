@@ -19,6 +19,10 @@ FORMATE: dict[str, tuple[str, str]] = {
     "docx": ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx"),
 }
 
+# Abgelegt neben der Aufnahme ist ein Export ein Begleiter mit dieser Rolle (je Format einer, neu abgelegt eine Version).
+ROLLEN: dict[str, str] = {"txt": "text", "md": "markdown", "srt": "untertitel", "vtt": "untertitel_vtt", "json": "daten",
+                          "docx": "dokument"}
+
 
 def marke(sekunden: float) -> str:
     """Zeitmarke zum Lesen: M:SS, ab einer Stunde H:MM:SS."""

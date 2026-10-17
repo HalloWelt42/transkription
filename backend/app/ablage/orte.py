@@ -1,4 +1,8 @@
-"""Orte im Zweig der App und was als Aufnahme gilt. Einzige Stelle für Ordner- und Dateinamen."""
+"""Orte im Zweig der App und was als Aufnahme gilt. Einzige Stelle für Ordner- und Dateinamen.
+
+Eine Ablage (Entscheidung 17.10.2026): Aufnahmen und ihre Transkripte liegen in einem Baum unter Aufnahmen, das
+Transkript als Begleitdatei neben seiner Aufnahme (`Runde.wav`, `Runde.transkript.json`). Den Namen vergibt die
+Kellerwolke aus dem Stamm der Aufnahme und dem Zusatz; Verschieben, Umbenennen und Papierkorb nehmen es mit."""
 
 from __future__ import annotations
 
@@ -7,11 +11,12 @@ from pathlib import PurePosixPath
 
 from appkern.kellerwolke import Knoten, pfad_aus
 
-AUFNAHMEN = "Aufnahmen"
-TRANSKRIPTE = "Transkripte"
+AUFNAHMEN = "Aufnahmen"            # Wurzel des einen Baums: Aufnahmen mit ihren Begleitern
+ALT_TRANSKRIPTE = "Transkripte"    # nur noch für das Zusammenführen der früheren getrennten Ablage
 SPRECHER = "Sprecher"
 PROFILE = "profile.json"
-ENDUNG = ".transkript.json"
+ROLLE = "transkript"               # Rolle des Transkripts als Begleiter seiner Aufnahme
+ENDUNG = ".transkript.json"        # zugleich der Zusatz hinter dem Stamm der Aufnahme
 INHALTSTYP = "application/json"
 FELD_MARKER = "marker"   # an einer Aufnahme: beim Aufnehmen gesetzte Marker [{zeit, titel}]
 FELD_DAUER = "dauer_s"   # an einer Aufnahme: Dauer in Sekunden, sobald bekannt (beim Transkribieren gemessen)
@@ -45,7 +50,7 @@ def art_der_aufnahme_name(name: str) -> str | None:
 
 
 def ist_transkript(knoten: Knoten) -> bool:
-    return not knoten.ist_ordner and knoten.name.endswith(ENDUNG)
+    return not knoten.ist_ordner and (knoten.rolle == ROLLE or knoten.name.endswith(ENDUNG))
 
 
 def anzeigename(dateiname: str) -> str:
@@ -65,11 +70,3 @@ def unterordner(pfad: str) -> str:
     teile = [_UNERLAUBT.sub(" ", t).strip(" .") for t in pfad.replace("\\", "/").split("/")]
     teile = [re.sub(r"\s+", " ", t)[:120] for t in teile if t and t not in (".", "..")]
     return "/".join(teile)
-
-
-def unterordner_der_aufnahme(zweig: str, aufnahme_pfad: str) -> str:
-    """Der Unterordner einer Aufnahme unter Aufnahmen ("" direkt dort oder außerhalb des Zweigs, etwa freigegeben)."""
-    oben = ort(zweig, AUFNAHMEN) + "/"
-    if not aufnahme_pfad.startswith(oben):
-        return ""
-    return aufnahme_pfad[len(oben):].rpartition("/")[0]

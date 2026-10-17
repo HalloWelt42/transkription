@@ -190,7 +190,7 @@ async def test_uebernahme_von_hand(tmp_path: Path):
             assert len(versionen) == 3 and versionen[0]["notiz"]["was"] == "neu transkribiert"
             assert "übernommen aus der alten App" in versionen[2]["notiz"]["was"]
             t = (await c.get(f"/api/v1/transkripte/{erg['transkript_id']}", headers=h)).json()
-            assert f"/Transkripte/{zielordner}/" in t["pfad"] and t["transkript"]["name"] == name
+            assert t["pfad"].endswith(f"/Aufnahmen/{zielordner}/{name}.transkript.json") and t["transkript"]["name"] == name
 
             # jetzt als übernommen gemeldet; ein zweites Übernehmen wird abgewiesen
             seite = (await c.get("/api/v1/altbestand", headers=h)).json()

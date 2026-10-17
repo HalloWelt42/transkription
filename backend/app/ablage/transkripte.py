@@ -1,5 +1,9 @@
-"""Transkripte als Dateien in der Kellerwolke: anlegen (eindeutiger Name, Herkunft zur Aufnahme), lesen mit Stand,
-schreiben nur mit dem zuletzt gelesenen Stand, Versionen lesen und zurückholen, in den Papierkorb legen.
+"""Transkripte als Dateien in der Kellerwolke: je Aufnahme eines, als Begleitdatei neben ihr (Rolle transkript); neu
+transkribiert wird eine neue Version (Entscheidung 17.10.2026). Lesen mit Stand, schreiben nur mit dem zuletzt
+gelesenen Stand, Versionen lesen und zurückholen, in den Papierkorb legen.
+
+Liegt die Aufnahme außerhalb der App (aus der Kellerwolke angefragt), arbeitet `fuer(zugang)` mit dem Zugang dieser
+Anfrage: dann darf die App genau diese Aufnahme und ihre Begleiter, solange die Anfrage offen ist.
 
 Der Stand ist der ETag der Datei in der Kellerwolke (er ist zugleich die Kennung der Version). Wer mit einem veralteten
 Stand schreibt, bekommt `StandVeraltet` und muss neu lesen; so überschreibt niemand still die Arbeit eines anderen.
@@ -10,14 +14,10 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Callable
 from uuid import UUID
 
-from appkern.kellerwolke import Kellerwolke, Knoten, StandVeraltet, Version
+from appkern.kellerwolke import Kellerwolke, Knoten, Version
 
 from ..modell.transkript import Aenderung, Transkript, jetzt
 from . import orte
-
-HERKUNFT = "transkript_zu"
-FELD_ART = "art"
-FELD_QUELLE = "quelle_id"
 
 
 class KeineKellerwolke(Exception):
@@ -29,6 +29,14 @@ def zugang(liefern: Callable[[], Kellerwolke | None]) -> Kellerwolke:
     if kw is None:
         raise KeineKellerwolke("Keine Kellerwolke eingerichtet")
     return kw
+
+
+async def begleiter_ablegen(kw: Kellerwolke, haupt_id: UUID | str, rolle: str, zusatz: str, inhalt: bytes,
+                            inhaltstyp: str) -> Knoten:
+    """Begleiter einer Rolle neben die Aufnahme: neu, oder eine neue Version des vorhandenen."""
+    vorhanden = next((b for b in await kw.begleiter(haupt_id) if b.rolle == rolle), None)
+    return await kw.begleiter_schreiben(haupt_id, rolle, zusatz, inhalt, stand=vorhanden.etag if vorhanden else None,
+                                        nur_neu=vorhanden is None, inhaltstyp=inhaltstyp)
 
 
 def _inhalt(t: Transkript) -> bytes:
@@ -44,32 +52,40 @@ class Transkripte:
     def kw(self) -> Kellerwolke:
         return zugang(self._kw)
 
-    async def ordner(self) -> Knoten:
-        kw = self.kw
-        return await kw.ordner(orte.ort((await kw.ich()).zweig, orte.TRANSKRIPTE))
+    def fuer(self, kw: Kellerwolke) -> Transkripte:
+        """Dieselbe Ablage mit einem bestimmten Zugang (etwa dem einer Anfrage aus der Kellerwolke)."""
+        return Transkripte(lambda: kw)
 
-    async def anlegen(self, t: Transkript, quelle: Knoten | None = None) -> Knoten:
-        """Neue Datei mit eindeutigem Namen; mit `quelle` auch die Herkunft und das Suchfeld zur Aufnahme. Liegt die
-        Aufnahme in einem Unterordner von Aufnahmen, kommt das Transkript in denselben Unterordner von Transkripte."""
+    async def ordner(self) -> Knoten:
+        """Wurzel des einen Baums der App: Aufnahmen mit ihren Transkripten daneben."""
         kw = self.kw
-        ordner = await self.ordner()
-        if quelle is not None and (unter := orte.unterordner_der_aufnahme((await kw.ich()).zweig, quelle.pfad)):
-            ordner = await kw.ordner(orte.ort(ordner.pfad, unter))
-        zusatz = 0
-        while True:
-            zusatz += 1
-            try:
-                knoten = await kw.schreiben(orte.ort(ordner.pfad, orte.dateiname(t.name, zusatz)), _inhalt(t),
-                                            nur_neu=True, inhaltstyp=orte.INHALTSTYP)
-                break
-            except StandVeraltet:
-                if zusatz >= 500:
-                    raise
-        felder = {FELD_ART: "transkript"}
-        if quelle is not None:
-            await kw.herkunft_setzen(knoten.id, quelle.id, HERKUNFT)
-            felder[FELD_QUELLE] = str(quelle.id)
-        return await kw.felder_setzen(knoten.id, felder)
+        return await kw.ordner(orte.ort((await kw.ich()).zweig, orte.AUFNAHMEN))
+
+    async def zweig(self) -> Knoten:
+        """Der ganze Zweig der App; der Abgleich sieht so auch Transkripte, die noch in der früheren getrennten Ablage
+        liegen (bis zum Zusammenführen)."""
+        kw = self.kw
+        return await kw.pfad((await kw.ich()).zweig)
+
+    async def zur_quelle(self, quelle_id: UUID | str) -> Knoten | None:
+        """Das Transkript einer Aufnahme (ihr Begleiter der Rolle transkript), sonst None."""
+        return next((b for b in await self.kw.begleiter(quelle_id) if b.rolle == orte.ROLLE), None)
+
+    async def speichern(self, t: Transkript, quelle: Knoten, aenderung: Aenderung,
+                        erneut: Aenderung | None = None) -> tuple[Transkript, Knoten]:
+        """Das Transkript einer Aufnahme: neu als Begleiter neben ihr (`aenderung`), oder eine neue Version des
+        vorhandenen (`erneut`, sonst `aenderung`; Name und Anlagezeit bleiben, die bisherigen Stände bleiben Versionen)."""
+        kw = self.kw
+        vorhanden = await self.zur_quelle(quelle.id)
+        if vorhanden is not None:
+            bisher = Transkript.model_validate_json(await kw.lesen_ganz(vorhanden.id))
+            t = t.model_copy(update={"name": bisher.name, "erstellt_am": bisher.erstellt_am})
+            aenderung = erneut or aenderung
+        t = t.model_copy(update={"geaendert_am": jetzt(), "aenderung": aenderung})
+        knoten = await kw.begleiter_schreiben(quelle.id, orte.ROLLE, orte.ENDUNG, _inhalt(t),
+                                              stand=vorhanden.etag if vorhanden else None, nur_neu=vorhanden is None,
+                                              inhaltstyp=orte.INHALTSTYP)
+        return t, knoten
 
     async def lesen(self, transkript_id: UUID | str) -> tuple[Transkript, Knoten]:
         kw = self.kw
@@ -98,14 +114,11 @@ class Transkripte:
         """In den Papierkorb der Kellerwolke; die Aufnahme bleibt."""
         await self.kw.loeschen(transkript_id)
 
-    async def zur_quelle(self, quelle_id: UUID | str) -> list[Knoten]:
-        """Transkripte einer Aufnahme (über das Suchfeld, neueste zuerst)."""
-        return await self.kw.suchen({FELD_ART: "transkript", FELD_QUELLE: str(quelle_id)}, anzahl=20)
-
     async def alle(self) -> AsyncIterator[Knoten]:
-        """Alle Transkripte im Zweig Transkripte, auch in Unterordnern."""
+        """Alle Transkripte im Zweig der App, auch in Unterordnern (und in der früheren Ablage, bis sie zusammengeführt
+        ist)."""
         kw = self.kw
-        offen = [(await self.ordner()).id]
+        offen = [(await self.zweig()).id]
         while offen:
             async for k in kw.alle_kinder(offen.pop()):
                 if k.ist_ordner:

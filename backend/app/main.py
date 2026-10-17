@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from appkern.app import Geruest
 
 from . import api
-from .arten import arten
+from .arten import ANGEBOTE, arten
 from .einstellungen import AppEinstellungen
 from .fassung import FASSUNG, WURZEL
 from .teile import Teile
@@ -24,7 +24,8 @@ def app_bauen(daten: Path, transport: httpx.AsyncBaseTransport | None = None) ->
     """`transport` nur für Tests (Kellerwolke und Leitstelle nachgestellt)."""
     geruest = Geruest(name="Transkription", kennung="transkription", rolle="macht aus Ton Text", symbol="fa-closed-captioning",
                       fassung=FASSUNG, daten=daten, einstellungen=AppEinstellungen,
-                      oberflaeche=WURZEL / "frontend" / "dist", transport=transport, gleichzeitig=2)
+                      oberflaeche=WURZEL / "frontend" / "dist", transport=transport, gleichzeitig=2,
+                      angebote=ANGEBOTE)
     teile = Teile(geruest)
     geruest.begleiter_anmelden(teile, teile.abgleich)
     geruest.auftraege.anmelden(*arten(teile))

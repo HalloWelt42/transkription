@@ -1,5 +1,8 @@
 """Transkripte: Verzeichnis mit Suche, Lesen, Ändern nur mit dem zuletzt gelesenen Stand, Versionen und Zurückholen,
-Export als Datei neben dem Transkript, Vorschläge der KI-Korrektur, Sprecher einem Profil zuordnen, Aufträge."""
+Export als Begleitdatei neben der Aufnahme, Vorschläge der KI-Korrektur, Sprecher einem Profil zuordnen, Aufträge.
+
+Liegt ein Transkript außerhalb der App (aus der Kellerwolke geöffnet), nennt `anfrage` die Anfrage, mit deren Recht
+gelesen und geschrieben wird; solche Transkripte stehen nicht im Verzeichnis der App."""
 
 from __future__ import annotations
 
@@ -16,6 +19,7 @@ from appkern.kellerwolke import Knoten, StandVeraltet
 
 from .. import auswertung, export
 from ..ablage import orte
+from ..ablage.transkripte import begleiter_ablegen
 from ..arten import AuswertenEingabe, KorrigierenEingabe, SprecherEingabe
 from ..modell.sprecherprofil import Probe, Profil
 from ..modell.transkript import Aenderung, Marker, Quelle, Segment, Sprecher, Transkript, woerter_angleichen
@@ -141,15 +145,17 @@ def router(teile: Teile) -> APIRouter:
     g = teile.geruest
     r = APIRouter(prefix="/api/v1/transkripte", tags=["transkripte"], dependencies=[g.pflicht])
 
-    async def lesen(transkript_id: UUID) -> tuple[Transkript, Knoten]:
-        return await teile.transkripte.lesen(transkript_id)
+    async def lesen(transkript_id: UUID, anfrage: UUID | None = None) -> tuple[Transkript, Knoten]:
+        return await teile.transkripte_fuer(anfrage).lesen(transkript_id)
 
-    async def schreiben(transkript_id: UUID, t: Transkript, stand: str, aenderung: Aenderung) -> TranskriptAntwort:
+    async def schreiben(transkript_id: UUID, t: Transkript, stand: str, aenderung: Aenderung,
+                        anfrage: UUID | None = None) -> TranskriptAntwort:
         try:
-            neu, knoten = await teile.transkripte.schreiben(transkript_id, t, stand, aenderung)
+            neu, knoten = await teile.transkripte_fuer(anfrage).schreiben(transkript_id, t, stand, aenderung)
         except StandVeraltet as f:
             raise Konflikt("Inzwischen geändert: bitte neu laden und dann ändern") from f
-        await teile.index.eintragen(neu, knoten)
+        if anfrage is None:
+            await teile.index.eintragen(neu, knoten)
         return _antwort(neu, knoten)
 
     @r.get("", response_model=Seite)
@@ -171,8 +177,7 @@ def router(teile: Teile) -> APIRouter:
         t = Transkript(name=e.name, quelle=Quelle(knoten_id=quelle.id, pfad=quelle.pfad, etag=quelle.etag), sprache=e.sprache,
                        dauer_s=round(max(x.ende for x in e.stuecke), 3), segmente=segmente, marker=marker,
                        aenderung=Aenderung(was="aus der Live-Mitschrift", wer=konto.name, app=konto.app))
-        knoten = await teile.transkripte.anlegen(t, quelle)
-        neu, knoten = await lesen(knoten.id)
+        neu, knoten = await teile.transkripte.speichern(t, quelle, t.aenderung)
         await teile.index.eintragen(neu, knoten)
         return _antwort(neu, knoten)
 
@@ -181,12 +186,13 @@ def router(teile: Teile) -> APIRouter:
         return await teile.index.sprecher_namen()
 
     @r.get("/{transkript_id}", response_model=TranskriptAntwort)
-    async def holen(transkript_id: UUID) -> TranskriptAntwort:
-        return _antwort(*await lesen(transkript_id))
+    async def holen(transkript_id: UUID, anfrage: UUID | None = None) -> TranskriptAntwort:
+        return _antwort(*await lesen(transkript_id, anfrage))
 
     @r.patch("/{transkript_id}", response_model=TranskriptAntwort)
-    async def aendern(transkript_id: UUID, a: Aenderungen, konto: Konto = g.pflicht) -> TranskriptAntwort:
-        alt, knoten = await lesen(transkript_id)
+    async def aendern(transkript_id: UUID, a: Aenderungen, anfrage: UUID | None = None,
+                      konto: Konto = g.pflicht) -> TranskriptAntwort:
+        alt, knoten = await lesen(transkript_id, anfrage)
         if knoten.etag != a.stand:
             raise Konflikt("Inzwischen geändert: bitte neu laden und dann ändern")
         daten = alt.model_dump()
@@ -205,47 +211,53 @@ def router(teile: Teile) -> APIRouter:
         except ValueError as f:
             raise HTTPException(422, str(f)) from f
         antwort = await schreiben(transkript_id, neu, a.stand,
-                                  Aenderung(was=a.was or _beschreiben(alt, a), wer=konto.name, app=konto.app))
+                                  Aenderung(was=a.was or _beschreiben(alt, a), wer=konto.name, app=konto.app), anfrage)
         if a.vorschlaege:
             await teile.vorschlaege.entscheiden(transkript_id, a.vorschlaege)
         return antwort
 
     @r.delete("/{transkript_id}", status_code=204)
-    async def loeschen(transkript_id: UUID, konto: Konto = g.pflicht) -> None:
-        await teile.transkript_wegraeumen(transkript_id, von(konto))
+    async def loeschen(transkript_id: UUID, anfrage: UUID | None = None, konto: Konto = g.pflicht) -> None:
+        await teile.transkript_wegraeumen(transkript_id, von(konto), anfrage)
 
     # --- Versionen ------------------------------------------------------------------------------------------------
 
     @r.get("/{transkript_id}/versionen", response_model=list[Version])
-    async def versionen(transkript_id: UUID) -> list[Version]:
+    async def versionen(transkript_id: UUID, anfrage: UUID | None = None) -> list[Version]:
         notizen = await teile.index.notizen(transkript_id)
         return [Version(id=v.id, groesse=v.groesse, erstellt_am=v.erstellt_am, aktuell=v.aktuell,
-                        notiz=notizen.get(str(v.id))) for v in await teile.transkripte.versionen(transkript_id)]
+                        notiz=notizen.get(str(v.id))) for v in await teile.transkripte_fuer(anfrage).versionen(transkript_id)]
 
     @r.get("/{transkript_id}/versionen/{version_id}", response_model=Transkript)
-    async def version(transkript_id: UUID, version_id: UUID) -> Transkript:
-        return _ohne_abdruck(await teile.transkripte.version(transkript_id, version_id))
+    async def version(transkript_id: UUID, version_id: UUID, anfrage: UUID | None = None) -> Transkript:
+        return _ohne_abdruck(await teile.transkripte_fuer(anfrage).version(transkript_id, version_id))
 
     @r.post("/{transkript_id}/versionen/{version_id}/zurueck", response_model=TranskriptAntwort)
-    async def zurueckholen(transkript_id: UUID, version_id: UUID, eingabe: StandEingabe,
+    async def zurueckholen(transkript_id: UUID, version_id: UUID, eingabe: StandEingabe, anfrage: UUID | None = None,
                            konto: Konto = g.pflicht) -> TranskriptAntwort:
         try:
-            neu, knoten = await teile.transkripte.zurueckholen(transkript_id, version_id, eingabe.stand, konto.name,
-                                                               konto.app)
+            neu, knoten = await teile.transkripte_fuer(anfrage).zurueckholen(transkript_id, version_id, eingabe.stand,
+                                                                             konto.name, konto.app)
         except StandVeraltet as f:
             raise Konflikt("Inzwischen geändert: bitte neu laden") from f
-        await teile.index.eintragen(neu, knoten)
+        if anfrage is None:
+            await teile.index.eintragen(neu, knoten)
         return _antwort(neu, knoten)
 
     # --- Export als Datei, Vorschläge -----------------------------------------------------------------------------
 
     @r.post("/{transkript_id}/export", status_code=201)
-    async def ablegen(transkript_id: UUID, eingabe: ExportEingabe) -> dict:
-        """Export als Datei neben das Transkript (der Download liegt unter /api/v1/inhalt)."""
-        t, knoten = await lesen(transkript_id)
-        kw = teile.transkripte.kw
+    async def ablegen(transkript_id: UUID, eingabe: ExportEingabe, anfrage: UUID | None = None) -> dict:
+        """Export als Begleitdatei neben die Aufnahme (je Format einer, erneut abgelegt eine neue Version); der
+        Download liegt unter /api/v1/inhalt."""
+        t, knoten = await lesen(transkript_id, anfrage)
+        kw = teile.zugang(anfrage)
         typ, endung = export.FORMATE[eingabe.format]
-        ordner = knoten.pfad.rsplit("/", 1)[0]
+        if t.quelle is not None:
+            datei = await begleiter_ablegen(kw, t.quelle.knoten_id, export.ROLLEN[eingabe.format], endung,
+                                            export.erzeugen(t, eingabe.format), typ)
+            return {"id": str(datei.id), "pfad": datei.pfad, "name": datei.name}
+        ordner = knoten.pfad.rsplit("/", 1)[0]          # ohne Aufnahme (frühere Ablage): neben das Transkript
         n = 1
         while await kw.finden(orte.ort(ordner, f"{t.name}{f' ({n})' if n > 1 else ''}{endung}")) is not None:
             n += 1
@@ -261,11 +273,11 @@ def router(teile: Teile) -> APIRouter:
     # --- Sprecher einem Profil zuordnen ---------------------------------------------------------------------------
 
     @r.post("/{transkript_id}/sprecher/{kennung}/profil", response_model=TranskriptAntwort)
-    async def profil_zuordnen(transkript_id: UUID, kennung: str, z: ProfilZuordnung,
+    async def profil_zuordnen(transkript_id: UUID, kennung: str, z: ProfilZuordnung, anfrage: UUID | None = None,
                               konto: Konto = g.pflicht) -> TranskriptAntwort:
         """Bestätigt die Stimme eines Sprechers als Profil (vorhanden oder neu mit `name`): der Sprecher trägt danach
         Namen und Profil, sein Abdruck schärft das Profil."""
-        t, knoten = await lesen(transkript_id)
+        t, knoten = await lesen(transkript_id, anfrage)
         if knoten.etag != z.stand:
             raise Konflikt("Inzwischen geändert: bitte neu laden und dann ändern")
         sprecher = next((s for s in t.sprecher if s.kennung == kennung), None)
@@ -294,28 +306,31 @@ def router(teile: Teile) -> APIRouter:
             "name": profil.name, "profil_id": profil.id, "vorschlag_id": None, "vorschlag_aehnlichkeit": None})
             if s.kennung == kennung else s for s in t.sprecher]})
         return await schreiben(transkript_id, neu, z.stand,
-                               Aenderung(was=f"{sprecher.name} ist {profil.name}", wer=konto.name, app=konto.app))
+                               Aenderung(was=f"{sprecher.name} ist {profil.name}", wer=konto.name, app=konto.app), anfrage)
 
     # --- Aufträge -------------------------------------------------------------------------------------------------
 
     @r.post("/{transkript_id}/sprecher-erkennen", status_code=201, response_model=Auftrag)
-    async def sprecher_erkennen(transkript_id: UUID, eingabe: ErkennenEingabe, konto: Konto = g.pflicht) -> Auftrag:
+    async def sprecher_erkennen(transkript_id: UUID, eingabe: ErkennenEingabe, anfrage: UUID | None = None,
+                                konto: Konto = g.pflicht) -> Auftrag:
         """Nur auf ausdrücklichen Wunsch; ersetzt die Zuordnung (der alte Stand bleibt als Version)."""
-        t, _ = await lesen(transkript_id)
+        t, _ = await lesen(transkript_id, anfrage)
         return await g.auftraege.einreihen("sprecher_erkennen", SprecherEingabe(
-            transkript_id=transkript_id, weg=eingabe.weg, anzahl=eingabe.anzahl, von=von(konto)), titel=f"{t.name}: Sprecher")
+            transkript_id=transkript_id, anfrage_id=anfrage, weg=eingabe.weg, anzahl=eingabe.anzahl, von=von(konto)),
+            titel=f"{t.name}: Sprecher")
 
     @r.post("/{transkript_id}/korrigieren", status_code=201, response_model=Auftrag)
-    async def korrigieren(transkript_id: UUID, konto: Konto = g.pflicht) -> Auftrag:
-        t, _ = await lesen(transkript_id)
-        return await g.auftraege.einreihen("korrigieren", KorrigierenEingabe(transkript_id=transkript_id, von=von(konto)),
-                                           titel=f"{t.name}: Korrektur")
+    async def korrigieren(transkript_id: UUID, anfrage: UUID | None = None, konto: Konto = g.pflicht) -> Auftrag:
+        t, _ = await lesen(transkript_id, anfrage)
+        return await g.auftraege.einreihen("korrigieren", KorrigierenEingabe(transkript_id=transkript_id, anfrage_id=anfrage,
+                                                                             von=von(konto)), titel=f"{t.name}: Korrektur")
 
     @r.post("/{transkript_id}/auswerten", status_code=201, response_model=Auftrag)
-    async def auswerten(transkript_id: UUID, eingabe: VorlageEingabe, konto: Konto = g.pflicht) -> Auftrag:
-        t, _ = await lesen(transkript_id)
+    async def auswerten(transkript_id: UUID, eingabe: VorlageEingabe, anfrage: UUID | None = None,
+                        konto: Konto = g.pflicht) -> Auftrag:
+        t, _ = await lesen(transkript_id, anfrage)
         return await g.auftraege.einreihen("auswerten", AuswertenEingabe(
-            transkript_id=transkript_id, vorlage=eingabe.vorlage, von=von(konto)),
+            transkript_id=transkript_id, anfrage_id=anfrage, vorlage=eingabe.vorlage, von=von(konto)),
             titel=f"{t.name}: {auswertung.titel(eingabe.vorlage)}")
 
     return r

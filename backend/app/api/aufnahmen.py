@@ -1,5 +1,7 @@
-"""Aufnahmen: Ton- und Videodateien im Ordner Aufnahmen und in Ordnern, die der Nutzer der App freigegeben hat; mit
-Stand (ohne Transkript, wartet, läuft, transkribiert). Hochladen gestreamt nach Aufnahmen; Transkribieren als Auftrag."""
+"""Aufnahmen: Ton- und Videodateien im Ordner Aufnahmen (ihre Transkripte liegen als Begleiter daneben) und in Ordnern,
+die der Nutzer der App freigegeben hat; mit Stand (ohne Transkript, wartet, läuft, transkribiert). Hochladen gestreamt
+nach Aufnahmen; Transkribieren als Auftrag, auch für Dateien aus der ganzen Kellerwolke (über eine Anfrage, nur für
+diesen Auftrag). Dazu das Zusammenführen der früheren getrennten Ablage mit Vorschau."""
 
 from __future__ import annotations
 
@@ -11,13 +13,18 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from appkern.anmeldung import Konto
+from appkern.anmeldung.api import KOPF
 from appkern.auftraege import Auftrag
+from appkern.kellerwolke import KellerwolkeFehler
 
+from .. import umzug
 from ..ablage import orte
-from ..ablage.transkripte import zugang
 from ..arten import TranskribierenAnfrage, TranskribierenEingabe
+from ..einstellungen import Sprache, SprecherWeg
 from ..teile import Teile
 from .gemeinsam import von
+
+AUFTRAGSARTEN = ["transkribieren", "aus_anfrage"]
 
 Stand = Literal["ohne", "wartet", "laeuft", "transkribiert"]
 Filter = Literal["alle", "ohne", "transkribiert"]
@@ -72,6 +79,20 @@ class MarkerEingabe(BaseModel):
     titel: str = Field(min_length=1, max_length=200)
 
 
+class AusKellerwolke(BaseModel):
+    """Dateien aus der ganzen Kellerwolke transkribieren (gewählt in der App); das Transkript kommt neben die Datei."""
+
+    knoten_ids: list[UUID] = Field(min_length=1, max_length=50)
+    sprache: Sprache | None = None
+    sprecher: SprecherWeg | None = None
+    anzahl: int | None = Field(None, ge=1, le=20)
+
+
+def _quelle_von(auftrag) -> str:
+    """Die Aufnahme eines laufenden Auftrags (Transkribieren nennt quelle_id, eine Anfrage knoten_id)."""
+    return str(auftrag.eingabe.get("quelle_id") or auftrag.eingabe.get("knoten_id"))
+
+
 Aufnahme.model_rebuild()
 
 
@@ -93,13 +114,19 @@ def router(teile: Teile) -> APIRouter:
     r = APIRouter(prefix="/api/v1", tags=["aufnahmen"], dependencies=[g.pflicht])
 
     async def eigener_ordner():
-        kw = zugang(lambda: g.kellerwolke)
-        return await kw.ordner(orte.ort((await kw.ich()).zweig, orte.AUFNAHMEN))
+        return await teile.transkripte.ordner()
+
+    async def laufende() -> dict[str, object]:
+        laufend: dict[str, object] = {}
+        for art in AUFTRAGSARTEN:
+            for a in (await g.auftraege.liste(zustand=["wartet", "laeuft"], art=art, grenze=500)).eintraege:
+                laufend.setdefault(_quelle_von(a), a)
+        return laufend
 
     @r.get("/aufnahmen/ordner", response_model=list[Ordner])
     async def ordner_liste() -> list[Ordner]:
         """Der eigene Ordner Aufnahmen und die Ordner, die der Nutzer der App außerhalb von Apps freigegeben hat."""
-        kw = zugang(lambda: g.kellerwolke)
+        kw = teile.zugang()
         ich = await kw.ich()
         eigen = await eigener_ordner()
         aus = [Ordner(id=eigen.id, name=eigen.name, pfad=eigen.pfad, recht=eigen.recht, eigen=True)]
@@ -112,7 +139,7 @@ def router(teile: Teile) -> APIRouter:
     @r.get("/aufnahmen", response_model=AufnahmenSeite)
     async def aufnahmen(ordner: UUID | None = None, filter: Filter = "alle", suche: str = "",
                         ab: int = Query(0, ge=0), anzahl: int = Query(50, ge=1, le=200)) -> AufnahmenSeite:
-        kw = zugang(lambda: g.kellerwolke)
+        kw = teile.zugang()
         ort = await kw.knoten(ordner) if ordner else await eigener_ordner()
         unterordner, dateien = [], []
         async for k in kw.alle_kinder(ort.id):
@@ -121,9 +148,7 @@ def router(teile: Teile) -> APIRouter:
             elif orte.art_der_aufnahme(k) and (not suche or suche.lower() in k.name.lower()):
                 dateien.append(k)
         transkripte = await teile.index.zur_quelle([str(k.id) for k in dateien])
-        laufend = {}
-        for a in (await g.auftraege.liste(zustand=["wartet", "laeuft"], art="transkribieren", grenze=500)).eintraege:
-            laufend.setdefault(str(a.eingabe.get("quelle_id")), a)
+        laufend = await laufende()
         alle: list[Aufnahme] = []
         for k in sorted(dateien, key=lambda k: k.geaendert_am, reverse=True):
             eintraege = transkripte.get(str(k.id), [])
@@ -141,7 +166,7 @@ def router(teile: Teile) -> APIRouter:
                         ordner: str = Query("", max_length=300, description="Unterordner von Aufnahmen, etwa Besprechungen")) -> Aufnahme:
         """Körper ist der Inhalt (roh, gestreamt) in den eigenen Ordner Aufnahmen (oder einen Unterordner davon, der bei
         Bedarf entsteht); ein belegter Name bekommt eine Zahl angehängt."""
-        kw = zugang(lambda: g.kellerwolke)
+        kw = teile.zugang()
         ort = await eigener_ordner()
         if unter := orte.unterordner(ordner):
             ort = await kw.ordner(orte.ort(ort.pfad, unter))
@@ -162,30 +187,34 @@ def router(teile: Teile) -> APIRouter:
                         geaendert_am=k.geaendert_am, stand="ohne", transkripte=[])
 
     @r.get("/aufnahmen/{knoten_id}", response_model=Aufnahme)
-    async def aufnahme(knoten_id: UUID) -> Aufnahme:
-        """Eine Aufnahme mit Stand, Transkripten und Markern (Ansicht zum Anhören, auch ohne Transkript)."""
-        kw = zugang(lambda: g.kellerwolke)
+    async def aufnahme(knoten_id: UUID, anfrage: UUID | None = None) -> Aufnahme:
+        """Eine Aufnahme mit Stand, Transkript und Markern (Ansicht zum Anhören, auch ohne Transkript); mit `anfrage`
+        auch eine Datei aus der Kellerwolke (geöffnet über das Dateimenü oder die Dateiwahl)."""
+        kw = teile.zugang(anfrage)
         k = await kw.knoten(knoten_id)
         if orte.art_der_aufnahme(k) is None:
             raise HTTPException(422, f"{k.name} ist keine Ton- oder Videodatei")
-        eintraege = (await teile.index.zur_quelle([str(k.id)])).get(str(k.id), [])
-        auftrag = next((a for a in (await g.auftraege.liste(zustand=["wartet", "laeuft"], art="transkribieren", grenze=500)).eintraege
-                        if str(a.eingabe.get("quelle_id")) == str(k.id)), None)
-        return aufnahme_aus(k, [TranskriptVerweis(id=e.id, name=e.name) for e in eintraege], auftrag,
-                            next((e.dauer_s for e in eintraege if e.dauer_s), None))
+        transkript = await teile.transkripte_fuer(anfrage).zur_quelle(k.id)
+        eintrag = await teile.index.eintrag(transkript.id) if transkript else None
+        verweise = [TranskriptVerweis(id=transkript.id, name=eintrag.name if eintrag else orte.anzeigename(k.name))] \
+            if transkript else []
+        return aufnahme_aus(k, verweise, (await laufende()).get(str(k.id)), eintrag.dauer_s if eintrag else None)
 
     @r.delete("/aufnahmen/{knoten_id}", status_code=204)
     async def aufnahme_loeschen(knoten_id: UUID, mit_transkripten: bool = False, konto: Konto = g.pflicht) -> None:
-        """In den Papierkorb der Kellerwolke (dort zurückholbar), auf Wunsch mit ihren Transkripten; sonst behalten die
-        Transkripte ihren Text, verlieren aber den Ton."""
-        kw = zugang(lambda: g.kellerwolke)
+        """In den Papierkorb der Kellerwolke (dort zurückholbar), mit ihren Begleitern (Transkript, Untertitel ...).
+        Ohne `mit_transkripten` behält das Transkript seinen Text: es löst sich aus der Gruppe und bleibt im Ordner."""
+        kw = teile.zugang()
         k = await kw.knoten(knoten_id)
         if orte.art_der_aufnahme(k) is None:
             raise HTTPException(422, f"{k.name} ist keine Ton- oder Videodatei")
-        if mit_transkripten:
-            for e in (await teile.index.zur_quelle([str(k.id)])).get(str(k.id), []):
-                await teile.transkript_wegraeumen(e.id, von(konto))
+        transkript = await teile.transkripte.zur_quelle(k.id)
+        if transkript is not None and not mit_transkripten:
+            await kw.begleiter_loesen(transkript.id)
         await kw.loeschen(k.id)
+        if transkript is not None and mit_transkripten:
+            await teile.index.entfernen(transkript.id)
+            await teile.vorschlaege.entfernen(transkript.id)
         teile.abspielen.vergessen(k.id)
         await g.protokoll.eintragen("aufnahme.geloescht", f"{k.name} in den Papierkorb", bezug_art="aufnahme",
                                     bezug_name=von(konto))
@@ -193,7 +222,7 @@ def router(teile: Teile) -> APIRouter:
     @r.put("/aufnahmen/{knoten_id}/marker", response_model=list[MarkerEingabe])
     async def marker_setzen(knoten_id: UUID, marker: list[MarkerEingabe]) -> list[MarkerEingabe]:
         """Marker, die beim Aufnehmen gesetzt wurden; sie hängen an der Aufnahme und kommen ins Transkript."""
-        kw = zugang(lambda: g.kellerwolke)
+        kw = teile.zugang()
         if orte.art_der_aufnahme(await kw.knoten(knoten_id)) is None:
             raise HTTPException(422, "Keine Ton- oder Videodatei")
         await kw.felder_setzen(knoten_id, {orte.FELD_MARKER: [m.model_dump() for m in sorted(marker, key=lambda m: m.zeit)]})
@@ -201,11 +230,48 @@ def router(teile: Teile) -> APIRouter:
 
     @r.post("/transkribieren", status_code=201, response_model=Auftrag)
     async def transkribieren(anfrage: TranskribierenAnfrage, konto: Konto = g.pflicht) -> Auftrag:
-        kw = zugang(lambda: g.kellerwolke)
+        if anfrage.anfrage_id is not None:
+            raise HTTPException(422, "Dateien aus der Kellerwolke über /kellerwolke/transkribieren")
+        kw = teile.zugang()
         quelle = await kw.knoten(anfrage.quelle_id)
         if orte.art_der_aufnahme(quelle) is None:
             raise HTTPException(422, f"{quelle.name} ist keine Ton- oder Videodatei")
         eingabe = TranskribierenEingabe(**anfrage.model_dump(), von=von(konto))
         return await g.auftraege.einreihen("transkribieren", eingabe, titel=anfrage.name or orte.anzeigename(quelle.name))
+
+    @r.post("/kellerwolke/transkribieren", status_code=201, response_model=list[str])
+    async def aus_kellerwolke(e: AusKellerwolke, request: Request, konto: Konto = g.mensch) -> list[str]:
+        """In der App gewählte Dateien aus der ganzen Kellerwolke: je Datei eine Anfrage an diese App (Recht nur für
+        diesen Auftrag), ausgeführt mit den gewählten Optionen; liefert die Aufträge."""
+        kw = teile.zugang()
+        sitzung = request.headers.get(KOPF, "")
+        auftraege: list[str] = []
+        try:
+            for knoten_id in e.knoten_ids:
+                neu = await kw.waehlen(sitzung, knoten_id, "transkribieren")
+                eingabe = TranskribierenEingabe(quelle_id=knoten_id, anfrage_id=neu.anfrage.id, sprache=e.sprache,
+                                                sprecher=e.sprecher, anzahl=e.anzahl, von=von(konto))
+                auftrag_id = await g.abholer.uebernehmen(neu.anfrage, kw, auftrag="transkribieren",
+                                                         eingabe=eingabe.model_dump(mode="json"),
+                                                         titel=orte.anzeigename(neu.anfrage.knoten_name))
+                if auftrag_id:
+                    auftraege.append(auftrag_id)
+        except KellerwolkeFehler as f:
+            raise HTTPException(f.status if f.status in (403, 404, 409, 422) else 502, f.meldung) from f
+        return auftraege
+
+    # --- Eine Ablage: die frühere getrennte Ablage zusammenführen ---------------------------------------------------
+
+    @r.get("/ablage/zusammenfuehren", response_model=umzug.Plan)
+    async def zusammenfuehren_plan() -> umzug.Plan:
+        """Vorschau: was wohin kommt; es geschieht nichts."""
+        return await umzug.planen(teile)
+
+    @r.post("/ablage/zusammenfuehren", status_code=201, response_model=Auftrag)
+    async def zusammenfuehren(konto: Konto = g.mensch) -> Auftrag:
+        laufend = (await g.auftraege.liste(zustand=["wartet", "laeuft"], art="zusammenfuehren")).eintraege
+        if laufend:
+            return laufend[0]
+        return await g.auftraege.einreihen("zusammenfuehren", {"von": von(konto)}, titel="Ablage zusammenführen")
 
     return r

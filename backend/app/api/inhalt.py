@@ -13,7 +13,6 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from ..ablage import orte
-from ..ablage.transkripte import zugang
 from ..einstellungen import Sprache
 from ..export import FORMATE, Format, erzeugen
 from ..modell.transkript import Segment
@@ -36,28 +35,28 @@ def router(teile: Teile) -> APIRouter:
     r = APIRouter(prefix="/api/v1", tags=["inhalt"])
 
     @r.get("/inhalt/aufnahmen/{knoten_id}", dependencies=[g.lesen])
-    async def aufnahme(knoten_id: UUID, request: Request) -> Response:
-        kw = zugang(lambda: g.kellerwolke)
+    async def aufnahme(knoten_id: UUID, request: Request, anfrage: UUID | None = None) -> Response:
+        kw = teile.zugang(anfrage)
         knoten = await kw.knoten(knoten_id)
         if orte.art_der_aufnahme(knoten) is None:
             raise HTTPException(404, "Keine Aufnahme")
         return await inhalt_reichen(kw, knoten, request)
 
     @r.get("/inhalt/transkripte/{transkript_id}/ton", dependencies=[g.lesen])
-    async def ton(transkript_id: UUID) -> Response:
+    async def ton(transkript_id: UUID, anfrage: UUID | None = None) -> Response:
         """Die Abspielfassung der Aufnahme (PCM-WAV, samplegenau springbar, ohne Versatz zum Text); fehlt sie, entsteht
         sie jetzt."""
-        t, _ = await teile.transkripte.lesen(transkript_id)
+        t, _ = await teile.transkripte_fuer(anfrage).lesen(transkript_id)
         if t.quelle is None:
             raise HTTPException(404, "Das Transkript nennt keine Aufnahme")
-        kw = zugang(lambda: g.kellerwolke)
+        kw = teile.zugang(anfrage)
         datei = await teile.abspielen.holen(await kw.knoten(t.quelle.knoten_id), kw)
         return FileResponse(datei, media_type="audio/wav", headers={"Cache-Control": "private, max-age=3600"})
 
     @r.get("/inhalt/aufnahmen/{knoten_id}/ton", dependencies=[g.lesen])
-    async def aufnahme_ton(knoten_id: UUID) -> Response:
+    async def aufnahme_ton(knoten_id: UUID, anfrage: UUID | None = None) -> Response:
         """Die Abspielfassung einer Aufnahme (wie beim Transkript), damit sie auch ohne Transkript samplegenau spielt."""
-        kw = zugang(lambda: g.kellerwolke)
+        kw = teile.zugang(anfrage)
         quelle = await kw.knoten(knoten_id)
         if orte.art_der_aufnahme(quelle) is None:
             raise HTTPException(422, f"{quelle.name} ist keine Ton- oder Videodatei")
@@ -65,17 +64,17 @@ def router(teile: Teile) -> APIRouter:
         return FileResponse(datei, media_type="audio/wav", headers={"Cache-Control": "private, max-age=3600"})
 
     @r.get("/inhalt/aufnahmen/{knoten_id}/wellenform", response_model=list[int], dependencies=[g.lesen])
-    async def wellenform(knoten_id: UUID) -> list[int]:
+    async def wellenform(knoten_id: UUID, anfrage: UUID | None = None) -> list[int]:
         """800 Werte von 0 bis 100 (Dezibel, fester Maßstab) aus der Abspielfassung; mit oder ohne Transkript gleich."""
-        kw = zugang(lambda: g.kellerwolke)
+        kw = teile.zugang(anfrage)
         quelle = await kw.knoten(knoten_id)
         if orte.art_der_aufnahme(quelle) is None:
             raise HTTPException(422, f"{quelle.name} ist keine Ton- oder Videodatei")
         return await teile.abspielen.wellenform(quelle, kw)
 
     @r.get("/inhalt/transkripte/{transkript_id}/export", dependencies=[g.lesen])
-    async def herunterladen(transkript_id: UUID, format: Format = Query("txt")) -> Response:
-        t, _ = await teile.transkripte.lesen(transkript_id)
+    async def herunterladen(transkript_id: UUID, format: Format = Query("txt"), anfrage: UUID | None = None) -> Response:
+        t, _ = await teile.transkripte_fuer(anfrage).lesen(transkript_id)
         typ, endung = FORMATE[format]
         return Response(erzeugen(t, format), media_type=typ, headers=herunterladen_kopf(f"{t.name}{endung}"))
 

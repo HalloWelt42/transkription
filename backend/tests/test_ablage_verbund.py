@@ -47,45 +47,52 @@ def probe(name: str, text: str) -> Transkript:
                       segmente=[Segment(start=0, ende=2, sprecher="s1", text=text)], aenderung=Aenderung(was="erzeugt"))
 
 
-async def test_anlegen_lesen_schreiben_versionen_zurueckholen(umgebung):
-    kw, transkripte, index, _, angelegt = umgebung
-    name = f"Probe {secrets.token_hex(3)}"
+async def _aufnahme(kw, angelegt, name: str):
     ich = await kw.ich()
     await kw.ordner(f"{ich.zweig}/Aufnahmen")
     aufnahme = await kw.schreiben(f"{ich.zweig}/Aufnahmen/{name}.wav", b"RIFF", nur_neu=True, inhaltstyp="audio/wav")
     angelegt.append(aufnahme.id)
-    erst = await transkripte.anlegen(probe(name, "Erster Text"), aufnahme)
-    zweit = await transkripte.anlegen(probe(name, "Gleicher Name"), aufnahme)
-    angelegt += [erst.id, zweit.id]
-    assert erst.name == f"{name}.transkript.json" and zweit.name == f"{name} (2).transkript.json"
-    assert {k.id for k in await transkripte.zur_quelle(aufnahme.id)} == {erst.id, zweit.id}
-    assert any(h.art == "transkript_zu" and h.von_id == aufnahme.id for h in await kw.herkunft(erst.id))
+    return aufnahme
 
-    t, k = await transkripte.lesen(erst.id)
+
+async def test_ein_transkript_je_aufnahme_mit_versionen(umgebung):
+    kw, transkripte, index, _, angelegt = umgebung
+    name = f"Probe {secrets.token_hex(3)}"
+    aufnahme = await _aufnahme(kw, angelegt, name)
+    erst, k1 = await transkripte.speichern(probe(name, "Erster Text"), aufnahme, Aenderung(was="erzeugt"))
+    # neu transkribiert: dieselbe Datei, eine neue Version; Name und Anlagezeit bleiben
+    zweit, k2 = await transkripte.speichern(probe("anderer Name", "Zweiter Lauf"), aufnahme, Aenderung(was="erzeugt"),
+                                            erneut=Aenderung(was="neu transkribiert"))
+    assert k1.id == k2.id and k1.name == f"{name}.transkript.json" and k1.parent_id == aufnahme.parent_id
+    assert (k2.haupt_id, k2.rolle) == (aufnahme.id, "transkript")
+    assert zweit.name == name and zweit.aenderung.was == "neu transkribiert"
+    assert (await transkripte.zur_quelle(aufnahme.id)).id == k1.id
+
+    t, k = await transkripte.lesen(k1.id)
     neu = t.model_copy(update={"segmente": [Segment(start=0, ende=2, sprecher="s1", text="Geänderter Text")]})
-    _, k2 = await transkripte.schreiben(erst.id, neu, k.etag, Aenderung(was="Text geändert", wer="chef"))
+    _, k3 = await transkripte.schreiben(k1.id, neu, k.etag, Aenderung(was="Text geändert", wer="chef"))
     with pytest.raises(StandVeraltet):
-        await transkripte.schreiben(erst.id, neu, k.etag, Aenderung(was="mit altem Stand"))
-    versionen = await transkripte.versionen(erst.id)
-    assert len(versionen) == 2 and versionen[0].id.hex == k2.etag.replace("-", "")
-    assert (await transkripte.version(erst.id, versionen[1].id)).segmente[0].text == "Erster Text"
-    _, k3 = await transkripte.zurueckholen(erst.id, versionen[1].id, k2.etag, "chef")
-    t3, _ = await transkripte.lesen(erst.id)
-    assert t3.segmente[0].text == "Erster Text" and "zurückgeholt" in t3.aenderung.was and k3.etag != k2.etag
+        await transkripte.schreiben(k1.id, neu, k.etag, Aenderung(was="mit altem Stand"))
+    versionen = await transkripte.versionen(k1.id)
+    assert len(versionen) == 3 and versionen[0].id.hex == k3.etag.replace("-", "")
+    assert (await transkripte.version(k1.id, versionen[2].id)).segmente[0].text == "Erster Text"
+    _, k4 = await transkripte.zurueckholen(k1.id, versionen[2].id, k3.etag, "chef")
+    t4, _ = await transkripte.lesen(k1.id)
+    assert t4.segmente[0].text == "Erster Text" and "zurückgeholt" in t4.aenderung.was and k4.etag != k3.etag
 
 
 async def test_abgleich_folgt_der_kellerwolke(umgebung):
     kw, transkripte, index, abgleich, angelegt = umgebung
     wort = f"Zauberwort{secrets.token_hex(3)}"
-    vorher = await transkripte.anlegen(probe(f"Vorher {wort}", f"{wort} ist schon da"))
-    angelegt.append(vorher.id)
+    eins = await _aufnahme(kw, angelegt, f"Vorher {wort}")
+    _, vorher = await transkripte.speichern(probe(f"Vorher {wort}", f"{wort} ist schon da"), eins, Aenderung(was="erzeugt"))
     await abgleich.verbunden()
     await asyncio.wait_for(abgleich.bereit.wait(), 30)
     assert [e.id for e in (await index.seite(suche=wort)).eintraege] == [vorher.id]
 
     # danach: neu, geändert (außerhalb der App, etwa von einer anderen App), gelöscht
-    neu = await transkripte.anlegen(probe(f"Neu {wort}", f"{wort} kam später"))
-    angelegt.append(neu.id)
+    zwei = await _aufnahme(kw, angelegt, f"Neu {wort}")
+    _, neu = await transkripte.speichern(probe(f"Neu {wort}", f"{wort} kam später"), zwei, Aenderung(was="erzeugt"))
     t, k = await transkripte.lesen(vorher.id)
     await transkripte.schreiben(vorher.id, t.model_copy(update={"segmente": [Segment(start=0, ende=1, text="ohne das Wort")]}),
                                 k.etag, Aenderung(was="extern"))
@@ -98,7 +105,7 @@ async def test_abgleich_folgt_der_kellerwolke(umgebung):
         return False
 
     assert await stand({neu.id})
-    await kw.loeschen(neu.id)
+    await kw.loeschen(zwei.id)                       # die Aufnahme nimmt ihr Transkript mit in den Papierkorb
     assert await stand(set())
     assert await index.eintrag(neu.id) is None
 

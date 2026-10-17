@@ -62,6 +62,3 @@ def test_unterordner_sicher():
     from app.ablage import orte
     assert orte.unterordner("../Besprechungen//2026 ") == "Besprechungen/2026"
     assert orte.unterordner("a:b/./c") == "a b/c" and orte.unterordner("") == ""
-    assert orte.unterordner_der_aufnahme("Apps/T", "Apps/T/Aufnahmen/x.wav") == ""
-    assert orte.unterordner_der_aufnahme("Apps/T", "Apps/T/Aufnahmen/A/B/x.wav") == "A/B"
-    assert orte.unterordner_der_aufnahme("Apps/T", "Freigabe/Musik/x.wav") == ""
