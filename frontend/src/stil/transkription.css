@@ -279,3 +279,43 @@ kbd.taste { font-family: ui-monospace, monospace; font-size: var(--marke); color
 .mobil .t-loeschen > .knopf { width: 100%; justify-content: center; min-height: 44px; }
 .mobil .t-zeile .t-text .auswahl { margin-top: 2px; }
 .eingabe .zeit-marke { font-family: ui-monospace, monospace; font-size: var(--marke); color: var(--text-3); flex: none; }
+
+/* Rekorder schlank (Entwurf 2): Zeit und Pegel, Symbole an festen Plätzen, eine Steuerzeile fester Höhe, der Rest für
+   den Live-Text. Am Rechner stehen die Symbole neben Zeit und Pegel, am Telefon in eigener Reihe unter der Steuerung,
+   damit ihre Blase nur den Text überdeckt, nie die Knöpfe. Erklärungen erscheinen per Klick; nichts verschiebt sich. */
+.rek { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "status symbole" "steuer steuer" "live live";
+  grid-template-rows: auto auto minmax(160px, 1fr); gap: 10px; min-height: 0; }
+.mobil .rek { grid-template-columns: minmax(0, 1fr); grid-template-areas: "status" "steuer" "symbole" "live"; flex: 1; }
+.rek-status { grid-area: status; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; height: 48px; }
+.rek-zeit { font-family: ui-monospace, monospace; font-size: 26px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.rek-zeit .punkt { width: 10px; height: 10px; border-radius: 5px; background: var(--gefahr); }
+.rek-zeit.pause .punkt { background: var(--text-3); }
+.rek-pegel { display: flex; align-items: center; gap: 2px; height: 32px; min-width: 0; overflow: hidden; }
+.rek-pegel span { flex: 1; min-width: 2px; max-width: 5px; border-radius: 2px; background: var(--gefahr); }
+.rek-symbole { grid-area: symbole; display: flex; gap: 4px; align-items: center; justify-content: flex-end; position: relative; }
+.mobil .rek-symbole { justify-content: center; gap: 10px; }
+.rek-symbol { width: 34px; height: 34px; border-radius: 17px; border: 0; background: var(--flaeche-2); color: var(--text-2);
+  display: grid; place-items: center; cursor: pointer; font-size: 15px; }
+.mobil .rek-symbol { width: 40px; height: 40px; border-radius: 20px; }
+.rek-symbol.aus { color: var(--text-3); opacity: .6; }
+.rek-symbol.gut { color: var(--gut); }
+.rek-symbol.warn { color: var(--warn); background: var(--warn-weich); }
+.rek-symbol.fehler { color: var(--gefahr); background: var(--gefahr-weich); }
+.rek-symbol.offen { box-shadow: 0 0 0 2px var(--akzent); }
+.rek-blase { position: absolute; top: calc(100% + 8px); right: 0; z-index: 5; width: min(320px, 86vw); padding: 12px 14px; border-radius: var(--r3);
+  background: var(--flaeche); box-shadow: var(--schatten), 0 0 0 1px var(--rand); font-size: var(--klein); color: var(--text-2); }
+.rek-blase b { display: block; color: var(--text); margin-bottom: 4px; }
+.rek-blase .knopfreihe { margin-top: 10px; }
+.rek-steuer { grid-area: steuer; display: flex; align-items: center; justify-content: center; gap: 18px; height: 64px; }
+.rek-steuer .rund { width: 48px; height: 48px; border-radius: 24px; font-size: 18px; }
+.rek-steuer .stopp { width: 60px; height: 60px; border-radius: 30px; border: 0; background: var(--gefahr); color: #fff; font-size: 22px; cursor: pointer; }
+.rek-steuer .marken { position: relative; }
+.rek-steuer .marken .zahl { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; border-radius: 9px; padding: 0 5px;
+  background: var(--akzent); color: #fff; font-size: 11px; display: grid; place-items: center; }
+.rek-frage { grid-area: steuer; display: flex; align-items: center; justify-content: center; gap: 10px; height: 64px; font-weight: 600; }
+.rek-live { grid-area: live; min-height: 160px; display: flex; flex-direction: column; background: var(--flaeche-2); border-radius: var(--r3); overflow: hidden; }
+.rek-live .kopf-zeile { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: var(--klein); color: var(--text-3); }
+.rek-live .text { flex: 1; overflow-y: auto; padding: 0 12px 10px; line-height: 1.55; }
+.rek-live .text p { margin: 6px 0; }
+.rek-live .text .zeit { font-family: ui-monospace, monospace; font-size: var(--klein); color: var(--text-3); margin-right: 8px; }
+.mobil .rek-blase { left: 50%; right: auto; transform: translateX(-50%); }
