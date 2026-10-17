@@ -30,7 +30,22 @@ Die einzige Wahrheit ist die Transkriptdatei in der Kellerwolke (`Transkripte/<N
 Suchindex, Aufträge, Vorschläge und Protokoll und folgt der Kellerwolke über ihren Ereignisstrom. Sprecherprofile liegen
 in `Sprecher/profile.json`.
 
-## Einrichten
+## Betrieb auf dem Pi
+
+Die Transkription läuft neben Kellerwolke und Leitstelle auf dem Pi, im Container (`Dockerfile`, `compose.pi.yml`),
+erreichbar unter `https://192.168.178.49:8631` (Zertifikat der Hausstelle; HTTPS braucht der Browser fürs Mikrofon).
+ffmpeg kommt nicht ins Abbild: das des Pi ist nur lesend eingehängt und läuft mit dem Lader des Pi
+(`deploy/ffmpeg-vom-pi`). Daten liegen in `/mnt/data/transkription/daten`, Sicherungen in `.../sicherungen`.
+
+```bash
+tools/ausrollen.sh
+```
+
+Prüft bei jedem Neubau alles selbst: gepushter Stand und grüne Tests, ffmpeg und ffprobe auf dem Pi, Docker,
+Zertifikat (stellt es bei Bedarf neu aus), sichert die Datenbank, baut und startet, wandelt im Container probehalber
+mit dem ffmpeg des Pi um und vergleicht über HTTPS die Fassungen von Server, Oberfläche und `version.json`.
+
+## Einrichten (Entwicklung)
 
 ```bash
 ./einrichten.sh
@@ -52,7 +67,7 @@ und Sprachmodell). ffmpeg muss auf dem Rechner sein.
 | Tests | `cd backend && .venv/bin/python -m pytest` |
 | Typen | `cd frontend && npm run check` |
 | Symbole | `python3 tools/symbole.py` nach einer Änderung an `frontend/public/symbol.svg` |
-| Ausrollen | `tools/ausrollen.sh` (nur gepushte Stände: Tests, Oberfläche bauen, im Stellwerk neu starten, Fassungen prüfen) |
+| Ausrollen | `tools/ausrollen.sh` (auf den Pi, siehe oben) |
 | Entwürfe | `python3 -m http.server` im Repo, dann `/mockups/transkription.html` und `/mockups/transkription-mobil.html` |
 
 Die Verbundtests (`test_ablage_verbund.py`, `test_verbund.py`) sprechen mit einer echten Kellerwolke und brauchen
