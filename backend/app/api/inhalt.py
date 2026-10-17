@@ -54,6 +54,16 @@ def router(teile: Teile) -> APIRouter:
         datei = await teile.abspielen.holen(await kw.knoten(t.quelle.knoten_id), kw)
         return FileResponse(datei, media_type="audio/wav", headers={"Cache-Control": "private, max-age=3600"})
 
+    @r.get("/inhalt/aufnahmen/{knoten_id}/ton", dependencies=[g.lesen])
+    async def aufnahme_ton(knoten_id: UUID) -> Response:
+        """Die Abspielfassung einer Aufnahme (wie beim Transkript), damit sie auch ohne Transkript samplegenau spielt."""
+        kw = zugang(lambda: g.kellerwolke)
+        quelle = await kw.knoten(knoten_id)
+        if orte.art_der_aufnahme(quelle) is None:
+            raise HTTPException(422, f"{quelle.name} ist keine Ton- oder Videodatei")
+        datei = await teile.abspielen.holen(quelle, kw)
+        return FileResponse(datei, media_type="audio/wav", headers={"Cache-Control": "private, max-age=3600"})
+
     @r.get("/inhalt/aufnahmen/{knoten_id}/wellenform", response_model=list[int], dependencies=[g.lesen])
     async def wellenform(knoten_id: UUID) -> list[int]:
         """800 Werte von 0 bis 100 (Dezibel, fester Maßstab) aus der Abspielfassung; mit oder ohne Transkript gleich."""

@@ -4,6 +4,7 @@ Schnittstelle bekommen dieses eine Objekt statt vieler einzelner Abhängigkeiten
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import UUID
 
 from appkern.app import Begleiter, Geruest
 from appkern.einstellungen import Angebot, Option
@@ -73,6 +74,15 @@ class Teile(Begleiter):
             return Angebot(optionen=optionen, stand=f"gefunden: {pfad}")
 
         g.einstellungen.anbieten("ffmpeg_ordner", ffmpeg)
+
+    async def transkript_wegraeumen(self, transkript_id: UUID | str, wer: str) -> None:
+        """In den Papierkorb der Kellerwolke, aus Verzeichnis und Vorschlägen, mit Eintrag im Protokoll."""
+        eintrag = await self.index.eintrag(transkript_id)
+        await self.transkripte.loeschen(transkript_id)
+        await self.index.entfernen(transkript_id)
+        await self.vorschlaege.entfernen(transkript_id)
+        await self.geruest.protokoll.eintragen("transkript.geloescht", f"{eintrag.name if eintrag else transkript_id} in den Papierkorb",
+                                               bezug_art="transkript", bezug_name=wer)
 
     async def starten(self) -> None:
         await self.index.einrichten()

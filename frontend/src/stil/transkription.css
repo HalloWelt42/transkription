@@ -51,7 +51,8 @@
 .beitrag .zeit { font-family: ui-monospace, monospace; font-size: var(--klein); color: var(--text-3); padding-top: 3px; cursor: pointer; }
 .beitrag.jetzt { background: var(--flaeche); box-shadow: var(--schatten); }
 .beitrag .text { line-height: 1.65; }
-.wort.jetzt { background: var(--akzent); color: #fff; border-radius: 4px; padding: 0 3px; }
+/* der Rand kommt als Schatten statt als Innenabstand: das Wort wird nicht breiter, der Absatz bricht nie neu um */
+.wort.jetzt { background: var(--akzent); color: #fff; border-radius: 3px; box-shadow: 0 0 0 2px var(--akzent); }
 /* im dunklen Modus ist der Akzent hell: dunkle Schrift darauf (etwa 8:1 statt 2,5:1 mit Weiß) */
 :root[data-theme="dunkel"] .wort.jetzt { color: var(--hg); }
 .wort.gehoert { color: var(--text); }

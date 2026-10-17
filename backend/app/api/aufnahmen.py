@@ -56,6 +56,7 @@ class Aufnahme(BaseModel):
     stand: Stand
     transkripte: list[TranskriptVerweis]
     auftrag: AuftragKurz | None = None
+    marker: list["MarkerEingabe"] = Field(default_factory=list, description="beim Aufnehmen oder Anhören gesetzt")
 
 
 class AufnahmenSeite(BaseModel):
@@ -69,6 +70,22 @@ class AufnahmenSeite(BaseModel):
 class MarkerEingabe(BaseModel):
     zeit: float = Field(ge=0)
     titel: str = Field(min_length=1, max_length=200)
+
+
+Aufnahme.model_rebuild()
+
+
+def aufnahme_aus(k, verweise: list[TranskriptVerweis], auftrag, transkript_dauer: float | None) -> Aufnahme:
+    """Ein Eintrag aus dem Knoten der Kellerwolke, gleich für Liste und Einzelansicht."""
+    stand: Stand = ("laeuft" if auftrag.zustand == "laeuft" else "wartet") if auftrag else \
+        ("transkribiert" if verweise else "ohne")
+    marker = [MarkerEingabe.model_validate(m) for m in (k.felder.get(orte.FELD_MARKER) or [])]
+    return Aufnahme(
+        id=k.id, name=k.name, pfad=k.pfad, art=orte.art_der_aufnahme(k), groesse=k.groesse, inhaltstyp=k.inhaltstyp,
+        dauer_s=k.felder.get(orte.FELD_DAUER) or transkript_dauer, geaendert_am=k.geaendert_am, stand=stand,
+        transkripte=verweise, marker=marker,
+        auftrag=AuftragKurz(id=auftrag.id, zustand=auftrag.zustand, fortschritt=auftrag.fortschritt, schritt=auftrag.schritt,
+                            phase=auftrag.phase) if auftrag else None)
 
 
 def router(teile: Teile) -> APIRouter:
@@ -109,16 +126,9 @@ def router(teile: Teile) -> APIRouter:
             laufend.setdefault(str(a.eingabe.get("quelle_id")), a)
         alle: list[Aufnahme] = []
         for k in sorted(dateien, key=lambda k: k.geaendert_am, reverse=True):
-            verweise = [TranskriptVerweis(id=e.id, name=e.name) for e in transkripte.get(str(k.id), [])]
-            auftrag = laufend.get(str(k.id))
-            stand: Stand = ("laeuft" if auftrag.zustand == "laeuft" else "wartet") if auftrag else \
-                ("transkribiert" if verweise else "ohne")
-            dauer = k.felder.get(orte.FELD_DAUER) or next((e.dauer_s for e in transkripte.get(str(k.id), []) if e.dauer_s), None)
-            alle.append(Aufnahme(
-                id=k.id, name=k.name, pfad=k.pfad, art=orte.art_der_aufnahme(k), groesse=k.groesse,
-                inhaltstyp=k.inhaltstyp, dauer_s=dauer, geaendert_am=k.geaendert_am, stand=stand, transkripte=verweise,
-                auftrag=AuftragKurz(id=auftrag.id, zustand=auftrag.zustand, fortschritt=auftrag.fortschritt,
-                                    schritt=auftrag.schritt, phase=auftrag.phase) if auftrag else None))
+            eintraege = transkripte.get(str(k.id), [])
+            alle.append(aufnahme_aus(k, [TranskriptVerweis(id=e.id, name=e.name) for e in eintraege], laufend.get(str(k.id)),
+                                     next((e.dauer_s for e in eintraege if e.dauer_s), None)))
         zahlen = {"alle": len(alle), "ohne": sum(a.stand != "transkribiert" for a in alle),
                   "transkribiert": sum(a.stand == "transkribiert" for a in alle)}
         gefiltert = [a for a in alle if filter == "alle" or (filter == "ohne") == (a.stand != "transkribiert")]
@@ -147,6 +157,35 @@ def router(teile: Teile) -> APIRouter:
         await g.protokoll.eintragen("aufnahme.hochgeladen", k.name, bezug_art="aufnahme", bezug_name=k.name)
         return Aufnahme(id=k.id, name=k.name, pfad=k.pfad, art=art, groesse=k.groesse, inhaltstyp=k.inhaltstyp,
                         geaendert_am=k.geaendert_am, stand="ohne", transkripte=[])
+
+    @r.get("/aufnahmen/{knoten_id}", response_model=Aufnahme)
+    async def aufnahme(knoten_id: UUID) -> Aufnahme:
+        """Eine Aufnahme mit Stand, Transkripten und Markern (Ansicht zum Anhören, auch ohne Transkript)."""
+        kw = zugang(lambda: g.kellerwolke)
+        k = await kw.knoten(knoten_id)
+        if orte.art_der_aufnahme(k) is None:
+            raise HTTPException(422, f"{k.name} ist keine Ton- oder Videodatei")
+        eintraege = (await teile.index.zur_quelle([str(k.id)])).get(str(k.id), [])
+        auftrag = next((a for a in (await g.auftraege.liste(zustand=["wartet", "laeuft"], art="transkribieren", grenze=500)).eintraege
+                        if str(a.eingabe.get("quelle_id")) == str(k.id)), None)
+        return aufnahme_aus(k, [TranskriptVerweis(id=e.id, name=e.name) for e in eintraege], auftrag,
+                            next((e.dauer_s for e in eintraege if e.dauer_s), None))
+
+    @r.delete("/aufnahmen/{knoten_id}", status_code=204)
+    async def aufnahme_loeschen(knoten_id: UUID, mit_transkripten: bool = False, konto: Konto = g.pflicht) -> None:
+        """In den Papierkorb der Kellerwolke (dort zurückholbar), auf Wunsch mit ihren Transkripten; sonst behalten die
+        Transkripte ihren Text, verlieren aber den Ton."""
+        kw = zugang(lambda: g.kellerwolke)
+        k = await kw.knoten(knoten_id)
+        if orte.art_der_aufnahme(k) is None:
+            raise HTTPException(422, f"{k.name} ist keine Ton- oder Videodatei")
+        if mit_transkripten:
+            for e in (await teile.index.zur_quelle([str(k.id)])).get(str(k.id), []):
+                await teile.transkript_wegraeumen(e.id, von(konto))
+        await kw.loeschen(k.id)
+        teile.abspielen.vergessen(k.id)
+        await g.protokoll.eintragen("aufnahme.geloescht", f"{k.name} in den Papierkorb", bezug_art="aufnahme",
+                                    bezug_name=von(konto))
 
     @r.put("/aufnahmen/{knoten_id}/marker", response_model=list[MarkerEingabe])
     async def marker_setzen(knoten_id: UUID, marker: list[MarkerEingabe]) -> list[MarkerEingabe]:

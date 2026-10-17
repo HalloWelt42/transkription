@@ -16,6 +16,7 @@ import os
 import time
 from collections.abc import Callable
 from pathlib import Path, PurePosixPath
+from uuid import UUID
 
 from appkern.kellerwolke import Kellerwolke, Knoten
 
@@ -65,6 +66,11 @@ class Abspielfassungen:
         werte = await self._ton().wellenform(await self.holen(quelle, kw))
         merker.write_text(json.dumps(werte))
         return werte
+
+    def vergessen(self, quelle_id: UUID | str) -> None:
+        """Fassungen und Wellenformen einer Quelle entfernen (etwa wenn die Aufnahme in den Papierkorb geht)."""
+        for p in [*self.ordner.glob(f"{quelle_id}-*.wav"), *self.ordner.glob(f"{quelle_id}-*.welle.json")]:
+            p.unlink(missing_ok=True)
 
     def _sperre(self, quelle: Knoten) -> asyncio.Lock:
         return self._sperren.setdefault(str(quelle.id), asyncio.Lock())

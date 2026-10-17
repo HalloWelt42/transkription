@@ -212,12 +212,7 @@ def router(teile: Teile) -> APIRouter:
 
     @r.delete("/{transkript_id}", status_code=204)
     async def loeschen(transkript_id: UUID, konto: Konto = g.pflicht) -> None:
-        eintrag = await teile.index.eintrag(transkript_id)
-        await teile.transkripte.loeschen(transkript_id)
-        await teile.index.entfernen(transkript_id)
-        await teile.vorschlaege.entfernen(transkript_id)
-        await g.protokoll.eintragen("transkript.geloescht", f"{eintrag.name if eintrag else transkript_id} in den Papierkorb",
-                                    bezug_art="transkript", bezug_name=von(konto))
+        await teile.transkript_wegraeumen(transkript_id, von(konto))
 
     # --- Versionen ------------------------------------------------------------------------------------------------
 
