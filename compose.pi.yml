@@ -1,4 +1,5 @@
-# Transkription auf dem Pi: https://192.168.178.49:8631 (Zertifikat der Hausstelle, tools/ausrollen.sh stellt es aus).
+# Transkription auf dem Pi: https://192.168.178.49:8631. Vorne Caddy mit dem Zertifikat der Hausstelle (wie Kiste und
+# Kellerwolke; tools/ausrollen.sh stellt es aus), dahinter die App ohne TLS, nur im eigenen Netz erreichbar.
 # Daten in ./daten (SQLite, Zwischendateien); ffmpeg und ffprobe vom Pi, nur lesend eingehängt.
 services:
   transkription:
@@ -7,8 +8,8 @@ services:
     container_name: transkription
     restart: unless-stopped
     user: "1000:1000"
-    ports:
-      - "8631:8631"
+    expose:
+      - "8630"
     environment:
       TRANSKRIPTION_DATEN: /app/daten
       TRANSKRIPTION_CA_DATEI: /zertifikate/rootCA.pem
@@ -18,3 +19,17 @@ services:
       - /usr/bin/ffmpeg:/host/usr/bin/ffmpeg:ro
       - /usr/bin/ffprobe:/host/usr/bin/ffprobe:ro
       - /usr/lib/aarch64-linux-gnu:/host/usr/lib/aarch64-linux-gnu:ro
+
+  vorne:
+    image: caddy:2.11.6-alpine
+    container_name: transkription-vorne
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    depends_on: [transkription]
+    ports:
+      - "8631:8631"
+    environment:
+      TRANSKRIPTION_HAUPTADRESSE: ${TRANSKRIPTION_HAUPTADRESSE:-192.168.178.49}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./zertifikate:/zertifikate:ro

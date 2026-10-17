@@ -7,7 +7,8 @@
 #   4. Stand holen, Datenbank sichern (die letzten zehn Sicherungen bleiben)
 #   5. Abbild bauen und starten
 #   6. im Container eine echte Umwandlung mit dem ffmpeg des Pi; über HTTPS melden Server, gebaute Oberfläche und
-#      version.json dieselbe Fassung
+#      version.json dieselbe Fassung; die Seite kommt über den Vorschaltdienst (HTTP/2), Symbole für Tab,
+#      Startbildschirm und Web-App sowie das Manifest antworten mit 200 und dem richtigen Typ
 #
 # Nutzung: tools/ausrollen.sh
 set -euo pipefail
@@ -87,5 +88,15 @@ info, fassung = json.loads(sys.argv[1]), sys.argv[2]
 print(f"Server {info['fassung']}, Oberfläche {info.get('oberflaeche')}, version.json {fassung}, Appkern {info['appkern']}")
 assert info["fassung"] == fassung == info.get("oberflaeche"), "Fassungen passen nicht zusammen"
 PRUEFUNG
+HAUSSTELLE_MAC="$(mkcert -CAROOT 2>/dev/null)/rootCA.pem"
+[ "$(curl -s -o /dev/null -w '%{http_version}' --http2 --cacert "$HAUSSTELLE_MAC" "$ADRESSE/")" = "2" ] \
+  || { echo "Die Seite kommt nicht über HTTP/2: Vorschaltdienst prüfen (docker compose -f compose.pi.yml logs vorne)"; exit 1; }
+for datei in favicon.ico:image/ favicon-32.png:image/png apple-touch-icon.png:image/png icon-192.png:image/png \
+             icon-512.png:image/png icon-maskable-512.png:image/png site.webmanifest:application/manifest+json; do
+  pfad="${datei%%:*}"; typ="${datei#*:}"
+  antwort="$(curl -s -o /dev/null -w '%{http_code} %{content_type}' --cacert "$HAUSSTELLE_MAC" "$ADRESSE/$pfad")"
+  case "$antwort" in "200 $typ"*) ;; *) echo "Symbol $pfad: $antwort (erwartet 200 $typ)"; exit 1 ;; esac
+done
+echo "HTTP/2 über den Vorschaltdienst, Symbole und Manifest in Ordnung"
 echo
 echo "Transkription ausgerollt: $ADRESSE"

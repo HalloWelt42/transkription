@@ -26,6 +26,7 @@ COPY version.json ./
 COPY backend ./backend
 COPY --from=oberflaeche /bau/frontend/dist ./frontend/dist
 WORKDIR /app/backend
-EXPOSE 8631
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8631", "--log-level", "warning", \
-     "--ssl-certfile", "/zertifikate/transkription.pem", "--ssl-keyfile", "/zertifikate/transkription-schluessel.pem"]
+# TLS macht der Vorschaltdienst (deploy/Caddyfile); er reicht die Adresse des Aufrufers weiter
+EXPOSE 8630
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8630", "--log-level", "warning", \
+     "--proxy-headers", "--forwarded-allow-ips", "*"]

@@ -34,6 +34,8 @@ in `Sprecher/profile.json`.
 
 Die Transkription läuft neben Kellerwolke und Leitstelle auf dem Pi, im Container (`Dockerfile`, `compose.pi.yml`),
 erreichbar unter `https://192.168.178.49:8631` (Zertifikat der Hausstelle; HTTPS braucht der Browser fürs Mikrofon).
+Vorne steht wie bei Kiste und Kellerwolke ein Caddy (`deploy/Caddyfile`, TLS und HTTP/2), die App dahinter ist von außen
+nicht erreichbar.
 ffmpeg kommt nicht ins Abbild: das des Pi ist nur lesend eingehängt und läuft mit dem Lader des Pi
 (`deploy/ffmpeg-vom-pi`). Daten liegen in `/mnt/data/transkription/daten`, Sicherungen in `.../sicherungen`.
 
