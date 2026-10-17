@@ -29,7 +29,7 @@ async def umgebung():
     index = Suchindex(db)
     transkripte = Transkripte(lambda: kw)
     abgleich = Abgleich(SimpleNamespace(kellerwolke=kw), transkripte, index)
-    await abgleich.starten()
+    await index.einrichten()
     angelegt: list = []
     yield kw, transkripte, index, abgleich, angelegt
     await abgleich.stoppen()
@@ -63,13 +63,13 @@ async def test_anlegen_lesen_schreiben_versionen_zurueckholen(umgebung):
 
     t, k = await transkripte.lesen(erst.id)
     neu = t.model_copy(update={"segmente": [Segment(start=0, ende=2, sprecher="s1", text="Geänderter Text")]})
-    k2 = await transkripte.schreiben(erst.id, neu, k.etag, Aenderung(was="Text geändert", wer="chef"))
+    _, k2 = await transkripte.schreiben(erst.id, neu, k.etag, Aenderung(was="Text geändert", wer="chef"))
     with pytest.raises(StandVeraltet):
         await transkripte.schreiben(erst.id, neu, k.etag, Aenderung(was="mit altem Stand"))
     versionen = await transkripte.versionen(erst.id)
     assert len(versionen) == 2 and versionen[0].id.hex == k2.etag.replace("-", "")
     assert (await transkripte.version(erst.id, versionen[1].id)).segmente[0].text == "Erster Text"
-    k3 = await transkripte.zurueckholen(erst.id, versionen[1].id, k2.etag, "chef")
+    _, k3 = await transkripte.zurueckholen(erst.id, versionen[1].id, k2.etag, "chef")
     t3, _ = await transkripte.lesen(erst.id)
     assert t3.segmente[0].text == "Erster Text" and "zurückgeholt" in t3.aenderung.was and k3.etag != k2.etag
 

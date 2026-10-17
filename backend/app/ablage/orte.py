@@ -33,12 +33,13 @@ def art_der_aufnahme(knoten: Knoten) -> str | None:
         return "ton"
     if typ.startswith("video/"):
         return "video"
-    endung = PurePosixPath(knoten.name).suffix.lower()
-    if endung in TON:
-        return "ton"
-    if endung in VIDEO:
-        return "video"
-    return None
+    return art_der_aufnahme_name(knoten.name)
+
+
+def art_der_aufnahme_name(name: str) -> str | None:
+    """Nur nach der Endung (vor dem Hochladen)."""
+    endung = PurePosixPath(name).suffix.lower()
+    return "ton" if endung in TON else "video" if endung in VIDEO else None
 
 
 def ist_transkript(knoten: Knoten) -> bool:

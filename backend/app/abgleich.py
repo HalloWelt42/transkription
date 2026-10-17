@@ -33,9 +33,6 @@ class Abgleich(Begleiter):
         self._aufgabe: asyncio.Task | None = None
         self.bereit = asyncio.Event()   # nach dem ersten vollständigen Abgleich (für Tests und die Anzeige)
 
-    async def starten(self) -> None:
-        await self.index.einrichten()
-
     async def verbunden(self) -> None:
         await self.stoppen()
         self.bereit.clear()

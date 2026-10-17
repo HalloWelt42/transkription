@@ -1,6 +1,6 @@
-"""Transkription gegen eine nachgestellte Kellerwolke: einrichten, anmelden, Probeauftrag bis zum Ende, Protokoll."""
+"""Transkription gegen eine nachgestellte Kellerwolke: einrichten, anmelden, Schutz der Schnittstelle, Einstellungen
+mit lesbaren Beschriftungen, leeres Verzeichnis."""
 
-import asyncio
 import json
 from pathlib import Path
 
@@ -8,6 +8,8 @@ import httpx
 import pytest
 
 from app.main import app_bauen
+
+BENUTZER = {"id": "1", "name": "probe", "rolle": "mitglied", "aktiv": True}
 
 
 def kellerwolke(request: httpx.Request) -> httpx.Response:
@@ -17,10 +19,10 @@ def kellerwolke(request: httpx.Request) -> httpx.Response:
     if pfad == "/api/v1/auth/login":
         if json.loads(request.content)["passwort"] != "geheim":
             return httpx.Response(401, json={"detail": "Anmeldung fehlgeschlagen"})
-        return httpx.Response(200, json={"token": "t1", "benutzer": {"id": "1", "name": "probe", "rolle": "mitglied", "aktiv": True}})
+        return httpx.Response(200, json={"token": "t1", "benutzer": BENUTZER})
     if pfad == "/api/v1/auth/status":
         ok = request.headers.get("x-kellerwolke-sitzung") == "t1"
-        return httpx.Response(200, json={"angemeldet": ok, "benutzer": {"id": "1", "name": "probe", "rolle": "mitglied", "aktiv": True} if ok else None})
+        return httpx.Response(200, json={"angemeldet": ok, "benutzer": BENUTZER if ok else None})
     return httpx.Response(404, json={"detail": "nicht da"})
 
 
@@ -33,18 +35,17 @@ async def client(tmp_path: Path):
     await app.state.geruest.stoppen()
 
 
-async def test_einrichten_anmelden_probeauftrag(client):
+async def test_einrichten_anmelden_und_schutz(client):
     assert (await client.get("/api/v1/app")).json()["einrichtung_noetig"]
     r = await client.post("/api/v1/einrichtung", json={"kellerwolke_adresse": "http://kw.test", "kellerwolke_schluessel": "kw_app_x"})
     assert r.json()["besitzer"] == "probe"
     h = {"X-Kellerwolke-Sitzung": (await client.post("/api/v1/anmeldung", json={"kennung": "probe", "passwort": "geheim"})).json()["token"]}
-    assert (await client.post("/api/v1/probe", json={"schritte": 3, "pause_s": 0})).status_code == 401
-    a = (await client.post("/api/v1/probe", headers=h, json={"schritte": 3, "pause_s": 0})).json()
-    for _ in range(300):
-        stand = (await client.get(f"/api/v1/auftraege/{a['id']}", headers=h)).json()
-        if stand["zustand"] == "fertig":
-            break
-        await asyncio.sleep(0.01)
-    assert stand["ergebnis"] == {"schritte": 3} and stand["phase"] == "abschliessen"
-    ereignisse = [e["ereignis"] for e in (await client.get("/api/v1/protokoll", headers=h)).json()["eintraege"]]
-    assert "auftrag.fertig" in ereignisse and "app.eingerichtet" in ereignisse
+    for weg in ("/api/v1/transkripte", "/api/v1/aufnahmen", "/api/v1/sprecher",
+                "/api/v1/inhalt/transkripte/00000000-0000-0000-0000-000000000000/ton"):
+        assert (await client.get(weg)).status_code == 401, weg
+    seite = (await client.get("/api/v1/transkripte", headers=h)).json()
+    assert seite == {"gesamt": 0, "ab": 0, "anzahl": 20, "eintraege": []}
+    felder = {f["name"]: f for f in (await client.get("/api/v1/einstellungen", headers=h)).json()}
+    assert felder["sprache"]["beschriftungen"]["de"] == "Deutsch" and felder["sprecher_sicher"]["schritt"] == 0.05
+    assert (await client.post("/api/v1/transkribieren", headers=h, json={"quelle_id": "x"})).status_code == 422
+    assert (await client.get("/api/v1/aufnahmen", headers=h)).status_code == 404          # Schein kennt keine Ablage

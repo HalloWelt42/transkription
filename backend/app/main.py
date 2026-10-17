@@ -10,21 +10,25 @@ from fastapi import FastAPI
 
 from appkern.app import Geruest
 
-from .api import router
+from . import api
 from .arten import arten
 from .einstellungen import AppEinstellungen
 from .fassung import FASSUNG, WURZEL
+from .teile import Teile
 
 
 def app_bauen(daten: Path, transport: httpx.AsyncBaseTransport | None = None) -> FastAPI:
     """`transport` nur für Tests (Kellerwolke und Leitstelle nachgestellt)."""
-    geruest = Geruest(name="Transkription", kennung="transkription", rolle="macht aus Ton Text", symbol="fa-closed-captioning", fassung=FASSUNG,
-                      daten=daten, einstellungen=AppEinstellungen, oberflaeche=WURZEL / "frontend" / "dist",
-                      transport=transport)
-    geruest.auftraege.anmelden(*arten(geruest))
+    geruest = Geruest(name="Transkription", kennung="transkription", rolle="macht aus Ton Text", symbol="fa-closed-captioning",
+                      fassung=FASSUNG, daten=daten, einstellungen=AppEinstellungen,
+                      oberflaeche=WURZEL / "frontend" / "dist", transport=transport, gleichzeitig=2)
+    teile = Teile(geruest)
+    geruest.begleiter_anmelden(teile, teile.abgleich)
+    geruest.auftraege.anmelden(*arten(teile))
     app = geruest.fastapi()
     app.state.geruest = geruest
-    app.include_router(router(geruest))
+    app.state.teile = teile
+    api.einbinden(app, teile)
     geruest.oberflaeche_ausliefern(app)
     return app
 
