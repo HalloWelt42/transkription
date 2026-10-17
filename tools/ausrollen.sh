@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Ausrollen auf den Pi (vom Mac aus). Prüft bei jedem Neubau alles selbst und bricht beim ersten Fehler ab:
-#   1. nur gepushte Stände, Tests hier grün
+#   1. nur gepushte Stände, Tests hier grün, Appkern in Oberfläche und Backend auf demselben Commit
 #   2. auf dem Pi: ffmpeg und ffprobe vorhanden und lauffähig (sie kommen nicht in den Container), Lader und
 #      Bibliotheken da, Docker mit Compose da
 #   3. Zertifikat der Hausstelle für HTTPS vorhanden und noch mindestens 60 Tage gültig, sonst neu ausstellen
@@ -27,6 +27,10 @@ schritt "Stand und Tests"
 git fetch -q origin
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "Erst pushen (main ist nicht auf origin)."; exit 1; }
 (cd backend && set -o pipefail && .venv/bin/python -m pytest -q 2>&1 | tail -1)
+OBERFLAECHE_STAND="$(python3 -c 'import json; print(json.load(open("frontend/package-lock.json"))["packages"]["node_modules/appkern-oberflaeche"]["resolved"].rsplit("#", 1)[1])')"
+grep -q "appkern/archive/$OBERFLAECHE_STAND.tar.gz" backend/requirements.txt \
+  || { echo "Appkern in Oberfläche (${OBERFLAECHE_STAND:0:7}) und Backend verschieden: tools/appkern.sh ausführen"; exit 1; }
+echo "Appkern ${OBERFLAECHE_STAND:0:7} in Oberfläche und Backend"
 
 schritt "Pi prüfen"
 ssh -o BatchMode=yes -o ConnectTimeout=10 "$PI" 'set -e
