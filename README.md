@@ -61,9 +61,11 @@ ffmpeg kommt nicht ins Abbild: das des Pi ist nur lesend eingehängt und läuft 
 tools/ausrollen.sh
 ```
 
-Prüft bei jedem Neubau alles selbst: gepushter Stand und grüne Tests, ffmpeg und ffprobe auf dem Pi, Docker,
-Zertifikat (stellt es bei Bedarf neu aus), sichert die Datenbank, baut und startet, wandelt im Container probehalber
-mit dem ffmpeg des Pi um und vergleicht über HTTPS die Fassungen von Server, Oberfläche und `version.json`.
+Prüft bei jedem Neubau alles selbst: gepushter Stand und grüne Tests, gleicher Appkern in Oberfläche und Backend,
+ffmpeg und ffprobe auf dem Pi, Docker, Zertifikat (stellt es bei Bedarf neu aus), sichert die Datenbank, baut und
+startet, wandelt im Container probehalber mit dem ffmpeg des Pi um und vergleicht über HTTPS die Fassungen von Server,
+Oberfläche und `version.json`, HTTP/2 und die Symbole. Die Angaben stehen in `deploy/ausrollen.toml`, der Ablauf für
+alle Apps gleich im Appkern (`appkern.werkzeuge.ausrollen`).
 
 ## Einrichten (Entwicklung)
 
@@ -89,6 +91,7 @@ und Sprachmodell). ffmpeg muss auf dem Rechner sein.
 | Symbole | `python3 tools/symbole.py` nach einer Änderung an `frontend/public/symbol.svg` |
 | Ausrollen | `tools/ausrollen.sh` (auf den Pi, siehe oben) |
 | Appkern heben | `tools/appkern.sh` (Oberfläche und Backend auf denselben Commit; Ausrollen prüft das) |
+| Ansicht prüfen | `tools/ansicht.sh` (Seiten aus `frontend/ansicht.json` in allen Breiten, hell und dunkel: seitliches Rollen, Überlauf, Kontrast, Verschiebung beim Wechsel) |
 | Pi im Browser ohne Zertifikat | `python3 tools/pi_durchleitung.py`, dann `http://127.0.0.1:8633` (prüft nach außen gegen die Hausstelle) |
 | Entwürfe | `python3 -m http.server` im Repo, dann `/mockups/transkription.html` und `/mockups/transkription-mobil.html` |
 
@@ -116,7 +119,8 @@ Zugangs neu und zieht sie am Ende zurück.
 ## Version
 
 Die Version steht nur in `version.json`; `tools/version.sh patch|minor|major` zählt hoch, der Pre-Commit-Hook
-erzwingt es (`git config core.hooksPath tools/git-hooks`).
+erzwingt es (`git config core.hooksPath tools/git-hooks`) und prüft die vorgemerkten Dateien: nur gerade Zeichen,
+Stil ohne `!important`, ohne einseitige Streifen und ohne Regeln auf Klassen der Schale (`appkern.werkzeuge`).
 
 ## Lizenz
 

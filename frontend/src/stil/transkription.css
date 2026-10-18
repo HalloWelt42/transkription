@@ -57,7 +57,6 @@
 .sprecher-zeile .anteil { font-size: var(--marke); color: var(--text-3); }
 .sprecher-zeile .vorschlag-chip { grid-column: 1 / -1; font-size: var(--klein); color: var(--text-2); display: flex; gap: 8px; align-items: center;
                                    background: var(--flaeche-2); border-radius: var(--r2); padding: 6px 10px; }
-.knopf.klein { height: 32px; padding: 0 12px; }
 .liste-klein div { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; font-size: var(--klein); }
 .liste-klein .zeit { font-family: ui-monospace, monospace; color: var(--text-3); width: 60px; flex: none; }
 
@@ -109,7 +108,6 @@
 .beitrag mark, .t-beitrag mark { background: var(--warn-weich); color: var(--text); border-radius: 3px; }
 .feld-text { width: 100%; font: inherit; color: var(--text); resize: vertical; min-height: 70px; }
 .werkzeuge .eingabe { height: 32px; font-size: var(--klein); }
-.mobil .t-ansicht > [role="region"] { padding-bottom: 8px; }
 /* Transkript am Rechner: Seite und Leiste nebeneinander im Bereich der Schale */
 .geruest-innen { display: grid; grid-template-columns: minmax(0, 1fr) 380px; flex: 1; min-height: 0; }
 .geruest-innen > .seite { min-height: 0; }
@@ -153,8 +151,6 @@
 @media (max-width: 999px) {
   .beitrag { grid-template-columns: 56px 120px minmax(0, 1fr); gap: 10px; }
   .vorschlag { margin-left: 0; }
-  .spieler { grid-template-columns: auto minmax(0, 1fr) auto; padding: 10px 16px; }
-  .spieler .knopfreihe, .spieler > .knopf { display: none; }
 }
 
 .t-aufnehmen .auswahl { margin-top: 4px; }
@@ -189,7 +185,6 @@ kbd.taste { font-family: ui-monospace, monospace; font-size: var(--marke); color
 .mobil .t-karte { padding: 10px 14px; }
 .mobil .t-loeschen { margin: 16px 0 8px; }
 .mobil .t-loeschen > .knopf { width: 100%; justify-content: center; min-height: 44px; }
-.mobil .t-zeile .t-text .auswahl { margin-top: 2px; }
 .eingabe .zeit-marke { font-family: ui-monospace, monospace; font-size: var(--marke); color: var(--text-3); flex: none; }
 
 /* Verbund mit der Kellerwolke (Entwurf mockups/verbund.html): Zusammenführen */

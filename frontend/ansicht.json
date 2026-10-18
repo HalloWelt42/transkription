@@ -1,0 +1,19 @@
+{
+  "seiten": [
+    { "name": "aufnahmen", "pfad": "/aufnahmen" },
+    { "name": "kellerwolke", "pfad": "/aufnahmen/kellerwolke" },
+    { "name": "transkripte", "pfad": "/transkripte" },
+    { "name": "sprecher", "pfad": "/sprecher" },
+    { "name": "auftraege", "pfad": "/auftraege" },
+    { "name": "protokoll", "pfad": "/protokoll" },
+    { "name": "einstellungen", "pfad": "/einstellungen" },
+    { "name": "aufnehmen", "pfad": "/aufnahmen", "nur": [1440, 900, 390],
+      "wechsel": [
+        { "klick": ".seiten-kopf .knopf:has(.fa-circle-dot), .t-aufnehmen .rot", "warten_ms": 2500 },
+        { "klick": ".rek-leiste .pause", "fest": [".rek-leiste", ".rek-symbole", ".rek-zeit"] },
+        { "klick": ".rek-symbol[aria-label='Live-Mitschrift']", "fest": [".rek-leiste", ".rek-symbole"] },
+        { "klick": ".rek-symbol[aria-label=Verwerfen]", "fest": [".rek-leiste", ".rek-symbole"] },
+        { "klick": ".rek-blase .knopf.gefahr" }
+      ] }
+  ]
+}
