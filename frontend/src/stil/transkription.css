@@ -29,8 +29,6 @@
 :root[data-theme="dunkel"] .wort.jetzt { color: var(--hg); }
 .wort.gehoert { color: var(--text); }
 .beitrag.jetzt .wort:not(.gehoert):not(.jetzt) { color: var(--text-2); }
-.sprecher { display: inline-flex; align-items: center; gap: 7px; font-size: var(--klein); font-weight: 600; white-space: nowrap; height: 28px; }
-.sprecher .punkt { width: 10px; height: 10px; border-radius: 5px; flex: none; }
 .marker-zeile { display: flex; align-items: center; gap: 10px; margin: 8px 0 8px 84px; font-size: var(--klein); color: var(--warn); }
 .marker-zeile::after { content: ""; flex: 1; height: 1px; background: var(--warn-weich); }
 
@@ -50,15 +48,10 @@
 
 /* Leiste rechts */
 /* Gruppen der Leiste: gleich, ob sie rechts in der Seitenleiste stehen oder am Telefon in der Karte unter "Mehr" */
-.leiste .gruppe, .leiste-inhalt .gruppe { padding: 14px 20px; border-bottom: 1px solid var(--rand); }
-.leiste-inhalt .gruppe:last-child { border-bottom: 0; }
-.leiste .gruppe h3, .leiste-inhalt .gruppe h3 { margin: 0 0 10px; font-size: var(--marke); text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); font-weight: 600; }
 .sprecher-zeile { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; padding: 6px 0; }
 .sprecher-zeile .anteil { font-size: var(--marke); color: var(--text-3); }
 .sprecher-zeile .vorschlag-chip { grid-column: 1 / -1; font-size: var(--klein); color: var(--text-2); display: flex; gap: 8px; align-items: center;
                                    background: var(--flaeche-2); border-radius: var(--r2); padding: 6px 10px; }
-.liste-klein div { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; font-size: var(--klein); }
-.liste-klein .zeit { font-family: ui-monospace, monospace; color: var(--text-3); width: 60px; flex: none; }
 
 /* Sprecherprofile */
 .profil { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 16px;
@@ -113,11 +106,8 @@
 .geruest-innen > .seite { min-height: 0; }
 
 /* ----- Leiste des Transkripts (nach Entwurf) ----- */
-.leiste-inhalt { padding: 0; }
-.leiste .gruppe .knopfreihe, .leiste-inhalt .gruppe .knopfreihe { margin-top: 8px; align-items: center; }
-/* am Telefon sind auch stille Knöpfe als Knopf erkennbar und groß genug zum Tippen */
-.mobil .leiste-inhalt .gruppe { padding: 14px 16px; }
-.mobil .leiste-inhalt .knopf.still, .mobil .t-karte .knopf.still, .mobil .t-loeschen .knopf.still {
+/* am Telefon sind auch stille Knöpfe als Knopf erkennbar und groß genug zum Tippen (in der Leiste: Bausteine) */
+.mobil .t-karte .knopf.still, .mobil .t-loeschen .knopf.still {
   background: var(--flaeche-2); box-shadow: 0 0 0 1px var(--rand); min-height: 40px; }
 .leiste .beschriftung { font-size: var(--klein); color: var(--text-2); }
 .sprecher-zeile .eingabe.klein-eingabe { height: 36px; gap: 8px; }
