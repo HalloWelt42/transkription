@@ -4,4 +4,4 @@
 # ffmpeg des Pi, Zertifikat, Datenbank sichern, bauen, Vorschaltdienst neu starten, Fassungen, HTTP/2 und Symbole.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-exec backend/.venv/bin/python -m appkern.werkzeuge ausrollen
+exec backend/.venv/bin/python -m appkern.werkzeuge ausrollen "$@"
