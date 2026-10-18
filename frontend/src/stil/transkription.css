@@ -101,10 +101,6 @@
 .beitrag mark, .t-beitrag mark { background: var(--warn-weich); color: var(--text); border-radius: 3px; }
 .feld-text { width: 100%; font: inherit; color: var(--text); resize: vertical; min-height: 70px; }
 .werkzeuge .eingabe { height: 32px; font-size: var(--klein); }
-/* Transkript am Rechner: Seite und Leiste nebeneinander im Bereich der Schale */
-.geruest-innen { display: grid; grid-template-columns: minmax(0, 1fr) 380px; flex: 1; min-height: 0; }
-.geruest-innen > .seite { min-height: 0; }
-
 /* ----- Leiste des Transkripts (nach Entwurf) ----- */
 /* am Telefon sind auch stille Knöpfe als Knopf erkennbar und groß genug zum Tippen (in der Leiste: Bausteine) */
 .mobil .t-karte .knopf.still, .mobil .t-loeschen .knopf.still {
@@ -132,12 +128,7 @@
 .version-text { color: var(--text); }
 .version-text b { font-weight: 600; }
 
-/* ----- Breiten: Seite mit Leiste (wie die Schale, siehe Appkern schale.css) ----- */
-.nur-schmal { display: none; }
-@media (max-width: 1279px) {
-  .geruest-innen { grid-template-columns: minmax(0, 1fr); }
-  .nur-schmal { display: inline-flex; }
-}
+/* ----- Breiten (Seite mit Leiste: Appkern bausteine.css) ----- */
 @media (max-width: 999px) {
   .beitrag { grid-template-columns: 56px 120px minmax(0, 1fr); gap: 10px; }
   .vorschlag { margin-left: 0; }

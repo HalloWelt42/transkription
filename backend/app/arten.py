@@ -65,6 +65,20 @@ class TranskribierenEingabe(TranskribierenAnfrage):
     von: str | None = Field(None, description="wer den Auftrag gab (Konto, bei anderen Apps auch die App)")
 
 
+class AnfrageOptionen(BaseModel):
+    """Was eine andere App beim Weitergeben einer Anfrage mitgeben darf (etwa die Vertonung die Sprache des Tons).
+    Andere Namen gelten nicht; ein ungültiger Wert lässt den Auftrag mit klarer Meldung scheitern."""
+
+    sprache: Sprache | None = None
+    sprecher: SprecherWeg | None = None
+    anzahl: int | None = Field(None, ge=1, le=20)
+
+
+def eingabe_aus_anfrage(e: AnfrageEingabe) -> TranskribierenEingabe:
+    optionen = AnfrageOptionen.model_validate(e.optionen).model_dump(exclude_none=True)
+    return TranskribierenEingabe(quelle_id=e.knoten_id, anfrage_id=e.anfrage_id, von="Kellerwolke", **optionen)
+
+
 class UebernehmenAnfrage(BaseModel):
     schluessel: str = Field(min_length=8, max_length=64, description="Eintrag des Altbestands (aus GET /altbestand)")
     zielordner: str = Field("", max_length=300, description="Unterordner von Aufnahmen, entsteht bei Bedarf; leer: direkt dort")
@@ -262,9 +276,9 @@ def arten(teile: Teile) -> list[Art]:
             shutil.rmtree(ordner, ignore_errors=True)
 
     async def aus_anfrage(k: Kontext) -> dict:
-        """Transkribieren auf Anfrage aus dem Dateimenü der Kellerwolke, mit den Vorgaben der Einstellungen."""
-        e: AnfrageEingabe = k.eingabe
-        k.eingabe = TranskribierenEingabe(quelle_id=e.knoten_id, anfrage_id=e.anfrage_id, von="Kellerwolke")
+        """Transkribieren auf Anfrage aus dem Dateimenü der Kellerwolke oder einer anderen App; was die Anfrage nicht
+        mitgibt, kommt aus den Einstellungen."""
+        k.eingabe = eingabe_aus_anfrage(k.eingabe)
         return await transkribieren(k)
 
     # --- uebernehmen (Altbestand der alten App) -------------------------------------------------------------------

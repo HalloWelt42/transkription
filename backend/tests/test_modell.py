@@ -89,3 +89,18 @@ def test_aufnahme_eines_transkripts():
     assert aufnahme_id(mit_quelle, knoten()) == alt
     assert aufnahme_id(Transkript(name="Runde"), knoten(haupt)) == haupt
     assert aufnahme_id(Transkript(name="Runde"), knoten()) is None
+
+
+def test_anfrage_einer_anderen_app_gibt_sprache_mit():
+    from uuid import uuid4
+
+    from appkern.anfragen import AnfrageEingabe
+
+    from app.arten import eingabe_aus_anfrage
+    e = AnfrageEingabe(anfrage_id=uuid4(), knoten_id=uuid4(), aktion="transkribieren",
+                       optionen={"sprache": "en", "fremd": "egal"})
+    t = eingabe_aus_anfrage(e)
+    assert (t.sprache, t.sprecher, t.quelle_id) == ("en", None, e.knoten_id)
+    assert eingabe_aus_anfrage(e.model_copy(update={"optionen": {}})).sprache is None   # dann gilt die Einstellung
+    with pytest.raises(ValidationError):
+        eingabe_aus_anfrage(e.model_copy(update={"optionen": {"sprache": "xx"}}))
