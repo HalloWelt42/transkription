@@ -50,6 +50,39 @@ def nach_trennung(segmente: list[Segment], wechsel: list[Wechsel]) -> list[str |
     return aus
 
 
+def an_wechseln_teilen(segmente: list[Segment], wechsel: list[Wechsel]) -> list[Segment]:
+    """Segmente des Hördienstes an den Sprecherwechseln der Trennung teilen (Wortzeiten): ein Segment von 15 Sekunden
+    enthält oft zwei Sprecher und ging sonst ganz an den überwiegenden (K3 der Vertonung, 18.10.2026). Jedes Wort geht an
+    den Sprecher, dessen Abschnitt es am meisten überlappt; ein Wort ohne Überlappung bleibt beim vorigen. Segmente ohne
+    Wörter bleiben, wie sie sind."""
+    aus: list[Segment] = []
+    for seg in segmente:
+        if not seg.woerter or not wechsel:
+            aus.append(seg)
+            continue
+        gruppen: list[tuple[str | None, list]] = []
+        bisher: str | None = None
+        for w in seg.woerter:
+            summe: dict[str, float] = {}
+            for x in wechsel:
+                ueber = min(w.ende, x.ende) - max(w.start, x.start)
+                if ueber > 0:
+                    summe[x.sprecher] = summe.get(x.sprecher, 0.0) + ueber
+            wer = max(summe, key=summe.get) if summe else bisher
+            if gruppen and wer == gruppen[-1][0]:
+                gruppen[-1][1].append(w)
+            else:
+                gruppen.append((wer, [w]))
+            bisher = wer
+        if len(gruppen) == 1:
+            aus.append(seg)
+            continue
+        for _, woerter in gruppen:
+            aus.append(seg.model_copy(update={"start": woerter[0].start, "ende": max(woerter[-1].ende, woerter[0].start),
+                                              "text": " ".join(w.wort for w in woerter), "woerter": list(woerter)}))
+    return aus
+
+
 def gruppieren(abdruecke: list[list[float] | None], segmente: list[Segment], schwelle: float,
                anzahl: int | None = None) -> list[str | None]:
     """Agglomerativ mit mittlerer Verknüpfung über die Kosinus-Ähnlichkeit (siehe Modultext)."""

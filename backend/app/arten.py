@@ -39,7 +39,7 @@ from .dienste import KeineLeitstelle, Wechsel
 from .einstellungen import Sprache, SprecherWeg
 from .fassung import FASSUNG
 from .modell.transkript import Aenderung, ErzeugtMit, Marker, Quelle, Segment, Transkript
-from .sprechererkennung import erkennen
+from .sprechererkennung import an_wechseln_teilen, erkennen
 from .teile import Teile
 from appkern.ton import HOEREN
 
@@ -171,10 +171,27 @@ def arten(teile: Teile) -> list[Art]:
         await k.merken(abschnitte=[[a.nummer, a.start, a.ende] for a in plan], dauer=dauer)
         return plan
 
+    async def abdruecke_fuer(k: Kontext, wav: Path, ordner: Path, segmente: list[Segment], plan: list[Abschnitt],
+                             titel: str) -> list[list[float] | None]:
+        """Stimmabdrücke für (geteilte) Segmente, je Abschnitt der Aufnahme ein Aufruf; Reihenfolge wie `segmente`."""
+        aus: list[list[float] | None] = []
+        for a in plan:
+            darin = [s for s in segmente if a.start <= s.start < a.ende]
+            if not darin:
+                continue
+            stueck = await teile.ton.ausschneiden(wav, a.start, a.ende, ordner / f"abdruck-{a.nummer}.wav")
+            zeiten = [(round(s.start - a.start, 3), round(s.ende - a.start, 3)) for s in darin]
+            aus += await geduldig(k, lambda: teile.klangwerk.abdruecke(stueck, zeiten, titel=titel, prioritaet="hintergrund"),
+                                  "Stimmabdrücke")
+            stueck.unlink(missing_ok=True)
+        return aus
+
     async def sprecher_bestimmen(k: Kontext, wav: Path, ordner: Path, segmente: list[Segment],
-                                 abdruecke: list[list[float] | None], anzahl: int | None, titel: str, trennung: bool):
+                                 abdruecke: list[list[float] | None], anzahl: int | None, titel: str, trennung: bool,
+                                 plan: list[Abschnitt]):
         """Nur auf ausdrücklichen Wunsch: mit `trennung` fragt sie erst die Sprechertrennung (scheitert die, wird
-        gruppiert), sonst gruppiert sie die Stimmabdrücke."""
+        gruppiert), sonst gruppiert sie die Stimmabdrücke. Mit Trennung werden die Segmente an den Sprecherwechseln
+        geteilt und ihre Abdrücke neu bestimmt (sonst mischen lange Segmente zwei Stimmen)."""
         e = teile.einstellungen
         wechsel: list[Wechsel] | None = None
         if trennung:
@@ -188,6 +205,12 @@ def arten(teile: Teile) -> list[Art]:
                 await g.protokoll.eintragen("sprecher.ohne_trennung", f"{titel}: {f.meldung}", stufe="warnung",
                                             bezug_art="auftrag", bezug_name=titel)
                 await k.fortschritt(None, "Sprechertrennung nicht verfügbar; gruppiere nach Stimmen")
+        if wechsel:
+            geteilt = an_wechseln_teilen(segmente, wechsel)
+            if len(geteilt) != len(segmente):
+                await k.fortschritt(None, f"An Sprecherwechseln geteilt: {len(segmente)} zu {len(geteilt)} Segmenten",
+                                    phase="sprecher")
+                segmente, abdruecke = geteilt, await abdruecke_fuer(k, wav, ordner, geteilt, plan, titel)
         await k.fortschritt(None, "Sprecher zuordnen", phase="sprecher")
         profile, _ = await teile.profile.lesen()
         return erkennen(segmente, abdruecke, wechsel, profile, teile.schwellen, anzahl)
@@ -255,7 +278,7 @@ def arten(teile: Teile) -> list[Art]:
             sprecher = []
             if mit_sprechern and segmente:
                 segmente, sprecher = await sprecher_bestimmen(k, wav, ordner, segmente, abdruecke_alle, e.anzahl, name,
-                                                              trennung=weg == "trennung")
+                                                              trennung=weg == "trennung", plan=plan)
 
             await k.pruefen()
             await k.fortschritt(None, "Speichern", phase="speichern")
@@ -399,7 +422,7 @@ def arten(teile: Teile) -> list[Art]:
                 await k.merken(abdruecke=gesammelt)
             abdruecke = [x for a in plan for x in gesammelt[str(a.nummer)]]
             segmente, sprecher = await sprecher_bestimmen(k, wav, ordner, t.segmente, abdruecke, e.anzahl, t.name,
-                                                          trennung=e.weg == "trennung")
+                                                          trennung=e.weg == "trennung", plan=plan)
             await k.fortschritt(None, "Speichern", phase="speichern")
             neu = t.model_copy(update={"segmente": segmente, "sprecher": sprecher,
                                        "wellenform": t.wellenform or await teile.ton.wellenform(wav)})

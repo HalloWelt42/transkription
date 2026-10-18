@@ -66,3 +66,17 @@ def test_erkennen_mit_trennung_und_segmente_aus_dem_hoerdienst():
     neu, sprecher = erkennen(s, [None, None], [Wechsel(600, 603, "SPEAKER_01"), Wechsel(603.1, 606, "SPEAKER_00")],
                              Profile(), Schwellen())
     assert [x.sprecher for x in neu] == ["s1", "s2"] and [p.name for p in sprecher] == ["Sprecher 1", "Sprecher 2"]
+
+
+def test_an_wechseln_teilen_nach_wortzeiten():
+    from app.modell.transkript import Wort
+    from app.sprechererkennung import an_wechseln_teilen
+    woerter = [Wort(wort=f"w{i}", start=i * 0.5, ende=i * 0.5 + 0.4) for i in range(10)]   # 0 bis 4,9 s
+    seg = Segment(start=0.0, ende=4.9, text=" ".join(w.wort for w in woerter), woerter=woerter)
+    wechsel = [Wechsel(0.0, 2.2, "A"), Wechsel(2.3, 3.9, "B"), Wechsel(4.1, 5.0, "A")]
+    teile = an_wechseln_teilen([seg], wechsel)
+    assert [t.text for t in teile] == ["w0 w1 w2 w3 w4", "w5 w6 w7", "w8 w9"]
+    assert (teile[1].start, teile[1].ende) == (2.5, 3.9) and [w.wort for w in teile[2].woerter] == ["w8", "w9"]
+    assert nach_trennung(teile, wechsel) == ["A", "B", "A"]
+    ohne_woerter = Segment(start=0.0, ende=4.0, text="x")
+    assert an_wechseln_teilen([ohne_woerter], wechsel) == [ohne_woerter]
