@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import asyncio
 import shutil
-import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -32,6 +31,7 @@ from appkern.anfragen import AnfrageEingabe, Angebot
 from appkern.auftraege import Art, Kontext, Phase
 from appkern.kellerwolke import Aktion, Kellerwolke, KellerwolkeFehler, StandVeraltet
 from appkern.leitstelle import DienstFehler, DienstWeg, Halt, NichtErreichbar, NichtGefunden
+from appkern.leitstelle import geduldig as leitstelle_geduldig
 
 from . import altbestand, auswertung, export, korrektur, umzug
 from .ablage import orte
@@ -49,7 +49,6 @@ from .ton import Abschnitt, abschnitte_planen
 
 T = TypeVar("T")
 GEDULD_S = 30 * 60
-WARTEN_S = 30
 
 
 class TranskribierenAnfrage(BaseModel):
@@ -126,21 +125,14 @@ WARTEN_BEI: tuple[type[Exception], ...] = (Halt, DienstWeg, NichtErreichbar)
 
 async def geduldig(k: Kontext, aufruf: Callable[[], Awaitable[T]], was: str,
                    warten_bei: tuple[type[Exception], ...] = WARTEN_BEI) -> T:
-    """Ruft die Leitstelle; wartet sie (Halt, Dienst lädt oder passt gerade nicht), wird nach ihrer Angabe erneut
-    versucht, höchstens `GEDULD_S` lang. Abbrechen geht auch während des Wartens. Wo es einen Ausweg gibt (die
-    Sprechertrennung), wird nur bei Halt gewartet."""
-    beginn = time.monotonic()
-    while True:
-        try:
-            return await aufruf()
-        except warten_bei as f:
-            if time.monotonic() - beginn > GEDULD_S:
-                raise
-            pause = f.nochmal_in or WARTEN_S
-            await k.fortschritt(None, f"{was}: {f.meldung}; neuer Versuch in {pause} s")
-            for _ in range(int(pause)):
-                await k.pruefen()
-                await asyncio.sleep(1)
+    """Ruft die Leitstelle geduldig (`appkern.leitstelle.geduldig`): wartet sie (Halt, Dienst lädt oder ist noch nicht
+    gemeldet, nicht erreichbar), steht das als Schritt im Auftrag und es wird nach ihrer Angabe erneut versucht,
+    höchstens `GEDULD_S` lang; abbrechen geht auch während des Wartens. Wo es einen Ausweg gibt (die Sprechertrennung),
+    wird nur bei Halt gewartet."""
+    async def melden(text: str) -> None:
+        await k.fortschritt(None, text)
+    return await leitstelle_geduldig(aufruf, was=was, geduld_s=GEDULD_S, warten_bei=warten_bei, melden=melden,
+                                     pruefen=k.pruefen)
 
 
 @dataclass(frozen=True)
