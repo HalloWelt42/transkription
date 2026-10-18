@@ -1,4 +1,4 @@
-# Transkription im Container. ffmpeg kommt nicht ins Abbild: es läuft das des Pi (siehe deploy/ffmpeg-vom-pi).
+# Transkription im Container. Ohne ffmpeg: Ton rechnet der Tondienst auf dem Mac, der Pi liefert nur Daten.
 
 # --- Oberfläche bauen ---------------------------------------------------------------------------------------------
 FROM node:22-slim AS oberflaeche
@@ -20,8 +20,6 @@ COPY backend/requirements.txt backend/requirements.txt
 RUN apt-get update && apt-get install -y --no-install-recommends git && \
     pip install --no-cache-dir -r backend/requirements.txt && \
     apt-get purge -y git && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
-COPY deploy/ffmpeg-vom-pi /usr/local/bin/ffmpeg
-COPY deploy/ffmpeg-vom-pi /usr/local/bin/ffprobe
 COPY version.json ./
 COPY backend ./backend
 COPY --from=oberflaeche /bau/frontend/dist ./frontend/dist

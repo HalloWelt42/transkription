@@ -12,6 +12,9 @@ from fastapi import APIRouter, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
+from appkern.ton import HOEREN
+from appkern.ton.wav import dauer as wav_dauer
+
 from ..ablage import orte
 from ..ablage.transkripte import aufnahme_id
 from ..einstellungen import Sprache
@@ -94,8 +97,8 @@ def router(teile: Teile) -> APIRouter:
                     if groesse > HOEREN_HOECHSTENS_BYTES:
                         raise HTTPException(413, "Zu groß für kurzes Hören; als Aufnahme transkribieren")
                     ziel.write(daten)
-            wav = await teile.ton.wandeln(roh, ordner / "ton.wav", HOEREN)
-            dauer = await teile.ton.dauer(wav)
+            wav = await teile.ton.wandeln(roh, ordner / "ton.wav", HOEREN, titel="Kurz hören", prioritaet="hoch")
+            dauer = wav_dauer(wav)
             if dauer > HOEREN_HOECHSTENS_S:
                 raise HTTPException(413, f"Höchstens {HOEREN_HOECHSTENS_S} s; Längeres als Aufnahme transkribieren")
             erg = await teile.klangwerk.hoeren(wav, sprache or teile.einstellungen.sprache, titel="Kurz hören",

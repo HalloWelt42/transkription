@@ -39,7 +39,7 @@ async def verbund(tmp_path: Path):
     """App mit Schein-Leitstelle, angemeldet; dazu die Sitzung des Kontos in der Kellerwolke selbst und ein Ordner des
     Kontos außerhalb der Rechte der App."""
     ton = await _ton(tmp_path / "probe.mp3")
-    app = app_bauen(tmp_path / "daten", transport=Weiche())
+    app = app_bauen(tmp_path / "daten", transport=Weiche(tmp_path / "tondienst"))
     g = app.state.geruest
     await g.starten()
     kw_client = httpx.AsyncClient(base_url=W["KELLERWOLKE_ADRESSE"], timeout=60)

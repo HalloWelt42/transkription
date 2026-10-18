@@ -12,6 +12,7 @@ import httpx
 import pytest
 
 from app.main import app_bauen
+from appkern.testen import Tondienst
 from appkern.ton import programm
 from tests.hilfen import HAT_KELLERWOLKE, W, aktionen_zurueckziehen
 
@@ -22,14 +23,17 @@ pytestmark = pytest.mark.skipif(not (HAT_KELLERWOLKE and W.get("KELLERWOLKE_KENN
                                 reason="keine Test-Kellerwolke eingerichtet (backend/.env.test)")
 
 class Weiche(httpx.AsyncBaseTransport):
-    """Leitstelle zum Schein, alles andere echt."""
+    """Leitstelle zum Schein mit echtem Tondienst (rechnet im Test), alles andere echt."""
 
-    def __init__(self):
+    def __init__(self, ablage: Path):
         self.echt = httpx.AsyncHTTPTransport()
         self.schein = httpx.MockTransport(antworten)
+        self.ton = Tondienst(ablage)
 
     async def handle_async_request(self, request):
-        ziel = self.schein if request.url.host == "ls.test" else self.echt
+        if request.url.host != "ls.test":
+            return await self.echt.handle_async_request(request)
+        ziel = self.ton.transport if self.ton.zustaendig(request) else self.schein
         return await ziel.handle_async_request(request)
 
     async def aclose(self):
@@ -52,7 +56,7 @@ async def test_ganzer_ablauf(tmp_path: Path):
         "aevalsrc='if(lt(mod(t,4),3),0.4*sin(2*PI*330*t),0)':s=16000:d=150", str(ton))
     assert await erzeugen.wait() == 0
 
-    app = app_bauen(tmp_path / "daten", transport=Weiche())
+    app = app_bauen(tmp_path / "daten", transport=Weiche(tmp_path / "tondienst"))
     g = app.state.geruest
     await g.starten()
     angelegt: list[str] = []

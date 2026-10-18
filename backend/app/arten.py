@@ -20,6 +20,7 @@ import asyncio
 import shutil
 import time
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Literal, TypeVar
 from uuid import UUID
@@ -41,7 +42,8 @@ from .fassung import FASSUNG
 from .modell.transkript import Aenderung, ErzeugtMit, Marker, Quelle, Segment, Transkript
 from .sprechererkennung import an_wechseln_teilen, erkennen
 from .teile import Teile
-from appkern.ton import HOEREN
+from appkern.ton import ABSPIELEN, HOEREN, Aufbereiten, Ausgabe, Messen, Pause, PausenWahl
+from appkern.ton.wav import ausschnitt, dauer as wav_dauer
 
 from .ton import Abschnitt, abschnitte_planen
 
@@ -141,6 +143,22 @@ async def geduldig(k: Kontext, aufruf: Callable[[], Awaitable[T]], was: str,
                 await asyncio.sleep(1)
 
 
+@dataclass(frozen=True)
+class Vorbereitet:
+    """Was der Tondienst aus einer Aufnahme macht: der Ton für Hören, Trennung und Abschnitte (16 kHz mono PCM, auf dem
+    Pi nur noch byteweise geschnitten), seine Dauer, die Sprechpausen und die Wellenform."""
+
+    wav: Path
+    dauer: float
+    pausen: list[Pause]
+    wellenform: list[int]
+
+
+async def ausschneiden(wav: Path, beginn: float, ende: float, ziel: Path) -> Path:
+    """Ein Abschnitt als Bytekopie (Datenarbeit, kein Rechnen)."""
+    return await asyncio.to_thread(ausschnitt, wav, beginn, ende, ziel)
+
+
 def _segmente(roh: list[dict]) -> list[Segment]:
     return [Segment.model_validate(s) for s in roh]
 
@@ -148,27 +166,34 @@ def _segmente(roh: list[dict]) -> list[Segment]:
 def arten(teile: Teile) -> list[Art]:
     g = teile.geruest
 
-    async def ton_holen(k: Kontext, quelle_id: UUID | str, ordner: Path, kw: Kellerwolke) -> tuple[Path, float]:
-        """Original holen, für den Hördienst wandeln (16 kHz mono) und gleich die Abspielfassung erzeugen: beide aus
-        derselben Quelle mit demselben Dekoder, damit Wortzeiten und Wiedergabe gleich laufen."""
+    async def ton_holen(k: Kontext, quelle_id: UUID | str, ordner: Path, kw: Kellerwolke) -> Vorbereitet:
+        """Original holen und vom Tondienst in einem Aufruf aufbereiten lassen: Ton für den Hördienst (16 kHz mono),
+        die Abspielfassung (fehlt sie noch), Sprechpausen und Wellenform. Beides aus derselben Quelle mit demselben
+        Dekoder, damit Wortzeiten und Wiedergabe gleich laufen."""
         quelle = await kw.knoten(quelle_id)
         roh = ordner / f"quelle{PurePosixPath(quelle.name).suffix.lower() or '.bin'}"
         await k.fortschritt(None, f"Ton holen ({quelle.name})")
         await kw.herunterladen(quelle.id, roh)
-        await k.fortschritt(None, "Ton wandeln")
-        wav = await teile.ton.wandeln(roh, ordner / "ton.wav", HOEREN)
-        await k.fortschritt(None, "Abspielfassung erzeugen")
-        await teile.abspielen.aus_datei(quelle, roh)
+        await k.fortschritt(None, "Ton wandeln (Tondienst)")
+        wav, fassung = ordner / "ton.wav", ordner / "abspielen.wav"
+        mit_fassung = teile.abspielen.vorhanden(quelle) is None
+        auftrag = Aufbereiten(ausgaben=[Ausgabe(format=HOEREN), *([Ausgabe(format=ABSPIELEN)] if mit_fassung else [])],
+                              messen=Messen(pausen=PausenWahl(), wellenform=800))
+        erg = await geduldig(k, lambda: teile.ton.aufbereiten(roh, auftrag, [wav, fassung][:len(auftrag.ausgaben)],
+                                                              titel=f"{quelle.name}, wandeln", prioritaet="hintergrund"),
+                             "Ton wandeln")
+        if mit_fassung:
+            await teile.abspielen.uebernehmen(quelle, fassung, erg.messwerte.wellenform)
         roh.unlink(missing_ok=True)
-        return wav, await teile.ton.dauer(wav)
+        return Vorbereitet(wav=wav, dauer=wav_dauer(wav), pausen=erg.messwerte.pausen or [],
+                           wellenform=erg.messwerte.wellenform or [])
 
-    async def abschnitte(k: Kontext, wav: Path, dauer: float) -> list[Abschnitt]:
+    async def abschnitte(k: Kontext, v: Vorbereitet) -> list[Abschnitt]:
         """Plan aus dem Zwischenstand (beim Fortsetzen derselbe), sonst neu an den Sprechpausen."""
         if "abschnitte" in k.zwischenstand:
             return [Abschnitt(*a) for a in k.zwischenstand["abschnitte"]]
-        await k.fortschritt(None, "Sprechpausen suchen")
-        plan = abschnitte_planen(dauer, await teile.ton.pausen(wav), hoechstens_s=teile.einstellungen.abschnitt_min * 60)
-        await k.merken(abschnitte=[[a.nummer, a.start, a.ende] for a in plan], dauer=dauer)
+        plan = abschnitte_planen(v.dauer, v.pausen, hoechstens_s=teile.einstellungen.abschnitt_min * 60)
+        await k.merken(abschnitte=[[a.nummer, a.start, a.ende] for a in plan], dauer=v.dauer)
         return plan
 
     async def abdruecke_fuer(k: Kontext, wav: Path, ordner: Path, segmente: list[Segment], plan: list[Abschnitt],
@@ -179,7 +204,7 @@ def arten(teile: Teile) -> list[Art]:
             darin = [s for s in segmente if a.start <= s.start < a.ende]
             if not darin:
                 continue
-            stueck = await teile.ton.ausschneiden(wav, a.start, a.ende, ordner / f"abdruck-{a.nummer}.wav")
+            stueck = await ausschneiden(wav, a.start, a.ende, ordner / f"abdruck-{a.nummer}.wav")
             zeiten = [(round(s.start - a.start, 3), round(s.ende - a.start, 3)) for s in darin]
             aus += await geduldig(k, lambda: teile.klangwerk.abdruecke(stueck, zeiten, titel=titel, prioritaet="hintergrund"),
                                   "Stimmabdrücke")
@@ -197,9 +222,8 @@ def arten(teile: Teile) -> list[Art]:
         if trennung:
             await k.fortschritt(None, "Sprechertrennung", phase="sprecher")
             try:
-                flac = await teile.ton.flac(wav, ordner / "ton.flac")
                 wechsel = await geduldig(k, lambda: teile.klangwerk.trennen(
-                    flac, anzahl=anzahl, zugang=e.trennen_zugang.get_secret_value(), titel=titel,
+                    wav, anzahl=anzahl, zugang=e.trennen_zugang.get_secret_value(), titel=titel,
                     prioritaet="hintergrund"), "Sprechertrennung", warten_bei=(Halt,))
             except (DienstWeg, DienstFehler, NichtGefunden, NichtErreichbar) as f:
                 await g.protokoll.eintragen("sprecher.ohne_trennung", f"{titel}: {f.meldung}", stufe="warnung",
@@ -233,9 +257,9 @@ def arten(teile: Teile) -> list[Art]:
         ordner.mkdir(parents=True, exist_ok=True)
         try:
             await k.fortschritt(0.0, "Vorbereiten", phase="vorbereiten")
-            wav, dauer = await ton_holen(k, quelle.id, ordner, kw)
-            plan = await abschnitte(k, wav, dauer)
-            wellenform = await teile.ton.wellenform(wav)
+            v = await ton_holen(k, quelle.id, ordner, kw)
+            wav, dauer, wellenform = v.wav, v.dauer, v.wellenform
+            plan = await abschnitte(k, v)
             if quelle.felder.get(orte.FELD_DAUER) is None:
                 try:          # für die Liste der Aufnahmen; in nur lesbaren Ordnern geht es nicht, das ist kein Fehler
                     await kw.felder_setzen(quelle.id, {orte.FELD_DAUER: round(dauer, 1)})
@@ -249,7 +273,7 @@ def arten(teile: Teile) -> list[Art]:
                     continue
                 await k.pruefen()
                 await k.fortschritt(len(fertig) / len(plan), f"Abschnitt {a.nummer} von {len(plan)}")
-                stueck = await teile.ton.ausschneiden(wav, a.start, a.ende, ordner / f"abschnitt-{a.nummer}.wav")
+                stueck = await ausschneiden(wav, a.start, a.ende, ordner / f"abschnitt-{a.nummer}.wav")
                 titel = f"{name}, Abschnitt {a.nummer} von {len(plan)}"
                 erg = await geduldig(k, lambda: teile.klangwerk.hoeren(stueck, sprache, versatz=a.start, titel=titel,
                                                                         prioritaet="hintergrund"), "Hören")
@@ -341,7 +365,7 @@ def arten(teile: Teile) -> list[Art]:
                     await k.fortschritt(None, f"Original laden ({eintrag.name})", phase="laden")
                     roh = ordner / f"original{eintrag.endung}"
                     await alte.original(eintrag.staende[-1].id, roh)
-                    dauer = await teile.ton.dauer(roh)
+                    dauer = await geduldig(k, lambda: teile.ton.dauer(roh, titel=f"{eintrag.name}, Dauer"), "Dauer messen")
                     await k.pruefen()
                     await k.fortschritt(None, "In der Kellerwolke ablegen", phase="ablegen")
                     zweig = (await kw.ich()).zweig
@@ -374,6 +398,7 @@ def arten(teile: Teile) -> list[Art]:
                     else:
                         _, bisher = await teile.transkripte.lesen(tid)
                         t, knoten = await teile.transkripte.schreiben(tid, t, bisher.etag or "", t.aenderung)
+                    await teile.index.notiz_merken(t, knoten)    # jeder Stand sagt, woher er kommt (nicht erst der Abgleich)
                     await k.merken(transkript_id=tid, staende_fertig=nummer + 1)
                 if t is not None and knoten is not None:
                     await teile.index.eintragen(t, knoten)
@@ -403,8 +428,9 @@ def arten(teile: Teile) -> list[Art]:
         ordner.mkdir(parents=True, exist_ok=True)
         try:
             await k.fortschritt(0.0, "Vorbereiten", phase="vorbereiten")
-            wav, dauer = await ton_holen(k, quelle, ordner, teile.zugang(e.anfrage_id))
-            plan = await abschnitte(k, wav, dauer)
+            v = await ton_holen(k, quelle, ordner, teile.zugang(e.anfrage_id))
+            wav = v.wav
+            plan = await abschnitte(k, v)
             gesammelt: dict[str, list] = dict(k.zwischenstand.get("abdruecke", {}))
             for a in plan:
                 if str(a.nummer) in gesammelt:
@@ -413,7 +439,7 @@ def arten(teile: Teile) -> list[Art]:
                 await k.fortschritt(len(gesammelt) / len(plan), f"Stimmabdrücke, Abschnitt {a.nummer} von {len(plan)}",
                                     phase="abdruecke")
                 drin = [s for s in t.segmente if a.start <= s.start < a.ende]
-                stueck = await teile.ton.ausschneiden(wav, a.start, a.ende, ordner / f"abschnitt-{a.nummer}.wav")
+                stueck = await ausschneiden(wav, a.start, a.ende, ordner / f"abschnitt-{a.nummer}.wav")
                 zeiten = [(round(max(0.0, s.start - a.start), 3), round(min(a.ende, s.ende) - a.start, 3)) for s in drin]
                 gesammelt[str(a.nummer)] = await geduldig(
                     k, lambda: teile.klangwerk.abdruecke(stueck, zeiten, titel=f"{t.name}, Sprecher", prioritaet="hintergrund"),
@@ -425,7 +451,7 @@ def arten(teile: Teile) -> list[Art]:
                                                           trennung=e.weg == "trennung", plan=plan)
             await k.fortschritt(None, "Speichern", phase="speichern")
             neu = t.model_copy(update={"segmente": segmente, "sprecher": sprecher,
-                                       "wellenform": t.wellenform or await teile.ton.wellenform(wav)})
+                                       "wellenform": t.wellenform or v.wellenform})
             try:
                 neu, knoten = await transkripte.schreiben(e.transkript_id, neu, knoten.etag,
                                                           Aenderung(was="Sprecher neu erkannt", wer=e.von))

@@ -1,6 +1,7 @@
 """Einstellungen von Transkription. Kellerwolke, Leitstelle und weitere Konten bringt das Gerüst mit; hier kommen die
 der Transkription dazu. Die Seite Einstellungen der Oberfläche entsteht daraus von selbst. Was das System kennt
-(Dienste und Modelle der Leitstelle, ffmpeg), kommt als Auswahl (siehe `teile.Teile.angebote`), nicht als Textfeld."""
+(Dienste und Modelle der Leitstelle), kommt als Auswahl (siehe `teile.Teile.angebote`), nicht als Textfeld. Ton wird
+hier nie gerechnet: Wandeln, Pausen und Wellenform macht der Tondienst auf dem Mac (der Pi liefert nur Daten)."""
 
 from typing import Literal
 
@@ -31,6 +32,9 @@ class AppEinstellungen(Grundeinstellungen):
     dienst_hoeren: str = Field("klangwerk-hoeren", title="Dienst zum Hören", json_schema_extra=HOEREN,
                                description="Macht aus Ton Text mit Wortzeiten. Zur Wahl steht, was die Leitstelle dieser App "
                                            "anbietet.")
+    dienst_ton: str = Field("klangwerk-ton", title="Tondienst", json_schema_extra=HOEREN,
+                            description="Wandelt jede Aufnahme für Hören und Abspielen, findet Sprechpausen und Wellenform. "
+                                        "Gerechnet wird auf dem Mac, nie hier.")
 
     sprecher_weg: SprecherWeg = Field("ohne", title="Sprecher beim Transkribieren",
                                       json_schema_extra={**SPRECHER, "beschriftungen": SPRECHER_WEGE},
@@ -67,6 +71,3 @@ class AppEinstellungen(Grundeinstellungen):
     altbestand_adresse: str = Field("", title="Alte App", json_schema_extra=ALTBESTAND,
                                     description="Die alte Sprachwerkstatt im Heimnetz, aus der du einzelne eigene Aufnahmen "
                                                 "samt Transkripten von Hand übernimmst. Leer: kein Altbestand.")
-    ffmpeg_ordner: str = Field("", title="Ordner von ffmpeg", json_schema_extra=TECHNIK,
-                               description="ffmpeg wandelt und schneidet den Ton. Ohne Eintrag wird es im Suchpfad und an den "
-                                           "üblichen Orten gesucht.")

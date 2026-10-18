@@ -135,7 +135,7 @@ async def test_uebernahme_von_hand(tmp_path: Path):
             break
         time.sleep(0.05)
 
-    app = app_bauen(tmp_path / "daten", transport=Weiche())
+    app = app_bauen(tmp_path / "daten", transport=Weiche(tmp_path / "tondienst"))
     g = app.state.geruest
     await g.starten()
     angelegt: list[str] = []

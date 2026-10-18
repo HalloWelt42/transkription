@@ -54,16 +54,17 @@ Die Transkription läuft neben Kellerwolke und Leitstelle auf dem Pi, im Contain
 erreichbar unter `https://192.168.178.49:8631` (Zertifikat der Hausstelle; HTTPS braucht der Browser fürs Mikrofon).
 Vorne steht wie bei Kiste und Kellerwolke ein Caddy (`deploy/Caddyfile`, TLS und HTTP/2), die App dahinter ist von außen
 nicht erreichbar.
-ffmpeg kommt nicht ins Abbild: das des Pi ist nur lesend eingehängt und läuft mit dem Lader des Pi
-(`deploy/ffmpeg-vom-pi`). Daten liegen in `/mnt/data/transkription/daten`, Sicherungen in `.../sicherungen`.
+Der Pi rechnet keinen Ton (er liefert nur Daten): Wandeln, Sprechpausen, Wellenform und Abspielfassung macht der
+Tondienst auf dem Mac über die Leitstelle (`appkern.ton.TonDienst`, Einstellung "Tondienst"); im Container gibt es kein
+ffmpeg. Daten liegen in `/mnt/data/transkription/daten`, Sicherungen in `.../sicherungen`.
 
 ```bash
 tools/ausrollen.sh
 ```
 
 Prüft bei jedem Neubau alles selbst: gepushter Stand und grüne Tests, gleicher Appkern in Oberfläche und Backend,
-ffmpeg und ffprobe auf dem Pi, Docker, Zertifikat (stellt es bei Bedarf neu aus), sichert die Datenbank, baut und
-startet, wandelt im Container probehalber mit dem ffmpeg des Pi um und vergleicht über HTTPS die Fassungen von Server,
+ob die Leitstelle den Tondienst meldet, Docker, Zertifikat (stellt es bei Bedarf neu aus), wartet auf laufende
+Aufträge, sichert die Datenbank, baut und startet und vergleicht über HTTPS die Fassungen von Server,
 Oberfläche und `version.json`, HTTP/2 und die Symbole. Die Angaben stehen in `deploy/ausrollen.toml`, der Ablauf für
 alle Apps gleich im Appkern (`appkern.werkzeuge.ausrollen`).
 
@@ -76,8 +77,9 @@ alle Apps gleich im Appkern (`appkern.werkzeuge.ausrollen`).
 Legt die Python-Umgebung an, holt die Pakete der Oberfläche und baut sie. Danach im Stellwerk starten (Eintrag
 `stellwerk.toml`) und `http://127.0.0.1:8631` öffnen: die erste Einrichtung fragt nach der Adresse der Kellerwolke
 und dem App-Schlüssel (in der Kellerwolke unter Einstellungen, Zugänge). Unter Einstellungen dann die Leitstelle und
-ihren Schlüssel (in der Leitstelle unter Anwendungen, mit den Fähigkeiten Hören, Sprecher erkennen, Sprecher trennen
-und Sprachmodell). ffmpeg muss auf dem Rechner sein.
+ihren Schlüssel (in der Leitstelle unter Anwendungen, mit den Fähigkeiten Hören, Ton bearbeiten, Sprecher erkennen,
+Sprecher trennen und Sprachmodell). Die Tests rechnen Ton selbst (der echte Tondienst im Prozess); dafür muss ffmpeg
+auf dem Entwicklungsrechner sein.
 
 ## Entwickeln
 
@@ -108,7 +110,7 @@ Zugangs neu und zieht sie am Ende zurück.
 | `backend/app/modell/` | Transkriptdatei und Sprecherprofile (fachlich, ohne Ein- und Ausgabe) |
 | `backend/app/ablage/` | Orte im Zweig, Transkripte und Profile in der Kellerwolke |
 | `backend/app/suchindex.py`, `abgleich.py` | Verzeichnis und Volltextindex, Abgleich mit der Kellerwolke |
-| `backend/app/ton.py` | ffmpeg: wandeln, Pausen, Abschnitte, Wellenform |
+| `backend/app/ton.py` | Hörabschnitte an Sprechpausen planen (die Pausen misst der Tondienst) |
 | `backend/app/dienste.py`, `sprechererkennung.py` | Klangwerk über die Leitstelle, Sprecher zuordnen |
 | `backend/app/korrektur.py`, `auswertung.py`, `export.py` | KI-Korrektur, Auswertung, Exporte |
 | `backend/app/arten.py` | Aufträge (transkribieren, Sprecher erkennen, korrigieren, auswerten) |

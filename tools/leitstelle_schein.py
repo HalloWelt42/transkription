@@ -1,5 +1,6 @@
 """Leitstelle zum Schein: Klangwerk (Hören, Stimmabdrücke) und Sprachmodell ohne echte Dienste, für den Verbundtest
-und zum Entwickeln und Vorführen der Oberfläche ohne Leitstelle. Die Sprechertrennung fehlt absichtlich (wie ein
+und zum Entwickeln und Vorführen der Oberfläche ohne Leitstelle. Der Tondienst ist echt (`appkern.testen.Tondienst`,
+rechnet dort, wo der Schein läuft), damit Wandeln, Pausen und Wellenform denselben Weg gehen wie im Betrieb. Die Sprechertrennung fehlt absichtlich (wie ein
 Dienst ohne Zugang), damit der Ausweg übers Gruppieren mitgeprüft wird.
 
     backend/.venv/bin/python tools/leitstelle_schein.py --port 8698
@@ -60,6 +61,7 @@ def antworten(request: httpx.Request, *, gespraech: bool = False) -> httpx.Respo
             {"id": "klangwerk-hoeren", "x-leitstelle": {"name": "Klangwerk Hören (Schein)", "faehigkeiten": ["hoeren"]}},
             {"id": "klangwerk-sprecher", "x-leitstelle": {"name": "Klangwerk Sprechermerkmal (Schein)", "faehigkeiten": ["sprecher_erkennen"]}},
             {"id": "klangwerk-trennen", "x-leitstelle": {"name": "Klangwerk Sprechertrennung (Schein)", "faehigkeiten": ["sprecher_trennen"]}},
+            {"id": "klangwerk-ton", "x-leitstelle": {"name": "Klangwerk Ton", "faehigkeiten": ["ton"]}},
         ]})
     if pfad.endswith("/stt"):
         if gespraech:
@@ -95,7 +97,14 @@ def main() -> None:
     teile = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     teile.add_argument("--port", type=int, default=8698)
     werte = teile.parse_args()
+    import tempfile
+    from pathlib import Path
+
+    from appkern.ton import TonHier
+    from appkern.ton.gegenseite import routen
+
     app = FastAPI(title="Leitstelle zum Schein")
+    app.include_router(routen(TonHier(), Path(tempfile.mkdtemp(prefix="schein-ton-"))), prefix="/v1/dienste/klangwerk-ton")
 
     @app.api_route("/{pfad:path}", methods=["GET", "POST"])
     async def alles(request: Request, pfad: str):
