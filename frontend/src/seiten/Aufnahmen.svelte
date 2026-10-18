@@ -4,16 +4,16 @@
   // Als Quelle auch alle Dateien der Kellerwolke (/aufnahmen/kellerwolke[/<ordner>]), jede Datei einzeln per Anfrage.
   // Entwurf: mockups/transkription.html (1), transkription-mobil.html (1, 2) und verbund.html (6a, 6b, 6e).
   import { onMount } from "svelte";
-  import { Auswahl, beiAuftrag, gehe, geraet, groesse, hole, json, marke, navigation, Rueckfrage, SPRACHEN,
-           uploadEntfernen, uploads, wann, type WahlSeite } from "appkern-oberflaeche";
+  import { aufnahme, aufnahmeAlsDatei, aufnahmeVerwerfen, aufnehmen, Auswahl, beiAuftrag, gehe, geraet, geraeteLaden,
+           gespeicherteAufnahmen, groesse, marke, navigation, quelleWechseln, Rueckfrage, SPRACHEN, uploadEntfernen, uploads,
+           wann, type Gespeichert, type WahlSeite } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
-  import { alsDatei, aufnahme, geraeteLaden, gespeicherte, quelleWechseln, starten as aufnehmen, verwerfen, type Gespeichert } from "../lib/aufnahme.svelte";
   import type { Aufnahme, AufnahmenSeite, Ordner } from "../lib/typen";
   import Altbestand from "../teile/Altbestand.svelte";
   import AufnahmeAnsicht from "../teile/AufnahmeAnsicht.svelte";
   import KellerwolkeQuelle from "../teile/KellerwolkeQuelle.svelte";
-  import Rekorder from "../teile/Rekorder.svelte";
+  import Aufnehmen from "../teile/Aufnehmen.svelte";
   import Zusammenfuehren from "../teile/Zusammenfuehren.svelte";
 
   type Filter = "alle" | "ohne" | "transkribiert";
@@ -69,7 +69,7 @@
         fehler = (f as Error).message;
       }
       await laden();
-      liegen = await gespeicherte();
+      liegen = await gespeicherteAufnahmen();
       await geraeteLaden();
     })();
     return beiAuftrag((a) => {
@@ -207,13 +207,12 @@
   }
 
   async function liegendeHochladen(g: Gespeichert) {
-    const fertig = await alsDatei(g.id);
+    const fertig = await aufnahmeAlsDatei(g.id);
     if (!fertig) return;
     try {
-      const datei = await api.aufnahmeHochladen(fertig.daten, g.name);
-      if (g.marker.length) await hole(`/aufnahmen/${datei.id}/marker`, { method: "PUT", ...json(g.marker) });
-      await verwerfen(g.id);
-      liegen = await gespeicherte();
+      await api.aufnahmeAblegen(fertig.daten, g);
+      await aufnahmeVerwerfen(g.id);
+      liegen = await gespeicherteAufnahmen();
       await laden();
     } catch (f) {
       fehler = (f as Error).message;
@@ -221,8 +220,8 @@
   }
 
   async function liegendeVerwerfen(g: Gespeichert) {
-    await verwerfen(g.id);
-    liegen = await gespeicherte();
+    await aufnahmeVerwerfen(g.id);
+    liegen = await gespeicherteAufnahmen();
   }
 
   function aufnahmeFertig(text: string) {
@@ -318,9 +317,9 @@
 {:else if geraet.mobil}
   {#if aufnahme.laeuft}
     <!-- über die ganze Höhe: die Aufnahmeleiste steht unten über den Reitern wie der Spieler -->
-    <div class="t-ansicht"><Rekorder onfertig={aufnahmeFertig} /></div>
+    <div class="t-ansicht"><Aufnehmen onfertig={aufnahmeFertig} /></div>
   {:else if aufnahme.danach}
-    <Rekorder onfertig={aufnahmeFertig} />
+    <Aufnehmen onfertig={aufnahmeFertig} />
   {:else}
     {@render liegendeListe()}
     <div class="t-aufnehmen">
@@ -357,7 +356,7 @@
   {/if}
 {:else if aufnahme.laeuft}
   <div class="seiten-kopf"><h1>Aufnahme läuft</h1></div>
-  <div class="rollfeld rek-flaeche"><Rekorder onfertig={aufnahmeFertig} /></div>
+  <div class="rollfeld rek-flaeche"><Aufnehmen onfertig={aufnahmeFertig} /></div>
 {:else}
   <div class="seiten-kopf">
     <h1>Aufnahmen</h1>
@@ -379,7 +378,7 @@
   </div>
   <div class="rollfeld" role="region" aria-label="Aufnahmen"
        ondragover={(e) => { e.preventDefault(); ueber = true; }} ondragleave={() => (ueber = false)} ondrop={ablegen}>
-    {#if aufnahme.danach}<Rekorder kompakt onfertig={aufnahmeFertig} />{/if}
+    {#if aufnahme.danach}<Aufnehmen kompakt onfertig={aufnahmeFertig} />{/if}
     {#if aufnahme.fehler}<div class="fehlertext" style="margin-bottom:12px">{aufnahme.fehler}</div>{/if}
     {@render liegendeListe()}
     <div class="ordnerzeile">

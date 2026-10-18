@@ -1,6 +1,6 @@
 // Aufrufe der Schnittstelle der Transkription (über `hole` der Schale: Anmeldung, Fehler, Verbindungsstand).
 import type { ErkennenWeg, SprecherWeg } from "./sprecherwahl";
-import { hochladen, hole, json, type Auftrag } from "appkern-oberflaeche";
+import { hochladen, hole, json, type Auftrag, type Gespeichert } from "appkern-oberflaeche";
 import type {
   AltbestandSeite, Aufnahme, AufnahmenSeite, ExportFormat, Ordner, Profil, TranskriptAntwort, Verzeichnis, Version, Vorlage, Vorschlag,
   Marker, Segment, Transkript, Umzugsplan,
@@ -80,6 +80,12 @@ export const aufnahmeLoeschen = (id: string, mitTranskripten: boolean) =>
   hole<void>(`/aufnahmen/${id}?mit_transkripten=${mitTranskripten}`, { method: "DELETE" });
 export const aufnahmeMarker = (id: string, marker: { zeit: number; titel: string }[]) =>
   hole<{ zeit: number; titel: string }[]>(`/aufnahmen/${id}/marker`, { method: "PUT", ...json(marker) });
+// Eine Aufnahme aus dem Browser ablegen: hochladen, dann ihre Marker
+export async function aufnahmeAblegen(daten: Blob, info: Gespeichert): Promise<Aufnahme> {
+  const datei = await aufnahmeHochladen(daten, info.name);
+  if (info.marker.length) await aufnahmeMarker(datei.id, info.marker);
+  return datei;
+}
 export const aufnahmeTonAdresse = (id: string, anfrage?: AnfrageId) => mit(`/api/v1/inhalt/aufnahmen/${id}/ton`, anfrage);
 export const wellenform = (aufnahmeId: string, anfrage?: AnfrageId) =>
   hole<number[]>(mit(`/inhalt/aufnahmen/${aufnahmeId}/wellenform`, anfrage));
