@@ -3,7 +3,7 @@
   // Transkripts), Umbenennen, Zusammenführen, Löschen (mit zweitem Klick). Schwellen kommen aus den Einstellungen.
   // Am Telefon: Liste, Antippen öffnet das Profil (/sprecher/<kennung>). Entwurf: mockups/transkription.html (5).
   import { onMount } from "svelte";
-  import { Auswahl, farbe, gehe, geraet, Leiste, leisteOeffnen, marke, navigation, wann } from "appkern-oberflaeche";
+  import { Auswahl, einzelton, farbe, gehe, geraet, Leiste, leisteOeffnen, marke, navigation, wann } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import type { Profil } from "../lib/typen";
 
@@ -16,7 +16,8 @@
   let loeschFrage = $state(false);
   let sicher = $state<number | null>(null);
   let vorschlag = $state<number | null>(null);
-  let probe = $state<string | null>(null);
+  // Probe eines Beitrags über den gemeinsamen Ton (startet im Tippen, hält sicher an, auch am iPhone)
+  const probe = $derived(einzelton.kennung?.startsWith("beitrag:") ? einzelton.kennung.slice(8) : null);
   let gewaehltId = $state<string | null>(null);
 
   const kennung = $derived(navigation.seite === "sprecher" ? navigation.teile[0] ?? null : null);
@@ -85,14 +86,11 @@
   <div class="liste-klein">
     {#each p.beispiele as b, i (i)}
       <div><button class="rund" style="width:30px;height:30px" title={probe === `${b.transkript_id}-${b.start}` ? "Anhalten" : "Anhören"}
-                   onclick={() => (probe = probe === `${b.transkript_id}-${b.start}` ? null : `${b.transkript_id}-${b.start}`)}>
+                   onclick={() => einzelton.umschalten(`beitrag:${b.transkript_id}-${b.start}`, `${api.tonAdresse(b.transkript_id)}#t=${b.start},${b.ende}`)}>
           <i class="fa-solid {probe === `${b.transkript_id}-${b.start}` ? 'fa-pause' : 'fa-play'}"></i></button>
         <span><button style="border:0;background:none;padding:0;font:inherit;color:var(--akzent);cursor:pointer"
                       onclick={() => gehe(`transkripte/${b.transkript_id}/${b.start}`)}>{marke(b.start)}</button>
           {b.text ? ` · "${b.text.slice(0, 60)}${b.text.length > 60 ? " ..." : ""}"` : ""}</span>
-        {#if probe === `${b.transkript_id}-${b.start}`}
-          <audio src="{api.tonAdresse(b.transkript_id)}#t={b.start},{b.ende}" autoplay onpause={() => (probe = null)} hidden></audio>
-        {/if}
       </div>
     {:else}
       <p class="leer" style="padding:4px 0; text-align:left">Noch keine Proben gemerkt.</p>
