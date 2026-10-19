@@ -11,7 +11,8 @@ korrigieren         KI-Korrektur in Fenstern von drei Segmenten; Ergebnis sind V
 auswerten           KI-Auswertung nach Vorlage als Markdown-Datei neben dem Transkript.
 
 Wartet die Leitstelle (Halt, Modell lädt, Speicher knapp), steht das als Schritt im Auftrag und es wird nach der
-genannten Zeit erneut versucht; gesperrte oder abgelehnte Aufträge gehen ohne Wiederholung an den Menschen.
+genannten Zeit erneut versucht, so lange, wie die Einstellung "Geduld bei Ausfall" sagt; schläft der Mac, ohne Grenze,
+bis er wach ist. Gesperrte oder abgelehnte Aufträge gehen ohne Wiederholung an den Menschen.
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ from pydantic import BaseModel, Field
 from appkern.anfragen import AnfrageEingabe, Angebot
 from appkern.auftraege import Art, Kontext, Phase
 from appkern.kellerwolke import Aktion, Kellerwolke, KellerwolkeFehler, StandVeraltet
-from appkern.leitstelle import DienstFehler, DienstWeg, Halt, NichtErreichbar, NichtGefunden
+from appkern.leitstelle import WARTEN_BEI, DienstFehler, DienstWeg, Halt, NichtErreichbar, NichtGefunden
 from appkern.leitstelle import geduldig as leitstelle_geduldig
 
 from . import altbestand, auswertung, export, korrektur, umzug
@@ -48,7 +49,6 @@ from appkern.ton.wav import ausschnitt, dauer as wav_dauer
 from .ton import Abschnitt, abschnitte_planen
 
 T = TypeVar("T")
-GEDULD_S = 30 * 60
 
 
 class TranskribierenAnfrage(BaseModel):
@@ -120,19 +120,15 @@ class AuswertenEingabe(BaseModel):
     von: str | None = None
 
 
-WARTEN_BEI: tuple[type[Exception], ...] = (Halt, DienstWeg, NichtErreichbar)
-
-
 async def geduldig(k: Kontext, aufruf: Callable[[], Awaitable[T]], was: str,
                    warten_bei: tuple[type[Exception], ...] = WARTEN_BEI) -> T:
     """Ruft die Leitstelle geduldig (`appkern.leitstelle.geduldig`): wartet sie (Halt, Dienst lädt oder ist noch nicht
-    gemeldet, nicht erreichbar), steht das als Schritt im Auftrag und es wird nach ihrer Angabe erneut versucht,
-    höchstens `GEDULD_S` lang; abbrechen geht auch während des Wartens. Wo es einen Ausweg gibt (die Sprechertrennung),
-    wird nur bei Halt gewartet."""
+    gemeldet, nicht erreichbar, der Mac schläft), steht das als Schritt im Auftrag und es wird nach ihrer Angabe erneut
+    versucht, so lange, wie die Einstellung "Geduld bei Ausfall" sagt (den Schlaf ohne Grenze); abbrechen geht auch
+    während des Wartens. Wo es einen Ausweg gibt (die Sprechertrennung), wird nur bei Halt und Schlaf gewartet."""
     async def melden(text: str) -> None:
         await k.fortschritt(None, text)
-    return await leitstelle_geduldig(aufruf, was=was, geduld_s=GEDULD_S, warten_bei=warten_bei, melden=melden,
-                                     pruefen=k.pruefen)
+    return await leitstelle_geduldig(aufruf, was=was, warten_bei=warten_bei, melden=melden, pruefen=k.pruefen)
 
 
 @dataclass(frozen=True)
