@@ -11,7 +11,7 @@
               background: var(--flaeche); border: 1px solid var(--rand); font-size: var(--klein); }
 .treffer { margin: 6px 0 0 58px; display: flex; flex-direction: column; gap: 4px; }
 .treffer div { font-size: var(--klein); color: var(--text-2); }
-.treffer .zeit { font-family: ui-monospace, monospace; color: var(--akzent); margin-right: 8px; }
+.treffer .zeit { font-family: var(--schrift-code); color: var(--akzent); margin-right: 8px; }
 .treffer mark { background: var(--warn-weich); color: var(--text); border-radius: 3px; }
 
 /* ----- Spieler ----- */
@@ -20,11 +20,11 @@
 .text-flaeche { max-width: 980px; }
 .beitrag { display: grid; grid-template-columns: 70px 150px minmax(0, 1fr); gap: 14px; padding: 10px 12px; border-radius: var(--r2); }
 .beitrag + .beitrag { margin-top: 2px; }
-.beitrag .zeit { font-family: ui-monospace, monospace; font-size: var(--klein); color: var(--text-3); padding-top: 3px; cursor: pointer; }
+.beitrag .zeit { font-family: var(--schrift-code); font-size: var(--klein); color: var(--text-3); padding-top: 3px; cursor: pointer; }
 .beitrag.jetzt { background: var(--flaeche); box-shadow: var(--schatten); }
 .beitrag .text { line-height: 1.65; }
 /* der Rand kommt als Schatten statt als Innenabstand: das Wort wird nicht breiter, der Absatz bricht nie neu um */
-.wort.jetzt { background: var(--akzent); color: #fff; border-radius: 3px; box-shadow: 0 0 0 2px var(--akzent); }
+.wort.jetzt { background: var(--akzent); color: var(--auf-farbe); border-radius: 3px; box-shadow: 0 0 0 2px var(--akzent); }
 /* im dunklen Modus ist der Akzent hell: dunkle Schrift darauf (etwa 8:1 statt 2,5:1 mit Weiß) */
 :root[data-theme="dunkel"] .wort.jetzt { color: var(--hg); }
 .wort.gehoert { color: var(--text); }
@@ -56,7 +56,7 @@
 /* Sprecherprofile */
 .profil { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 16px;
           background: var(--flaeche); border-radius: var(--r3); box-shadow: var(--schatten); margin-bottom: 8px; border: 2px solid transparent; }
-.profil .bild { width: 48px; height: 48px; border-radius: 24px; display: grid; place-items: center; color: #fff; font-weight: 600; font-size: 18px; }
+.profil .bild { width: 48px; height: 48px; border-radius: 24px; display: grid; place-items: center; color: var(--auf-farbe); font-weight: 600; font-size: calc(var(--gross) + 3px); }
 .profil > div { min-width: 0; }
 .profil .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profil .unter { font-size: var(--klein); color: var(--text-3); margin-top: 2px; }
@@ -64,33 +64,28 @@
 
 /* ----- Telefon ----- */
 .mobil .t-aufnehmen { display: flex; flex-direction: column; align-items: center; gap: 12px; background: var(--flaeche); border-radius: 14px; padding: 22px 16px 18px; }
-.mobil .t-aufnehmen .rot { width: 84px; height: 84px; border-radius: 42px; border: 0; background: var(--gefahr); color: #fff; font-size: 30px;
+.mobil .t-aufnehmen .rot { width: 84px; height: 84px; border-radius: 42px; border: 0; background: var(--gefahr); color: var(--auf-farbe);
                            box-shadow: 0 0 0 8px var(--gefahr-weich); }
+.mobil .t-aufnehmen .rot i { font-size: 30px; }
 .mobil .t-aufnehmen .unter { font-size: var(--klein); color: var(--text-3); text-align: center; }
 .mobil .t-zweit { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
 .mobil .t-zweit .knopf { height: 50px; justify-content: center; border-radius: 14px; }
-.mobil .t-uhr { font-family: ui-monospace, monospace; font-size: 54px; font-weight: 600; text-align: center; margin: 30px 0 6px; }
-.mobil .t-pegel { display: flex; align-items: center; justify-content: center; gap: 3px; height: 90px; }
-.mobil .t-pegel span { width: 5px; border-radius: 3px; background: var(--gefahr); }
-.mobil .t-steuer { display: flex; justify-content: center; align-items: center; gap: 28px; margin: 26px 0 18px; }
-.mobil .t-steuer .rund { width: 64px; height: 64px; border-radius: 32px; font-size: 22px; }
-.mobil .t-steuer .stopp { width: 84px; height: 84px; border-radius: 42px; border: 0; background: var(--gefahr); color: #fff; font-size: 28px; }
 .mobil .t-beitrag { padding: 10px 12px; border-radius: 12px; }
 .mobil .t-beitrag + .t-beitrag { border-top: 1px solid var(--rand); }
 .mobil .t-beitrag .wer { display: flex; align-items: center; gap: 8px; font-size: var(--klein); font-weight: 600; }
-.mobil .t-beitrag .wer .zeit { margin-left: auto; font-weight: 400; color: var(--text-3); font-family: ui-monospace, monospace; }
+.mobil .t-beitrag .wer .zeit { margin-left: auto; font-weight: 400; color: var(--text-3); font-family: var(--schrift-code); }
 .mobil .t-beitrag .text { line-height: 1.6; margin-top: 4px; }
 /* der laufende Beitrag bekommt nur den Grund; der Text bleibt bündig mit den anderen */
 .mobil .t-beitrag.jetzt { background: var(--flaeche); border-top-color: transparent; }
 .mobil .t-beitrag.jetzt + .t-beitrag { border-top-color: transparent; }
 .mobil .t-treffer { font-size: var(--klein); color: var(--text-2); padding: 0 14px 12px 54px; margin-top: -4px; }
-.mobil .t-treffer .zeit { font-family: ui-monospace, monospace; color: var(--akzent); margin-right: 6px; }
+.mobil .t-treffer .zeit { font-family: var(--schrift-code); color: var(--akzent); margin-right: 6px; }
 .mobil .t-treffer mark { background: var(--warn-weich); color: var(--text); border-radius: 3px; }
 .seiten-kopf h1.titel-lang { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ----- Umsetzung: Uploads ----- */
 .ablage.ueber { border-color: var(--akzent); background: var(--akzent-weich); color: var(--akzent); }
-.beitrag .zeit, .t-beitrag .zeit { border: 0; background: transparent; font: inherit; font-family: ui-monospace, monospace;
+.beitrag .zeit, .t-beitrag .zeit { border: 0; background: transparent; font: inherit; font-family: var(--schrift-code);
                                    font-size: var(--klein); color: var(--text-3); text-align: left; cursor: pointer; padding: 3px 0 0; }
 .t-beitrag .wer .zeit { margin-left: auto; padding: 0; }
 .beitrag { cursor: default; }
@@ -113,7 +108,7 @@
 .hinweis-zeile i { color: var(--akzent); }
 .leer-zeile { margin: 2px 0 6px; font-size: var(--klein); color: var(--text-3); }
 .liste-klein .marker-eintrag { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; }
-.marker-eintrag .zeit { border: 0; background: none; padding: 0; font: inherit; font-family: ui-monospace, monospace; color: var(--text-3); cursor: pointer; text-align: left; }
+.marker-eintrag .zeit { border: 0; background: none; padding: 0; font: inherit; font-family: var(--schrift-code); color: var(--text-3); cursor: pointer; text-align: left; }
 .marker-eintrag .weg { border: 0; background: none; color: var(--text-3); cursor: pointer; padding: 2px 4px; opacity: 0; }
 .marker-eintrag:hover .weg, .marker-eintrag .weg:focus-visible { opacity: 1; }
 .marker-titel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -124,7 +119,7 @@
 .vorlage span { font-size: var(--klein); color: var(--text-3); }
 .versionen { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
 .version-zeile { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; font-size: var(--klein); }
-.version-zeile .zeit { font-family: ui-monospace, monospace; color: var(--text-3); }
+.version-zeile .zeit { font-family: var(--schrift-code); color: var(--text-3); }
 .version-text { color: var(--text); }
 .version-text b { font-weight: 600; }
 
@@ -145,7 +140,7 @@
   border-radius: var(--r2); background: var(--flaeche-2); color: var(--text); font: inherit; cursor: pointer; }
 .sprecher-knopf:hover { border-color: var(--akzent); }
 .sprecher-knopf .punkt { width: 10px; height: 10px; border-radius: 5px; }
-kbd.taste { font-family: ui-monospace, monospace; font-size: var(--marke); color: var(--text-2); border: 1px solid var(--rand);
+kbd.taste { font-family: var(--schrift-code); font-size: var(--marke); color: var(--text-2); border: 1px solid var(--rand);
   border-radius: var(--r1); padding: 0 5px; line-height: 18px; background: var(--flaeche); }
 .beitrag.gewaehlt { background: var(--akzent-weich); box-shadow: 0 0 0 1px var(--akzent); }
 .beitrag.waehlbar { cursor: pointer; user-select: none; }
@@ -160,13 +155,13 @@ kbd.taste { font-family: ui-monospace, monospace; font-size: var(--marke); color
 .ohne-text h2 { margin: 0 0 6px; font-size: 1.15em; }
 .ohne-text p { margin: 0 0 14px; color: var(--text-2); }
 .vorschau-ziel { flex-basis: 100%; font-size: var(--klein); color: var(--text-2); }
-.vorschau-ziel code { font-family: ui-monospace, monospace; color: var(--text); }
+.vorschau-ziel code { font-family: var(--schrift-code); color: var(--text); }
 /* Aufnahme am Telefon (1b): großer Knopf zum Transkribieren, Marker als Karte, Papierkorb darunter */
 .mobil .t-breit { width: 100%; height: 48px; justify-content: center; margin: 10px 0 16px; }
 .mobil .t-karte { padding: 10px 14px; }
 .mobil .t-loeschen { margin: 16px 0 8px; }
 .mobil .t-loeschen > .knopf { width: 100%; justify-content: center; min-height: 44px; }
-.eingabe .zeit-marke { font-family: ui-monospace, monospace; font-size: var(--marke); color: var(--text-3); flex: none; }
+.eingabe .zeit-marke { font-family: var(--schrift-code); font-size: var(--marke); color: var(--text-3); flex: none; }
 
 /* Verbund mit der Kellerwolke (Entwurf mockups/verbund.html): Zusammenführen */
 .umzug-liste { margin: 0 0 14px; border-radius: 10px; background: var(--flaeche); overflow: hidden; }
