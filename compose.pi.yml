@@ -1,4 +1,4 @@
-# Transkription auf dem Pi: https://192.168.178.49:8631. Vorne Caddy mit dem Zertifikat der Hausstelle (wie Kiste und
+# Transkription auf dem Pi, Port 8631. Vorne Caddy mit dem Zertifikat der Hausstelle (wie Kiste und
 # Kellerwolke; tools/ausrollen.sh stellt es aus), dahinter die App ohne TLS, nur im eigenen Netz erreichbar.
 # Daten in ./daten (SQLite, Zwischendateien). Kein ffmpeg: Ton rechnet der Tondienst auf dem Mac.
 services:
@@ -27,8 +27,6 @@ services:
     depends_on: [transkription]
     ports:
       - "8631:8631"
-    environment:
-      TRANSKRIPTION_HAUPTADRESSE: ${TRANSKRIPTION_HAUPTADRESSE:-192.168.178.49}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./zertifikate:/zertifikate:ro

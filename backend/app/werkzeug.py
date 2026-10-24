@@ -39,7 +39,7 @@ class PlanAufnahme(BaseModel):
 
 
 class UmzugPlan(BaseModel):
-    adresse: str = Field(min_length=1, description="die alte App, wie die App sie erreicht (etwa http://192.168.178.45:10031)")
+    adresse: str = Field(min_length=1, description="die alte App, wie die App sie erreicht (etwa http://192.168.1.21:10031)")
     aufnahmen: list[PlanAufnahme] = Field(default_factory=list)
     profile: list[AltesProfil] = Field(default_factory=list)
 

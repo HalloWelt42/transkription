@@ -51,12 +51,13 @@ Transkripte der alten App ins Format `transkript/1` für Dateien, die nicht in d
 ## Betrieb auf dem Pi
 
 Die Transkription läuft neben Kellerwolke und Leitstelle auf dem Pi, im Container (`Dockerfile`, `compose.pi.yml`),
-erreichbar unter `https://192.168.178.49:8631` (Zertifikat der Hausstelle; HTTPS braucht der Browser fürs Mikrofon).
+erreichbar über HTTPS auf Port 8631 (Zertifikat der Hausstelle; HTTPS braucht der Browser fürs Mikrofon).
 Vorne steht wie bei Kiste und Kellerwolke ein Caddy (`deploy/Caddyfile`, TLS und HTTP/2), die App dahinter ist von außen
 nicht erreichbar.
 Der Pi rechnet keinen Ton (er liefert nur Daten): Wandeln, Sprechpausen, Wellenform und Abspielfassung macht der
 Tondienst auf dem Mac über die Leitstelle (`appkern.ton.TonDienst`, Einstellung "Tondienst"); im Container gibt es kein
-ffmpeg. Daten liegen in `/mnt/data/transkription/daten`, Sicherungen in `.../sicherungen`.
+ffmpeg. Daten liegen im Ordner der App auf dem Pi unter `daten/`, Sicherungen unter `sicherungen/`; Rechner, Ordner und
+Adresse des Hauses stehen nicht im Repo, `tools/ausrollen.sh` holt sie aus der privaten Wahrheit (`handbuch ziel`).
 
 ```bash
 tools/ausrollen.sh
