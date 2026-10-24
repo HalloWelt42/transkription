@@ -64,7 +64,7 @@
 
 /* ----- Telefon ----- */
 .mobil .t-aufnehmen { display: flex; flex-direction: column; align-items: center; gap: 12px; background: var(--flaeche); border-radius: 14px; padding: 22px 16px 18px; }
-.mobil .t-aufnehmen .rot { width: 84px; height: 84px; border-radius: 42px; border: 0; background: var(--gefahr); color: var(--auf-farbe);
+.mobil .t-aufnehmen .rot { width: 84px; height: 84px; border-radius: 42px; border: 0; background: var(--gefahr-flaeche); color: var(--auf-farbe);
                            box-shadow: 0 0 0 8px var(--gefahr-weich); }
 .mobil .t-aufnehmen .rot i { font-size: 30px; }
 .mobil .t-aufnehmen .unter { font-size: var(--klein); color: var(--text-3); text-align: center; }
