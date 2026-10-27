@@ -6,13 +6,13 @@ daten:
   - "Kellerwolke: die einzige Wahrheit, je Aufnahme ein Transkript `<name>.transkript.json` als Begleitdatei (mit Versionen), dazu Exporte, Auswertungen und `Sprecher/profile.json`"
   - "Pi: `{{wurzel}}/daten/transkription.sqlite` (Verzeichnis, Suchindex, Aufträge, Vorschläge, Protokoll; folgt der Kellerwolke), `abspielen/` (Abspielfassungen, rund 20 GB, neu erzeugbar), `arbeit/`, `umzug/`"
 sicherung:
-  - "jedes Ausrollen sichert `transkription.sqlite` vor dem Neustart nach `{{wurzel}}/sicherungen` (die letzten zehn bleiben); das Werkzeug Sicherungen holt sie täglich nach `~/Sicherungen/transkription/pi`"
+  - "nach der Regel des Appkerns eine Kopie von `transkription.sqlite` nach `{{wurzel}}/sicherungen`, wöchentlich und vor dem Ausrollen (nur, wenn die jüngste älter als 24 Stunden ist), nie ohne Änderung, höchstens drei Stände (Einstellungen, Sicherung); das Werkzeug Sicherungen holt sie täglich nach `~/Sicherungen/transkription/pi`"
   - "Transkripte und Aufnahmen liegen in der Kellerwolke und hängen an deren Sicherung; `abspielen/` braucht keine Sicherung"
 schluessel_orte:
   - "Pi: Einstellungen im Verzeichnis `transkription.sqlite`: App-Schlüssel der Kellerwolke, Schlüssel der Leitstelle (in der Oberfläche unter Einstellungen, verdeckt)"
   - "Pi: `{{wurzel}}/zertifikate/`, Blattzertifikat mit Schlüssel aus der Hausstelle (vom Ausrollen)"
 einrichten: einrichten.sh
-stand: e99813a
+stand: 520c4ab
 ---
 
 # Transkription
@@ -59,7 +59,7 @@ Probe: `test -f frontend/dist/index.html && backend/.venv/bin/python -c "import 
 
 ### 2. Ordner auf dem Pi
 
-Auf dem Pi `mkdir -p {{wurzel}}/daten` (sonst legt Docker ihn für root an). Aus der Sicherung die jüngste Kopie als
+Auf dem Pi `mkdir -p {{wurzel}}/daten {{wurzel}}/sicherungen` (sonst legt Docker sie für root an). Aus der Sicherung die jüngste Kopie als
 `{{wurzel}}/daten/transkription.sqlite` ablegen (Besitzer `pi`).
 
 Probe: `stat -c %U {{wurzel}}/daten` meldet `pi`.
@@ -90,11 +90,12 @@ transkribiert.
 
 ## Sicherung und Rückspielen
 
-Jedes Ausrollen legt vor dem Neustart eine stimmige Kopie von `transkription.sqlite` nach
-`{{wurzel}}/sicherungen/transkription-<Zeit>.sqlite`; die letzten zehn bleiben. Das Werkzeug Sicherungen am Mac holt sie
-täglich nach `~/Sicherungen/transkription/pi` (Stand in `~/Sicherungen/LIESMICH.md`). Zwischen zwei Ausrollen entsteht
-keine Sicherung. Transkripte, Aufnahmen und Sprecherprofile hängen an der Sicherung der Kellerwolke; `abspielen/`
-entsteht neu.
+Nach der Regel der Sicherung aus dem [[Appkern]] legt die App einmal je Woche, das Ausrollen vor dem Neustart (nur,
+wenn die jüngste älter als 24 Stunden ist) eine stimmige Kopie von `transkription.sqlite` nach
+`{{wurzel}}/sicherungen/transkription-<Zeit>.sqlite`; hat sich seit der jüngsten nichts geändert, entsteht keine, und
+höchstens drei bleiben (Werte unter Einstellungen, Sicherung). Das Werkzeug Sicherungen am Mac holt sie täglich nach
+`~/Sicherungen/transkription/pi` (Stand in `~/Sicherungen/LIESMICH.md`). Transkripte, Aufnahmen und Sprecherprofile
+hängen an der Sicherung der Kellerwolke; `abspielen/` entsteht neu.
 
 Zurückspielen: auf dem Pi im Ordner {{wurzel}} `docker compose -f compose.pi.yml stop transkription`, die Kopie als
 `daten/transkription.sqlite` ablegen (alte `-wal` und `-shm` daneben entfernen), `docker compose -f compose.pi.yml start
