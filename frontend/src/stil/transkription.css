@@ -37,10 +37,43 @@ mark.fund { background: var(--warn-weich); color: inherit; border-radius: 3px; }
 .marker-zeile { display: flex; align-items: center; gap: 10px; margin: 8px 0 8px 84px; font-size: var(--klein); color: var(--warn); }
 .marker-zeile::after { content: ""; flex: 1; height: 1px; background: var(--warn-weich); }
 
-/* Bearbeiten */
-.beitrag.bearbeiten { background: var(--flaeche); box-shadow: 0 0 0 2px var(--akzent); }
+/* Bearbeiten: ein offener Beitrag (Sprecher, Text, Beginn und Ende, Werkzeuge); am Telefon untereinander */
+.beitrag.bearbeiten { background: var(--flaeche); box-shadow: 0 0 0 2px var(--akzent); align-items: start; }
 .beitrag .feld-text { border: 1px solid var(--rand); border-radius: var(--r2); padding: 8px 10px; background: var(--flaeche-2); line-height: 1.6; }
-.beitrag .werkzeuge { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.beitrag .werkzeuge, .beitrag .b-zeiten { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+.beitrag .b-inhalt { min-width: 0; }
+.beitrag .werkzeuge .b-schliessen { margin-left: auto; }
+.b-zeit { display: inline-flex; gap: 6px; align-items: center; }
+.b-zeiten .zeit-feld { height: 32px; width: 130px; gap: 6px; font-size: var(--klein); color: var(--text-2); }
+.b-zeiten .zeit-feld input { font-family: var(--schrift-code); min-width: 0; }
+.mobil .beitrag.bearbeiten { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 12px; }
+.mobil .beitrag.bearbeiten .zeit { align-self: flex-start; }
+.mobil .beitrag.bearbeiten .b-zeit { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
+.mobil .beitrag.bearbeiten .b-zeiten .zeit-feld { width: auto; height: 44px; }
+.mobil .beitrag.bearbeiten .b-zeiten .knopf { justify-content: center; min-height: 44px; white-space: normal; line-height: 1.2; }
+.mobil .beitrag.bearbeiten .werkzeuge .knopf { min-height: 40px; }
+.beitrag.waehlbar, .t-beitrag.waehlbar { cursor: pointer; }
+.beitrag.waehlbar:hover { background: var(--flaeche); }
+.t-beitrag.geaendert .wer::after { content: ""; width: 7px; height: 7px; border-radius: 4px; background: var(--akzent); }
+
+/* Bearbeitungsleiste: fest oben über dem Text, solange bearbeitet wird */
+.bearbeitungsleiste { position: sticky; top: 0; z-index: 3; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
+  margin-bottom: 12px; background: var(--flaeche); border-radius: var(--r2); box-shadow: 0 0 0 2px var(--akzent), var(--schatten); }
+.bearbeitungsleiste .bl-zeile { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bearbeitungsleiste .bl-titel { font-weight: 600; color: var(--akzent); }
+.bearbeitungsleiste .bl-stand { color: var(--text-2); }
+.bearbeitungsleiste .bl-stand.offen { color: var(--text); font-weight: 600; }
+.bearbeitungsleiste .bl-knoepfe { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.bearbeitungsleiste .bl-was { color: var(--text-2); font-size: var(--klein); min-width: 170px; }
+.bearbeitungsleiste .bl-anhalten { margin-top: 0; align-items: flex-start; }
+.bearbeitungsleiste .bl-anhalten b { color: var(--text); font-weight: 600; }
+.bearbeitungsleiste .bl-erklaerung { color: var(--text-3); }
+.bearbeitungsleiste .bl-anleitung { margin: 0; font-size: var(--klein); color: var(--text-3); }
+.mobil .bearbeitungsleiste { padding: 10px 12px; }
+.mobil .bearbeitungsleiste .bl-knoepfe { margin-left: 0; width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mobil .bearbeitungsleiste .bl-knoepfe .knopf { justify-content: center; min-height: 44px; }
+.text-suche { min-width: 180px; }
+.text-suche.mobil-suche { flex: 1; min-width: 0; }
 .sprecherwahl { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 15px; border: 1px solid var(--rand);
                 background: var(--flaeche); font-size: var(--klein); }
 
@@ -136,19 +169,14 @@ mark.fund { background: var(--warn-weich); color: inherit; border-radius: 3px; }
 
 .t-aufnehmen .auswahl { margin-top: 4px; }
 
-/* Sprecher von Hand zuordnen: Leiste mit den Sprechern als Knöpfe (Ziffer als Taste), gewählte Beiträge markiert */
-.zuordnen { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px;
-  margin-bottom: 10px; background: var(--flaeche); border-radius: var(--r2); box-shadow: var(--schatten); }
-.zuordnen .titel { font-weight: 600; margin-right: 4px; min-width: 150px; }
-.zuordnen .hinweis { font-size: var(--klein); color: var(--text-3); flex-basis: 100%; }
+/* Sprecher zuordnen (Bearbeitungsleiste): Sprecher als Knöpfe mit Ziffer als Taste, gewählte Beiträge markiert */
 .sprecher-knopf { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border: 1px solid var(--rand);
   border-radius: var(--r2); background: var(--flaeche-2); color: var(--text); font: inherit; cursor: pointer; }
 .sprecher-knopf:hover { border-color: var(--akzent); }
 .sprecher-knopf .punkt { width: 10px; height: 10px; border-radius: 5px; }
 kbd.taste { font-family: var(--schrift-code); font-size: var(--marke); color: var(--text-2); border: 1px solid var(--rand);
   border-radius: var(--r1); padding: 0 5px; line-height: 18px; background: var(--flaeche); }
-.beitrag.gewaehlt { background: var(--akzent-weich); box-shadow: 0 0 0 1px var(--akzent); }
-.beitrag.waehlbar { cursor: pointer; user-select: none; }
+.beitrag.gewaehlt, .beitrag.gewaehlt:hover { background: var(--akzent-weich); box-shadow: 0 0 0 1px var(--akzent); }
 .sprecher-knopf:disabled { opacity: 0.55; cursor: default; }
 .sprecher-knopf:disabled:hover { border-color: var(--rand); }
 .sprecher-zeile .aktionen { display: flex; gap: 2px; }

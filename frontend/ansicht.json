@@ -4,6 +4,11 @@
     { "name": "kellerwolke", "pfad": "/aufnahmen/kellerwolke" },
     { "name": "transkripte", "pfad": "/transkripte" },
     { "name": "transkript", "abfrage": "/api/v1/transkripte?anzahl=1", "pfad": "/transkripte/{eintraege.0.id}" },
+    { "name": "bearbeiten", "abfrage": "/api/v1/transkripte?anzahl=1", "pfad": "/transkripte/{eintraege.0.id}",
+      "wechsel": [
+        { "klick": ".seiten-kopf .knopf:has(.fa-pen), .knopfzeile .rund[aria-label=Bearbeiten]", "warten_ms": 800 },
+        { "klick": "[data-i='1'] .beitrag, [data-i='1'] .t-beitrag", "warten_ms": 500 }
+      ] },
     { "name": "sprecher", "pfad": "/sprecher" },
     { "name": "auftraege", "pfad": "/auftraege" },
     { "name": "protokoll", "pfad": "/protokoll" },

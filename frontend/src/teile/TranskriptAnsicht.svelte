@@ -1,16 +1,17 @@
 <script lang="ts">
   // Ein Transkript: Spieler, Text zum Mitlesen (Wort für Wort, folgt der Wiedergabe, bis man selbst rollt), Suche im
-  // Text, rechts die Leiste. Bearbeiten: Änderungen sammeln sich in einem Entwurf, Vorschläge der KI-Korrektur stehen
-  // unter ihrem Beitrag, Speichern legt eine neue Version an (nur mit dem gelesenen Stand; sonst neu laden).
-  // Sprecher zuordnen: Beiträge wählen (Klick, Umschalt für einen Bereich, Befehl für einzelne), dann Sprecher per Knopf
-  // oder Ziffer; N legt einen neuen an, Leertaste spielt die Auswahl. Auch das sammelt sich im Entwurf.
-  // Entwurf: mockups/transkription.html (3, 3b, 3c, 4) und transkription-mobil.html (3).
+  // Text, rechts die Leiste. Bearbeiten ist ein Modus für Text, Sprecher und Marker, am Rechner wie am Telefon: oben
+  // steht fest die Bearbeitungsleiste (Anleitung, Zahl der Änderungen, Verwerfen, Speichern), Änderungen sammeln sich
+  // in einem Entwurf, Vorschläge der KI-Korrektur stehen unter ihrem Beitrag, Speichern legt eine neue Version an (nur
+  // mit dem gelesenen Stand; sonst neu laden). Entwurf: mockups/transkription.html (3, 3b, 3c, 4), transkription-mobil.html (3).
   import { onMount, tick } from "svelte";
   import { AnfrageBand, arbeit, farbe, gehe, geraet, Leiste, leisteOeffnen, marke, navigation, Spieler,
            zurueckZurKellerwolke } from "appkern-oberflaeche";
   import * as api from "../lib/api";
+  import { neueKennung } from "../lib/kennung";
   import type { Marker, Segment, Transkript, TranskriptAntwort, Vorschlag } from "../lib/typen";
   import Beitrag from "./Beitrag.svelte";
+  import Bearbeitungsleiste from "./Bearbeitungsleiste.svelte";
   import TranskriptLeiste from "./TranskriptLeiste.svelte";
 
   // `anfrage`: aus der Kellerwolke geöffnet (Datei außerhalb der App); alles geht dann mit dem Recht dieser Anfrage.
@@ -21,6 +22,7 @@
     else gehe("transkripte");
   }
   const herkunft = (a: TranskriptAntwort) => a.transkript.quelle?.pfad ?? a.pfad;
+  const ANHALTEN_SCHLUESSEL = "transkription.anhalten";
 
   let antwort = $state<TranskriptAntwort | null>(null);
   let fehler = $state("");
@@ -35,15 +37,14 @@
   let bearbeiten = $state(false);
   let entwurf = $state<Transkript | null>(null);
   let offen = $state<number | null>(null);
-  let nurBeitrag = $state(false);
   let vorschlaege = $state<Vorschlag[]>([]);
   let entscheidungen = $state<Record<string, "uebernommen" | "verworfen">>({});
   let speichert = $state(false);
   let mehr = $state(false);
-  let zuordnen = $state(false);
   let gewaehlt = $state<number[]>([]);
   let anker = $state<number | null>(null);
-  let spielBis = $state<number | null>(null);
+  let anhalten = $state(gemerktesAnhalten());
+  let angehaltenBei = $state<number | null>(null);
   let welle = $state<number[] | null>(null);
   let ruhePause: ReturnType<typeof setTimeout>;
 
@@ -94,6 +95,30 @@
   const verworfen = $derived(Object.values(entscheidungen).filter((z) => z === "verworfen").length);
   const ungespeichert = $derived(anzahlAenderungen + verworfen);
 
+  // "Am Ende des Beitrags anhalten": hält einmal am Ende der Auswahl; nochmal Abspielen läuft weiter, zurück in den
+  // Beitrag gilt es wieder. Die Wahl merkt sich das Gerät.
+  const auswahlEnde = $derived(gewaehlt.length ? segmente[gewaehlt[gewaehlt.length - 1]]?.ende ?? null : null);
+  const stoppBei = $derived(bearbeiten && anhalten && auswahlEnde != null && angehaltenBei !== auswahlEnde ? auswahlEnde : null);
+  $effect(() => {
+    if (stoppBei != null && !laeuft && zeit >= stoppBei - 0.05) angehaltenBei = stoppBei;
+    else if (angehaltenBei != null && zeit < angehaltenBei - 0.3) angehaltenBei = null;
+  });
+  $effect(() => {
+    try {
+      localStorage.setItem(ANHALTEN_SCHLUESSEL, anhalten ? "1" : "0");
+    } catch {
+      // ohne Speicher im Browser gilt die Wahl nur bis zum Neuladen
+    }
+  });
+
+  function gemerktesAnhalten(): boolean {
+    try {
+      return localStorage.getItem(ANHALTEN_SCHLUESSEL) !== "0";
+    } catch {
+      return true;
+    }
+  }
+
   $effect(() => {
     arbeit.ungespeichert = ungespeichert > 0 || Object.keys(entscheidungen).length > 0;
     return () => (arbeit.ungespeichert = false);
@@ -127,7 +152,7 @@
   // Dem laufenden Beitrag folgen, außer man rollt selbst (dann eine Weile nicht).
   $effect(() => {
     const i = aktiv;
-    if (i < 0 || !mitlaufen || !rollfeld || bearbeiten || zuordnen) return;
+    if (i < 0 || !mitlaufen || !rollfeld || bearbeiten) return;
     rollfeld.querySelector(`[data-i="${i}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
   });
 
@@ -168,19 +193,32 @@
     weiterSuchen(e.shiftKey);
   }
 
-  // --- Bearbeiten -----------------------------------------------------------------------------------------------
+  // --- Bearbeiten: ein Modus für Text, Sprecher und Marker ------------------------------------------------------
+  // Jede Änderung landet im Entwurf (auch ein Marker aus der Leiste oder ein übernommener Vorschlag öffnet ihn);
+  // erst Speichern legt eine neue Version an. Klick öffnet einen Beitrag, Umschalt- und Befehl-Klick wählen mehrere
+  // für die Sprecher; Ziffer ordnet zu und geht zum nächsten, Leertaste spielt die Auswahl.
 
   function bearbeitenBeginnen() {
-    if (!antwort || zuordnen) return;
+    if (!antwort || bearbeiten) return;
     entwurf = structuredClone($state.snapshot(antwort.transkript)) as Transkript;
     bearbeiten = true;
     entscheidungen = {};
+  }
+
+  function verwerfen() {
+    if (!antwort) return;
+    entwurf = structuredClone($state.snapshot(antwort.transkript)) as Transkript;
+    entscheidungen = {};
+    offen = null;
+    gewaehlt = [];
   }
 
   function bearbeitenBeenden() {
     entwurf = null;
     bearbeiten = false;
     offen = null;
+    gewaehlt = [];
+    anker = null;
     entscheidungen = {};
   }
 
@@ -201,7 +239,7 @@
     entwurf.segmente.splice(i, 1,
       { ...s, ende: schnitt, text: vorne, woerter: passend ? s.woerter.slice(0, n) : [] },
       { ...s, start: schnitt, text: hinten, woerter: passend ? s.woerter.slice(n) : [] });
-    offen = i + 1;
+    oeffnen(i + 1);
   }
 
   function zusammen(i: number) {
@@ -214,17 +252,14 @@
   function markerAmBeitrag(i: number) {
     if (!entwurf) return;
     const s = entwurf.segmente[i];
-    entwurf.marker = [...entwurf.marker, { id: crypto.getRandomValues(new Uint32Array(4)).join("-"), zeit: s.start,
+    entwurf.marker = [...entwurf.marker, { id: neueKennung(), zeit: s.start,
       titel: s.text.split(/\s+/).slice(0, 4).join(" ") || "Marker", farbe: "gelb" as const }].sort((a, b) => a.zeit - b.zeit);
   }
 
+  // Marker aus der Leiste: wie jede Änderung in den Entwurf (öffnet Bearbeiten, falls nötig)
   async function markerSpeichern(liste: Marker[]) {
-    if (bearbeiten && entwurf) {
-      entwurf.marker = liste.sort((a, b) => a.zeit - b.zeit);
-      return;
-    }
-    if (!antwort) return;
-    antwort = await api.aendern(id, { stand: antwort.stand, marker: liste }, anfrage);
+    bearbeitenBeginnen();
+    if (entwurf) entwurf.marker = liste.sort((a, b) => a.zeit - b.zeit);
   }
 
   function vorschlagIndex(v: Vorschlag): number {
@@ -232,7 +267,7 @@
   }
 
   function entscheiden(v: Vorschlag, zustand: "uebernommen" | "verworfen") {
-    if (!entwurf) bearbeitenBeginnen();
+    bearbeitenBeginnen();
     if (zustand === "uebernommen" && entwurf) {
       const i = vorschlagIndex(v);
       if (i >= 0) entwurf.segmente[i] = { ...entwurf.segmente[i], text: v.neu };
@@ -240,55 +275,55 @@
     entscheidungen = { ...entscheidungen, [v.id]: zustand };
   }
 
-  // --- Sprecher zuordnen ----------------------------------------------------------------------------------------
-
-  function zuordnenBeginnen() {
-    if (!antwort) return;
-    entwurf = structuredClone($state.snapshot(antwort.transkript)) as Transkript;
-    if (!entwurf.sprecher.length) entwurf.sprecher = [{ kennung: "s1", name: "Sprecher 1" }];
-    zuordnen = true;
-    bearbeiten = false;
-    offen = null;
-    entscheidungen = {};
-    gewaehlt = [];
-    anker = null;
-  }
-
-  function zuordnenBeenden() {
-    entwurf = null;
-    zuordnen = false;
-    gewaehlt = [];
-    anker = null;
-    spielBis = null;
-  }
-
-  function waehlen(i: number, e: MouseEvent) {
-    spielBis = null;
-    if (e.shiftKey && anker != null) {
-      const [a, b] = anker < i ? [anker, i] : [i, anker];
-      gewaehlt = Array.from({ length: b - a + 1 }, (_, n) => a + n);
-      return;
-    }
-    if (e.metaKey || e.ctrlKey) gewaehlt = gewaehltMenge.has(i) ? gewaehlt.filter((x) => x !== i) : [...gewaehlt, i].sort((x, y) => x - y);
-    else gewaehlt = gewaehlt.length === 1 && gewaehlt[0] === i ? [] : [i];
-    anker = i;
-  }
+  // --- Auswahl und Sprecher -----------------------------------------------------------------------------------
 
   function zeigen(i: number) {
     void tick().then(() => rollfeld?.querySelector(`[data-i="${i}"]`)?.scrollIntoView({ block: "nearest" }));
   }
 
+  // Öffnen: der Beitrag wird die Auswahl, der Spieler springt an seinen Anfang (spielt weiter, wenn er lief)
+  function oeffnen(i: number) {
+    offen = i;
+    gewaehlt = [i];
+    anker = i;
+    spieler?.springe(segmente[i].start, laeuft);
+    zeigen(i);
+  }
+
+  function beitragKlick(i: number, e: MouseEvent) {
+    if (e.shiftKey && anker != null) {
+      const [a, b] = anker < i ? [anker, i] : [i, anker];
+      gewaehlt = Array.from({ length: b - a + 1 }, (_, n) => a + n);
+      offen = null;
+      return;
+    }
+    if (e.metaKey || e.ctrlKey) {
+      gewaehlt = gewaehltMenge.has(i) ? gewaehlt.filter((x) => x !== i) : [...gewaehlt, i].sort((x, y) => x - y);
+      anker = i;
+      offen = null;
+      return;
+    }
+    oeffnen(i);
+  }
+
   function zuweisen(kennung: string) {
     if (!entwurf || !gewaehlt.length) return;
     for (const i of gewaehlt) entwurf.segmente[i] = { ...entwurf.segmente[i], sprecher: kennung };
-    // ein einzelner Beitrag: weiter zum nächsten, damit man beim Anhören nur Ziffern tippt
-    if (gewaehlt.length === 1 && gewaehlt[0] + 1 < entwurf.segmente.length) {
-      const weiter = gewaehlt[0] + 1;
-      gewaehlt = [weiter];
-      anker = weiter;
-      zeigen(weiter);
-      if (laeuft) auswahlAbspielen();
-    }
+  }
+
+  // per Taste: ein einzelner Beitrag geht danach zum nächsten, damit man beim Anhören nur Ziffern tippt
+  function zuweisenUndWeiter(kennung: string) {
+    zuweisen(kennung);
+    if (!entwurf || gewaehlt.length !== 1 || gewaehlt[0] + 1 >= entwurf.segmente.length) return;
+    waehleEinzeln(gewaehlt[0] + 1);
+    if (laeuft) spieler?.springe(segmente[gewaehlt[0]].start, true);
+  }
+
+  function waehleEinzeln(i: number) {
+    gewaehlt = [i];
+    anker = i;
+    offen = null;
+    zeigen(i);
   }
 
   function neuerSprecher(): string | null {
@@ -297,6 +332,11 @@
     const kennung = `s${n}`;
     entwurf.sprecher = [...entwurf.sprecher, { kennung, name: `Sprecher ${n}` }];
     return kennung;
+  }
+
+  function neuerSprecherFuerAuswahl() {
+    const k = neuerSprecher();
+    if (k && gewaehlt.length) zuweisen(k);
   }
 
   function sprecherUmbenennen(kennung: string, name: string) {
@@ -311,35 +351,35 @@
   }
 
   function auswahlAbspielen() {
-    if (!gewaehlt.length) return;
-    spielBis = segmente[gewaehlt[gewaehlt.length - 1]].ende;
-    spieler?.springe(segmente[gewaehlt[0]].start, true);
+    if (gewaehlt.length) spieler?.springe(segmente[gewaehlt[0]].start, true);
   }
 
-  function zuordnenTasten(e: KeyboardEvent) {
-    if (!zuordnen || !entwurf) return;
+  // Tasten im Bearbeiten (nicht beim Schreiben in Feldern): Ziffer, N, Pfeile, Leertaste, Eingabe, Escape
+  function bearbeitenTasten(e: KeyboardEvent) {
+    if (!bearbeiten || !entwurf || geraet.mobil) return;
     const ziel = e.target as HTMLElement;
     if (ziel.closest("input, textarea, [contenteditable]") || e.metaKey || e.ctrlKey || e.altKey) return;
     if (/^[1-9]$/.test(e.key)) {
       const s = entwurf.sprecher[Number(e.key) - 1];
       if (s && gewaehlt.length) {
         e.preventDefault();
-        zuweisen(s.kennung);
+        zuweisenUndWeiter(s.kennung);
       }
     } else if ((e.key === "n" || e.key === "N") && gewaehlt.length) {
       e.preventDefault();
       const k = neuerSprecher();
-      if (k) zuweisen(k);
+      if (k) zuweisenUndWeiter(k);
     } else if (e.key === "Escape") {
-      gewaehlt = [];
+      if (offen != null) offen = null;
+      else gewaehlt = [];
+    } else if (e.key === "Enter" && gewaehlt.length === 1 && offen == null) {
+      e.preventDefault();
+      oeffnen(gewaehlt[0]);
     } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && gewaehlt.length === 1) {
       e.preventDefault();
-      const i = Math.max(0, Math.min(segmente.length - 1, gewaehlt[0] + (e.key === "ArrowDown" ? 1 : -1)));
-      gewaehlt = [i];
-      anker = i;
-      zeigen(i);
+      waehleEinzeln(Math.max(0, Math.min(segmente.length - 1, gewaehlt[0] + (e.key === "ArrowDown" ? 1 : -1))));
     } else if (e.key === " " && gewaehlt.length) {
-      // vor dem Spieler (Erfassungsphase): mit Auswahl spielt die Leertaste genau die gewählten Beiträge
+      // vor dem Spieler: mit Auswahl spielt die Leertaste die gewählten Beiträge ab
       e.preventDefault();
       e.stopPropagation();
       if (laeuft) spieler?.umschalten();
@@ -363,6 +403,7 @@
       entwurf = structuredClone($state.snapshot(antwort.transkript)) as Transkript;
       entscheidungen = {};
       offen = null;
+      gewaehlt = [];
     } catch (f) {
       const meldung = (f as Error).message;
       if ((f as { status?: number }).status === 409) konflikt = true;
@@ -428,20 +469,58 @@
       <div class="marker-zeile"><i class="fa-solid fa-flag"></i>{marke(m.zeit)} {m.titel}</div>
     {/each}
     <div data-i={i}>
-      <Beitrag seg={s} sprecher={t?.sprecher ?? []} jetzt={i === aktiv ? zeit : null} {suche} mobil={geraet.mobil}
-               offen={bearbeiten && offen === i} {bearbeiten} geaendert={(bearbeiten || zuordnen) && geaendert.has(i)}
-               waehlbar={zuordnen} gewaehlt={zuordnen && gewaehltMenge.has(i)} onwaehlen={(e) => waehlen(i, e)}
-               onspringen={springen} onoeffnen={() => (offen = i)} onschliessen={() => (offen = null)}
+      <Beitrag seg={s} sprecher={t?.sprecher ?? []} jetzt={i === aktiv ? zeit : null} {suche} mobil={geraet.mobil} {bearbeiten}
+               offen={bearbeiten && offen === i} gewaehlt={bearbeiten && gewaehltMenge.has(i)} geaendert={bearbeiten && geaendert.has(i)}
+               spielerzeit={bearbeiten && offen === i ? zeit : null}
+               onspringen={springen} onklick={(e) => beitragKlick(i, e)} onschliessen={() => (offen = null)}
                onaendern={(neu) => segmentAendern(i, neu)} onteilen={(p) => teilen(i, p)} onzusammen={() => zusammen(i)}
-               onmarker={() => markerAmBeitrag(i)} />
+               onmarker={() => markerAmBeitrag(i)} onneuerSprecher={neuerSprecher} />
     </div>
-    {#if bearbeiten && !geraet.mobil}
+    {#if bearbeiten}
       {#each passendVorschlag(s) as v (v.id)}{@render vorschlagBox(v, s)}{/each}
     {/if}
   {/each}
   {#each markerVor[segmente.length] ?? [] as m (m.id)}
     <div class="marker-zeile"><i class="fa-solid fa-flag"></i>{marke(m.zeit)} {m.titel}</div>
   {/each}
+{/snippet}
+
+{#snippet suchfeld(mobil: boolean)}
+  <label class="suche text-suche" class:mobil-suche={mobil}><i class="fa-solid fa-magnifying-glass"></i>
+    <input class="eingabe-roh" placeholder="Im Text suchen" enterkeyhint="next" bind:value={suche} onkeydown={suchTaste} />
+    {@render trefferStand()}</label>
+{/snippet}
+
+{#snippet oberhalbText()}
+  {#if bearbeiten && entwurf}
+    <Bearbeitungsleiste mobil={geraet.mobil} aenderungen={ungespeichert} {speichert} bind:anhalten sprecher={entwurf.sprecher}
+                        gewaehlt={gewaehlt.length} onzuweisen={zuweisen} onneuerSprecher={neuerSprecherFuerAuswahl}
+                        onverwerfen={verwerfen} onspeichern={speichern} onfertig={bearbeitenBeenden} />
+  {/if}
+  {#if fehler}
+    <div class="fehlertext" style="margin-bottom:12px">{fehler}
+      {#if konflikt}<button class="knopf klein" style="margin-left:10px" onclick={() => { bearbeitenBeenden(); void laden(); }}>Neu laden (eigene Änderungen verwerfen)</button>{/if}</div>
+  {/if}
+  {#if bearbeiten && offeneVorschlaege.length}
+    <div class="optionen" style="margin-bottom:12px">
+      <span class="titel"><i class="fa-solid fa-wand-magic-sparkles"></i> KI-Korrektur</span>
+      <span style="font-size:var(--klein); color:var(--text-2)">{vorschlaege.length} Vorschläge: {Object.values(entscheidungen).filter((z) => z === "uebernommen").length} übernommen,
+        {Object.values(entscheidungen).filter((z) => z === "verworfen").length} verworfen, {offeneVorschlaege.length} offen</span>
+      <span class="knopfzeile" style="margin-left:auto">
+        <button class="knopf" onclick={() => offeneVorschlaege.forEach((v) => entscheiden(v, "uebernommen"))}>Alle offenen übernehmen</button>
+        <button class="knopf still" onclick={() => offeneVorschlaege.forEach((v) => entscheiden(v, "verworfen"))}>Alle verwerfen</button>
+      </span>
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet leiste(a: TranskriptAntwort)}
+  <TranskriptLeiste antwort={a} {anfrage} {zeit} {bearbeiten} vorschlaege={bearbeiten ? 0 : offeneVorschlaege.length} onspringen={springen}
+                    entwurf={bearbeiten ? entwurf : null} {ungespeichert} onzuordnen={bearbeitenBeginnen}
+                    zuordnung={bearbeiten ? { neu: neuerSprecher, umbenennen: sprecherUmbenennen, zusammenfuehren } : null}
+                    onneu={(a) => { antwort = a; if (bearbeiten) entwurf = structuredClone($state.snapshot(a.transkript)) as Transkript; }}
+                    onmarker={markerSpeichern} onvorschlaege={() => api.vorschlaege(id).then((v) => (vorschlaege = v))}
+                    onansehen={() => { bearbeitenBeginnen(); mehr = false; }} />
 {/snippet}
 
 {#if !antwort}
@@ -454,21 +533,19 @@
   <div class="t-ansicht">
   {#if anfrage}<AnfrageBand {anfrage} pfad={herkunft(antwort)} />{/if}
   <div class="knopfzeile" style="margin-bottom:8px">
-    <label class="suche" style="flex:1; min-width:0"><i class="fa-solid fa-magnifying-glass"></i>
-      <input class="eingabe-roh" placeholder="Im Text suchen" enterkeyhint="next" bind:value={suche} onkeydown={suchTaste} />
-      {@render trefferStand()}</label>
+    {@render suchfeld(true)}
+    {#if !bearbeiten}
+      <button class="rund" aria-label="Bearbeiten" title="Bearbeiten" onclick={bearbeitenBeginnen}><i class="fa-solid fa-pen"></i></button>
+    {/if}
     <button class="rund" aria-label="Mehr" class:aktiv={mehr} onclick={() => (mehr = !mehr)}><i class="fa-solid fa-ellipsis-vertical"></i></button>
   </div>
   {#if mehr}
-    <div class="karte" style="padding:0; margin-bottom:10px">
-      <TranskriptLeiste {antwort} {anfrage} {zeit} onspringen={springen} onneu={(a) => (antwort = a)} onmarker={markerSpeichern}
-                        onvorschlaege={() => api.vorschlaege(id).then((v) => (vorschlaege = v))} onansehen={() => {}} />
-    </div>
+    <div class="karte" style="padding:0; margin-bottom:10px">{@render leiste(antwort)}</div>
   {/if}
-  {#if fehler}<div class="fehlertext">{fehler}</div>{/if}
+  {@render oberhalbText()}
   <div bind:this={rollfeld} ontouchmove={selbstGerollt} onwheel={selbstGerollt} role="region" aria-label="Text">{@render text()}</div>
   <Spieler bind:this={spieler} src={api.tonAdresse(id, anfrage)} dauer={antwort.transkript.dauer_s} wellenform={welle ?? antwort.transkript.wellenform}
-           {spur} marker={antwort.transkript.marker.map((m) => m.zeit)} bind:zeit bind:laeuft kompakt />
+           {spur} marker={(t?.marker ?? []).map((m) => m.zeit)} bind:zeit bind:laeuft {stoppBei} kompakt />
   </div>
 {:else}
   <div class="geruest-innen">
@@ -476,91 +553,27 @@
       <div class="seiten-kopf">
         <button class="knopf still" style="padding:0 6px" onclick={zurueck}><i class="fa-solid fa-chevron-left"></i> {anfrage ? "Kellerwolke" : "Transkripte"}</button>
         <h1 class="titel-lang" title={antwort.transkript.name}>{antwort.transkript.name}</h1>
-        {#if zuordnen}
-          <span style="margin-left:auto; display:flex; gap:8px">
-            {#if ungespeichert}
-              <button class="knopf still" onclick={zuordnenBeenden}>Abbrechen</button>
-              <button class="knopf primaer" onclick={speichern} disabled={speichert}>
-                <i class="fa-solid {speichert ? 'fa-circle-notch fa-spin' : 'fa-floppy-disk'}"></i>
-                Speichern ({ungespeichert === 1 ? "1 Änderung" : `${ungespeichert} Änderungen`})</button>
-            {:else}<button class="knopf" onclick={zuordnenBeenden}>Fertig</button>{/if}
-          </span>
-        {:else if bearbeiten}
-          <span class="pille aktiv"><i class="fa-solid fa-pen"></i>Bearbeiten</span>
-          {#if !ungespeichert && !Object.keys(entscheidungen).length}<button class="knopf" onclick={bearbeitenBeenden}>Fertig</button>{/if}
-        {:else}
-          <label class="suche" style="min-width:180px"><i class="fa-solid fa-magnifying-glass"></i>
-            <input class="eingabe-roh" placeholder="Im Text suchen" bind:value={suche} onkeydown={suchTaste} />
-            {@render trefferStand()}</label>
-          <button class="knopf" onclick={bearbeitenBeginnen}><i class="fa-solid fa-pen"></i> Bearbeiten</button>
+        {@render suchfeld(false)}
+        {#if !bearbeiten}
+          <button class="knopf" onclick={bearbeitenBeginnen} title="Text, Sprecher, Zeiten und Marker ändern"><i class="fa-solid fa-pen"></i> Bearbeiten</button>
         {/if}
         <button class="knopf nur-schmal" title="Sprecher, Marker, Export, KI, Versionen" onclick={leisteOeffnen}>
           <i class="fa-solid fa-table-columns"></i> Leiste</button>
       </div>
       {#if anfrage}<div style="padding:0 22px"><AnfrageBand {anfrage} pfad={herkunft(antwort)} /></div>{/if}
       <Spieler bind:this={spieler} src={api.tonAdresse(id, anfrage)} dauer={antwort.transkript.dauer_s} wellenform={welle ?? antwort.transkript.wellenform}
-               {spur} marker={(t?.marker ?? []).map((m) => m.zeit)} bind:zeit bind:laeuft
-               stoppBei={bearbeiten && nurBeitrag && offen != null ? segmente[offen]?.ende ?? null : zuordnen ? spielBis : null} />
-      {#if bearbeiten}
-        <div class="knopfzeile" style="padding:8px 22px 0">
-          <span class="segment"><button class:aktiv={nurBeitrag} onclick={() => (nurBeitrag = true)}>Nur diesen Beitrag</button>
-            <button class:aktiv={!nurBeitrag} onclick={() => (nurBeitrag = false)}>Weiter</button></span>
-        </div>
-      {/if}
+               {spur} marker={(t?.marker ?? []).map((m) => m.zeit)} bind:zeit bind:laeuft {stoppBei} />
       <div class="rollfeld" style="padding-top:14px" bind:this={rollfeld} onwheel={selbstGerollt} ontouchmove={selbstGerollt}
            role="region" aria-label="Text">
         <div class="text-flaeche">
-          {#if fehler}
-            <div class="fehlertext" style="margin-bottom:12px">{fehler}
-              {#if konflikt}<button class="knopf klein" style="margin-left:10px" onclick={() => { bearbeitenBeenden(); void laden(); }}>Neu laden (eigene Änderungen verwerfen)</button>{/if}</div>
-          {/if}
-          {#if bearbeiten && offeneVorschlaege.length}
-            <div class="optionen">
-              <span class="titel"><i class="fa-solid fa-wand-magic-sparkles"></i> KI-Korrektur</span>
-              <span style="font-size:var(--klein); color:var(--text-2)">{vorschlaege.length} Vorschläge: {Object.values(entscheidungen).filter((z) => z === "uebernommen").length} übernommen,
-                {Object.values(entscheidungen).filter((z) => z === "verworfen").length} verworfen, {offeneVorschlaege.length} offen</span>
-              <span class="knopfzeile" style="margin-left:auto">
-                <button class="knopf" onclick={() => offeneVorschlaege.forEach((v) => entscheiden(v, "uebernommen"))}>Alle offenen übernehmen</button>
-                <button class="knopf still" onclick={() => offeneVorschlaege.forEach((v) => entscheiden(v, "verworfen"))}>Alle verwerfen</button>
-              </span>
-            </div>
-          {/if}
-          {#if zuordnen && entwurf}
-            <div class="zuordnen">
-              <span class="titel">{gewaehlt.length === 0 ? "Beitrag wählen" : gewaehlt.length === 1 ? "1 Beitrag gewählt" : `${gewaehlt.length} Beiträge gewählt`}</span>
-              {#each entwurf.sprecher as s, n (s.kennung)}
-                <button class="sprecher-knopf" disabled={!gewaehlt.length} onclick={() => zuweisen(s.kennung)}>
-                  <span class="punkt" style="background:{farbe(s.kennung)}"></span>{s.name}{#if n < 9}<kbd class="taste">{n + 1}</kbd>{/if}</button>
-              {/each}
-              <button class="sprecher-knopf" onclick={() => { const k = neuerSprecher(); if (k && gewaehlt.length) zuweisen(k); }}>
-                <i class="fa-solid fa-user-plus"></i>Neuer Sprecher<kbd class="taste">N</kbd></button>
-              <button class="knopf still" style="margin-left:auto" disabled={!gewaehlt.length} onclick={() => (gewaehlt = [])}>Auswahl aufheben</button>
-              <span class="hinweis">Klick wählt einen Beitrag, mit Umschalt einen Bereich. Ziffer ordnet zu und springt zum nächsten Beitrag;
-                Leertaste spielt die gewählten ab, Pfeil hoch und runter wechselt den Beitrag.</span>
-            </div>
-          {/if}
+          {@render oberhalbText()}
           {@render text()}
           {#if !segmente.length}<p class="leer">In dieser Aufnahme wurde nichts gesprochen.</p>{/if}
-          {#if bearbeiten && (ungespeichert || Object.keys(entscheidungen).length)}
-            <div class="speicherleiste" style="margin-top:14px">
-              <span class="was"><b style="color:var(--text)">{ungespeichert === 1 ? "1 Änderung" : `${ungespeichert} Änderungen`}</b> noch nicht
-                gespeichert. Speichern legt eine neue Version an; die jetzige bleibt abrufbar.</span>
-              <button class="knopf still" onclick={() => { entwurf = structuredClone($state.snapshot(antwort!.transkript)) as Transkript; entscheidungen = {}; offen = null; }}>Verwerfen</button>
-              <button class="knopf primaer" onclick={speichern} disabled={speichert}><i class="fa-solid {speichert ? 'fa-circle-notch fa-spin' : 'fa-floppy-disk'}"></i> Speichern</button>
-            </div>
-          {/if}
         </div>
       </div>
     </section>
-    <Leiste>
-      <TranskriptLeiste {antwort} {anfrage} {zeit} {bearbeiten} vorschlaege={bearbeiten ? 0 : offeneVorschlaege.length} onspringen={springen}
-                        entwurf={zuordnen ? entwurf : null} {ungespeichert} onzuordnen={zuordnenBeginnen}
-                        zuordnung={zuordnen ? { neu: neuerSprecher, umbenennen: sprecherUmbenennen, zusammenfuehren } : null}
-                        onneu={(a) => { antwort = a; if (bearbeiten || zuordnen) entwurf = structuredClone($state.snapshot(a.transkript)) as Transkript; }}
-                        onmarker={markerSpeichern} onvorschlaege={() => api.vorschlaege(id).then((v) => (vorschlaege = v))}
-                        onansehen={bearbeitenBeginnen} />
-    </Leiste>
+    <Leiste>{@render leiste(antwort)}</Leiste>
   </div>
 {/if}
 
-<svelte:window onkeydowncapture={zuordnenTasten} />
+<svelte:window onkeydowncapture={bearbeitenTasten} />

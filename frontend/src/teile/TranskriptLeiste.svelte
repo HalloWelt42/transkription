@@ -2,11 +2,13 @@
   // Leiste eines Transkripts, wie im Entwurf (mockups/transkription.html, 3): Sprecher mit Anteil, Profilvorschlag zum
   // Übernehmen, Umbenennen (als Profil oder nur hier) und Neu erkennen; Marker; Export (Download, auf Wunsch auch als
   // Datei daneben); KI über die Leitstelle (Korrigieren, Auswerten nach Vorlage); Versionen. Laufende Aufträge zu
-  // diesem Transkript stehen in ihrem Abschnitt; fertige laden nach. Beim Zuordnen der Sprecher (3b) zeigt sie den Entwurf:
-  // Umbenennen, Zusammenführen und neue Sprecher wirken dort und werden mit dem Entwurf gespeichert.
+  // diesem Transkript stehen in ihrem Abschnitt; fertige laden nach. Im Bearbeiten (3b) zeigt sie den Entwurf:
+  // Umbenennen, Zusammenführen, neue Sprecher und Marker wirken dort und werden mit dem Entwurf gespeichert; ein Marker
+  // außerhalb öffnet das Bearbeiten (eine Regel für jede Änderung).
   import { onMount } from "svelte";
   import { Auswahl, beiAuftrag, farbe, gehe, marke, wann, type Auftrag } from "appkern-oberflaeche";
   import * as api from "../lib/api";
+  import { neueKennung } from "../lib/kennung";
   import { ANZAHL_OPTIONEN, ERKENNEN_WEGE, type ErkennenWeg } from "../lib/sprecherwahl";
   import type { ExportFormat, Marker, Profil, Transkript, TranskriptAntwort, Version, Vorlage } from "../lib/typen";
 
@@ -170,7 +172,7 @@
     const titel = markerTitel.trim();
     if (!titel) return;
     void machen(async () => {
-      await onmarker([...t.marker, { id: crypto.getRandomValues(new Uint32Array(4)).join("-"), zeit: Math.round(zeit * 10) / 10,
+      await onmarker([...t.marker, { id: neueKennung(), zeit: Math.round(zeit * 10) / 10,
         titel, farbe: "gelb" as const }]);
       markerTitel = "";
       modus = "";
@@ -277,7 +279,7 @@
     {:else}
       <div class="knopfreihe">
         {#if t.sprecher.length}<button class="knopf klein still" onclick={umbenennenBeginnen} disabled={bearbeiten}><i class="fa-solid fa-pen"></i> Umbenennen</button>{/if}
-        {#if onzuordnen}<button class="knopf klein still" onclick={onzuordnen} disabled={bearbeiten}><i class="fa-solid fa-hand-pointer"></i> Von Hand zuordnen</button>{/if}
+        {#if onzuordnen}<button class="knopf klein still" onclick={onzuordnen} disabled={bearbeiten} title="Öffnet das Bearbeiten"><i class="fa-solid fa-hand-pointer"></i> Von Hand zuordnen</button>{/if}
         <button class="knopf klein still" onclick={() => (modus = "erkennen")} disabled={!!laufend.sprecher_erkennen || bearbeiten}>
           <i class="fa-solid fa-rotate"></i> {t.sprecher.length ? "Neu erkennen" : "Sprecher erkennen"}</button>
       </div>
