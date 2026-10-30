@@ -177,9 +177,12 @@ async def test_zusammenfuehren_der_frueheren_ablage(verbund):
     kw = g.kellerwolke
     zweig = (await kw.ich()).zweig
     lauf = f"Alt {secrets.token_hex(2)}"
-    aufnahme = await kw.schreiben(f"{(await kw.ordner(f'{zweig}/Aufnahmen/{lauf}')).pfad}/Runde.mp3", ton, nur_neu=True,
-                                  inhaltstyp="audio/mpeg")
+    ordner_aufnahmen = await kw.ordner(f"{zweig}/Aufnahmen/{lauf}")
     alt = await kw.ordner(f"{zweig}/Transkripte/{lauf}")
+    # beide Ordner gleich zum Aufräumen (mit Inhalt in den Papierkorb), auch wenn der Test unterwegs scheitert;
+    # sonst sammeln sich leere Ordner im Testzweig und der erste Abgleich wird mit jedem Lauf langsamer (HELF-58)
+    angelegt += [str(ordner_aufnahmen.id), str(alt.id)]
+    aufnahme = await kw.schreiben(f"{ordner_aufnahmen.pfad}/Runde.mp3", ton, nur_neu=True, inhaltstyp="audio/mpeg")
     angelegt += [str(aufnahme.id)]
 
     def transkript(name: str, quelle) -> bytes:
@@ -208,4 +211,3 @@ async def test_zusammenfuehren_der_frueheren_ablage(verbund):
     assert (await kw.knoten(waise.id)).pfad.endswith(f"/Aufnahmen/{lauf}/Ohne Ton.transkript.json")
     assert (await kw.knoten(notiz.id)).pfad == f"{alt.pfad}/Notiz.txt"
     assert (await c.get("/api/v1/ablage/zusammenfuehren", headers=h)).json()["noetig"] is False   # nur noch die Notiz dort
-    angelegt += [str((await kw.pfad(f"{zweig}/Aufnahmen/{lauf}")).id)]

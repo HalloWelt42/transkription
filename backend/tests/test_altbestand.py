@@ -139,6 +139,7 @@ async def test_uebernahme_von_hand(tmp_path: Path):
     g = app.state.geruest
     await g.starten()
     angelegt: list[str] = []
+    zielordner_pfad = ""
     try:
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t", timeout=60) as c:
             assert (await c.post("/api/v1/einrichtung", json={"kellerwolke_adresse": W["KELLERWOLKE_ADRESSE"],
@@ -157,6 +158,7 @@ async def test_uebernahme_von_hand(tmp_path: Path):
             assert [s["id"] for s in eintrag["staende"]] == ["alt1", "alt2"] and eintrag["uebernommen"] is None
 
             zielordner = f"Altbestand {secrets.token_hex(2)}"
+            zielordner_pfad = f"{(await g.kellerwolke.ich()).zweig}/Aufnahmen/{zielordner}"
             name = f"Probe Alt {secrets.token_hex(2)}"
             # erst bricht die Übernahme nach dem Hochladen ab: unvollständig, nicht übernommen
             abbruch = await warten(c, h, (await c.post("/api/v1/altbestand/uebernehmen", headers=h, json={
@@ -205,6 +207,9 @@ async def test_uebernahme_von_hand(tmp_path: Path):
                     angelegt.append(str(k.id))
     finally:
         if g.kellerwolke is not None:
+            # der Zielordner auch dann, wenn der Test vor dem Ende scheiterte (sonst sammeln sich Ordner, HELF-58)
+            if zielordner_pfad and (k := await g.kellerwolke.finden(zielordner_pfad)) is not None and str(k.id) not in angelegt:
+                angelegt.append(str(k.id))
             # erst die Dateien, dann die (dann leeren) Ordner; ein Ordner bekommt einen zweiten Versuch
             for runde in (0, 1):
                 for k in list(angelegt):
