@@ -6,7 +6,8 @@
   // Datei kommt; die App darf nur lesen und Begleiter schreiben, darum Marker nur ansehen und kein Papierkorb.
   import { onMount } from "svelte";
   import { AnfrageBand, Auswahl, beiAuftrag, gehe, geraet, groesse, Leiste, leisteOeffnen, marke, navigation,
-           Rueckfrage, Spieler, SPRACHEN, wann, zurueckZurKellerwolke } from "appkern-oberflaeche";
+           Rueckfrage, Spieler, wann, zurueckZurKellerwolke } from "appkern-oberflaeche";
+  import { sprachOptionen as sprachWahl } from "../lib/sprachen.svelte";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import type { Aufnahme } from "../lib/typen";
@@ -30,7 +31,7 @@
   let loeschenFrage = $state(false);
   let loescht = $state(false);
 
-  const sprachOptionen = Object.entries(SPRACHEN).map(([wert, titel]) => ({ wert, titel }));
+  const sprachOptionen = $derived(sprachWahl());
   const ordner = $derived(a ? a.pfad.split("/").slice(0, -1).join("/") : "");
   const format = $derived(a ? (a.name.split(".").pop() ?? "").toUpperCase() : "");
   const laufend = $derived(a?.stand === "laeuft" || a?.stand === "wartet");

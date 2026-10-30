@@ -3,7 +3,8 @@
   // Dateiwahl des Appkerns: wählbar sind Ton und Video ohne Transkript, das Transkript kommt neben die Datei. Eigen ist
   // der Transkription nur, wie sie startet (Sprache, Sprecher, Anzahl).
   import { onMount } from "svelte";
-  import { Auswahl, Dateiwahl, SPRACHEN, type WahlSeite, type WahlZweck } from "appkern-oberflaeche";
+  import { Auswahl, Dateiwahl, type WahlSeite, type WahlZweck } from "appkern-oberflaeche";
+  import { sprachOptionen as sprachWahl } from "../lib/sprachen.svelte";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
 
@@ -13,7 +14,7 @@
   let sprache = $state("de");
   let sprecher = $state<SprecherWeg>("ohne");
   let anzahl = $state<number | null>(null);
-  const sprachOptionen = Object.entries(SPRACHEN).map(([wert, titel]) => ({ wert, titel }));
+  const sprachOptionen = $derived(sprachWahl());
 
   onMount(() => {
     void (async () => {

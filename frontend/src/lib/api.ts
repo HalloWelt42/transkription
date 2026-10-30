@@ -37,6 +37,9 @@ export const aufnahmen = (o: { ordner?: string | null; filter?: string; suche?: 
 export const transkribieren = (e: { quelle_id: string; name?: string; sprache?: string; sprecher?: SprecherWeg; anzahl?: number | null }) =>
   hole<Auftrag>("/transkribieren", { method: "POST", ...json(e) });
 
+// Sprachen zur Wahl: was der Hördienst laut Steckbrief kann (mit "auto" zum Erkennen)
+export const sprachen = () => hole<{ code: string; name: string }[]>("/sprachen");
+
 // Mitlesen: was ein laufender Auftrag schon gehört hat und wie lange er noch braucht
 export const bisher = (auftrag: string) => hole<Bisher>(`/transkribieren/${encodeURIComponent(auftrag)}/bisher`);
 

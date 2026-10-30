@@ -319,6 +319,7 @@ def router(teile: Teile) -> APIRouter:
 
     @r.post("/{transkript_id}/korrigieren", status_code=201, response_model=Auftrag)
     async def korrigieren(transkript_id: UUID, anfrage: UUID | None = None, konto: Konto = g.pflicht) -> Auftrag:
+        teile.ki_modell()                       # ohne gewähltes Modell gleich eine klare Meldung
         t, _ = await lesen(transkript_id, anfrage)
         return await g.auftraege.einreihen("korrigieren", KorrigierenEingabe(transkript_id=transkript_id, anfrage_id=anfrage,
                                                                              von=von(konto)), titel=f"{t.name}: Korrektur")
@@ -326,6 +327,7 @@ def router(teile: Teile) -> APIRouter:
     @r.post("/{transkript_id}/auswerten", status_code=201, response_model=Auftrag)
     async def auswerten(transkript_id: UUID, eingabe: VorlageEingabe, anfrage: UUID | None = None,
                         konto: Konto = g.pflicht) -> Auftrag:
+        teile.ki_modell()
         t, _ = await lesen(transkript_id, anfrage)
         return await g.auftraege.einreihen("auswerten", AuswertenEingabe(
             transkript_id=transkript_id, anfrage_id=anfrage, vorlage=eingabe.vorlage, von=von(konto)),

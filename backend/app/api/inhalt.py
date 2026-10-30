@@ -17,7 +17,7 @@ from appkern.ton.wav import dauer as wav_dauer
 
 from ..ablage import orte
 from ..ablage.transkripte import aufnahme_id
-from ..einstellungen import Sprache
+from ..sprachen import Sprache
 from ..export import FORMATE, Format, erzeugen
 from ..modell.transkript import Segment
 from ..teile import Teile
@@ -86,6 +86,7 @@ def router(teile: Teile) -> APIRouter:
     @r.post("/hoeren", response_model=Gehoert, dependencies=[g.pflicht])
     async def hoeren(datei: UploadFile, sprache: Sprache | None = Query(None)) -> Gehoert:
         """Kurzer Ton (bis zwei Minuten) sofort zu Text, ohne Auftrag: Spracheingabe, Referenztexte."""
+        await teile.sprachen.pruefen(sprache)
         ordner = teile.arbeit / f"hoeren-{uuid.uuid4().hex}"
         ordner.mkdir(parents=True, exist_ok=True)
         try:

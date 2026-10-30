@@ -108,6 +108,10 @@ transkription`. Probe wie in Schritt 3.
   schläft); Aufträge warten und laufen am nächsten Abschnitt weiter.
 - Das Mikrofon geht nicht: die Seite muss über HTTPS kommen ({{adresse}}), und das Gerät muss der Hausstelle vertrauen.
 - Eine Aktion im Dateimenü der Kellerwolke fehlt: "Adresse dieser App" ist nicht gesetzt (Schritt 5).
+- Korrigieren oder Auswerten geht nicht: unter Einstellungen, KI ist kein Sprachmodell gewählt, oder die Leitstelle
+  bietet das gewählte der Anwendung Transkription nicht an (Fähigkeit text).
+- Eine Sprache fehlt zur Wahl: die Sprachen kommen aus dem Steckbrief des Hördienstes (Selbstauskunft in seiner
+  Dienstdatei, siehe [[Klangwerk]]); antwortet die Leitstelle nicht, steht nur Erkennen und die eingestellte zur Wahl.
 - Die Suche findet etwas nicht: unter Transkripte sucht sie in Namen, Text und Markern der eigenen Transkripte
   (nicht in denen, die andere Apps bestellen), unter Aufnahmen nur nach Dateinamen ab dem gewählten Ordner abwärts.
 - Das Ausrollen wartet lange: es wartet auf eine Lücke ohne laufenden Auftrag (bis vier Stunden); `--sofort` rollt

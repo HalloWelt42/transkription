@@ -9,23 +9,22 @@ from pydantic import Field, SecretStr
 
 from appkern.app import Grundeinstellungen
 
+from .sprachen import Sprache
+
 HOEREN = {"gruppe": "Hören"}
 SPRECHER = {"gruppe": "Sprecher"}
 KI = {"gruppe": "KI"}
 TECHNIK = {"gruppe": "Technik"}
 ALTBESTAND = {"gruppe": "Altbestand"}
 
-SPRACHEN = {"de": "Deutsch", "en": "Englisch", "fr": "Französisch", "es": "Spanisch", "it": "Italienisch",
-            "nl": "Niederländisch", "auto": "Erkennen"}
-Sprache = Literal["de", "en", "fr", "es", "it", "nl", "auto"]
 SprecherWeg = Literal["ohne", "stimmen", "trennung"]
 SPRECHER_WEGE = {"ohne": "Ohne Sprecher", "stimmen": "Stimmen gruppieren", "trennung": "Mit Sprechertrennung"}
 
 
 class AppEinstellungen(Grundeinstellungen):
-    sprache: Sprache = Field("de", title="Sprache", json_schema_extra={**HOEREN, "beschriftungen": SPRACHEN},
+    sprache: Sprache = Field("de", title="Sprache", json_schema_extra=HOEREN,
                              description="In welcher Sprache gesprochen wird; Vorgabe für neue Aufträge, je Auftrag änderbar. "
-                                         "Erkennen lässt den Hördienst entscheiden.")
+                                         "Zur Wahl steht, was der Hördienst kann; Erkennen lässt ihn entscheiden.")
     abschnitt_min: int = Field(10, ge=2, le=30, title="Abschnittslänge", json_schema_extra={**HOEREN, "einheit": "Minuten"},
                                description="Lange Aufnahmen gehen in Abschnitten dieser Länge an den Hördienst, geschnitten in "
                                            "Sprechpausen. Nach einem Abbruch geht es beim nächsten Abschnitt weiter.")
@@ -59,9 +58,9 @@ class AppEinstellungen(Grundeinstellungen):
                                         json_schema_extra={**SPRECHER, "schritt": 5, "einheit": "% Ähnlichkeit"},
                                         description="Zwei erkannte Sprecher mit so ähnlichen Stimmen werden einer.")
 
-    ki_modell: str = Field("", title="Sprachmodell", json_schema_extra=KI,
-                           description="Für Korrektur und Auswertung. Ohne eigene Wahl entscheidet die Kette der App in der "
-                                       "Leitstelle.")
+    ki_modell: str = Field("qwen/qwen3-next-80b", title="Sprachmodell", json_schema_extra=KI,
+                           description="Für Korrektur und Auswertung. Die App wählt das Modell, nie die Leitstelle; zur Wahl "
+                                       "steht, was die Leitstelle dieser App für Text anbietet.")
 
     abspiel_speicher_gb: int = Field(20, ge=1, le=500, title="Speicher für Abspielfassungen",
                                      json_schema_extra={**TECHNIK, "einheit": "GB"},

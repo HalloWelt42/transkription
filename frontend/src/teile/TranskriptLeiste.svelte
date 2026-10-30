@@ -5,7 +5,7 @@
   // diesem Transkript stehen in ihrem Abschnitt; fertige laden nach. Beim Zuordnen der Sprecher (3b) zeigt sie den Entwurf:
   // Umbenennen, Zusammenführen und neue Sprecher wirken dort und werden mit dem Entwurf gespeichert.
   import { onMount } from "svelte";
-  import { Auswahl, beiAuftrag, farbe, marke, wann, type Auftrag } from "appkern-oberflaeche";
+  import { Auswahl, beiAuftrag, farbe, gehe, marke, wann, type Auftrag } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, ERKENNEN_WEGE, type ErkennenWeg } from "../lib/sprecherwahl";
   import type { ExportFormat, Marker, Profil, Transkript, TranskriptAntwort, Version, Vorlage } from "../lib/typen";
@@ -82,8 +82,12 @@
     }
   }
 
+  // Die App wählt das Sprachmodell (Einstellungen, KI); ohne Wahl sagt die Leiste das, statt Aufträge scheitern zu lassen
+  let kiModell = $state<string | null>(null);
+
   onMount(() => {
     api.profile().then((p) => (profile = p)).catch(() => {});
+    void api.einstellung<string>("ki_modell").then((m) => (kiModell = m ?? ""));
     return beiAuftrag((a) => {
       if (a.eingabe.transkript_id !== antwort.id) return;
       if (a.zustand === "wartet" || a.zustand === "laeuft") {
@@ -339,11 +343,16 @@
         <button class="knopf klein still" onclick={() => (modus = "")}>Abbrechen</button>
       </div>
     {:else}
+      {#if kiModell === ""}
+        <p class="fehlertext" style="margin:0 0 8px">Kein Sprachmodell gewählt. Unter Einstellungen, KI, Sprachmodell eines wählen.
+          <button class="knopf klein" onclick={() => gehe("einstellungen")}>Einstellungen</button></p>
+      {/if}
       <div class="knopfreihe">
-        <button class="knopf klein" disabled={!!laufend.korrigieren} onclick={() => machen(() => api.korrigieren(antwort.id, anfrage))}>
+        <button class="knopf klein" disabled={!!laufend.korrigieren || kiModell === ""} onclick={() => machen(() => api.korrigieren(antwort.id, anfrage))}>
           <i class="fa-solid fa-wand-magic-sparkles"></i> Korrigieren</button>
-        <button class="knopf klein" disabled={!!laufend.auswerten} onclick={() => (modus = "auswerten")}><i class="fa-solid fa-list-ul"></i> Auswerten</button>
+        <button class="knopf klein" disabled={!!laufend.auswerten || kiModell === ""} onclick={() => (modus = "auswerten")}><i class="fa-solid fa-list-ul"></i> Auswerten</button>
       </div>
+      {#if kiModell}<p class="hilfe-zeile" style="margin-top:6px">Sprachmodell: {kiModell}</p>{/if}
     {/if}
     {#each ["korrigieren", "auswerten"] as art (art)}
       {#if laufend[art]}<p class="lauf-zeile"><i class="fa-solid fa-circle-notch fa-spin"></i> {art === "korrigieren" ? "Korrektur" : "Auswertung"}: {lauf(art)}</p>{/if}

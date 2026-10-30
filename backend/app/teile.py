@@ -17,9 +17,10 @@ from appkern.kellerwolke import Kellerwolke, Knoten
 from .ablage.transkripte import Transkripte, zugang
 from . import altbestand
 from .abgleich import Abgleich
-from .dienste import Klangwerk
+from .dienste import Klangwerk, KeinSprachmodell
 from .einstellungen import AppEinstellungen
 from .mitlesen import Mitlesen
+from .sprachen import Sprachen
 from .modell.transkript import Transkript
 from .sprechererkennung import Schwellen
 from .suchindex import Suchindex
@@ -38,6 +39,7 @@ class Teile(Begleiter):
         self.abgleich = Abgleich(geruest, self.transkripte, self.index)
         e = lambda: geruest.einstellungen.stand  # noqa: E731
         self.ton = TonDienst(lambda: geruest.leitstelle, lambda: e().dienst_ton)     # Tonarbeit nur auf dem Mac
+        self.sprachen = Sprachen(lambda: geruest.leitstelle, lambda: e().dienst_hoeren, lambda: e().sprache)
         self.abspielen = Abspielfassungen(geruest.daten / "abspielen", lambda: self.ton,
                                           lambda: float(self.einstellungen.abspiel_speicher_gb))
         self.klangwerk = Klangwerk(lambda: geruest.leitstelle,
@@ -65,6 +67,12 @@ class Teile(Begleiter):
     def einstellungen(self) -> AppEinstellungen:
         return self.geruest.einstellungen.stand
 
+    def ki_modell(self) -> str:
+        """Das gewählte Sprachmodell für Korrektur und Auswertung; ohne Wahl ein klarer Fehler statt der Leitstelle."""
+        if not (modell := self.einstellungen.ki_modell.strip()):
+            raise KeinSprachmodell()
+        return modell
+
     @property
     def schwellen(self) -> Schwellen:
         e = self.einstellungen
@@ -80,10 +88,11 @@ class Teile(Begleiter):
         """Auswahl aus dem System für die Einstellungen: Dienste und Modelle der Leitstelle."""
         g = self.geruest
         g.einstellungen.anbieten("dienst_hoeren", g.leitstelle_angebot("hoeren"))
+        g.einstellungen.anbieten("sprache", self.sprachen.angebot)
         g.einstellungen.anbieten("dienst_ton", g.leitstelle_angebot("ton"))
         g.einstellungen.anbieten("dienst_sprecher", g.leitstelle_angebot("sprecher_erkennen"))
         g.einstellungen.anbieten("dienst_trennen", g.leitstelle_angebot("sprecher_trennen"))
-        g.einstellungen.anbieten("ki_modell", g.leitstelle_angebot("text", leer="Kette der App in der Leitstelle"))
+        g.einstellungen.anbieten("ki_modell", g.leitstelle_angebot("text"))
 
         async def alte_app() -> Angebot:
             """Sucht im Heimnetz (je /24 von Kellerwolke und Leitstelle) nach der alten App und zählt ihren Altbestand."""

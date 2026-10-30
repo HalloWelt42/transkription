@@ -5,10 +5,11 @@
   // Entwurf: mockups/transkription.html (1), transkription-mobil.html (1, 2) und verbund.html (6a, 6b, 6e).
   import { onMount } from "svelte";
   import { aufnahme, aufnahmeAlsDatei, aufnahmeVerwerfen, aufnehmen, Auswahl, beiAuftrag, gehe, geraet, geraeteLaden,
-           gespeicherteAufnahmen, groesse, marke, navigation, quelleWechseln, Rueckfrage, SPRACHEN, uploadEntfernen, uploads,
+           gespeicherteAufnahmen, groesse, marke, navigation, quelleWechseln, Rueckfrage, uploadEntfernen, uploads,
            wann, type Gespeichert, type WahlSeite } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
+  import { sprachOptionen as sprachWahl } from "../lib/sprachen.svelte";
   import type { Aufnahme, AufnahmenSeite, Ordner } from "../lib/typen";
   import Altbestand from "../teile/Altbestand.svelte";
   import AufnahmeAnsicht from "../teile/AufnahmeAnsicht.svelte";
@@ -240,7 +241,7 @@
     ...(alteApp && !geraet.mobil ? [{ wert: ALTBESTAND as string | null, titel: "Altbestand der alten App", hinweis: "nur lesen, übernehmen von Hand" }] : []),
     { wert: KELLERWOLKE as string | null, titel: "Alle deine Dateien in der Kellerwolke", hinweis: "jede Datei einzeln, nur für den Auftrag" },
   ]);
-  const sprachOptionen = Object.entries(SPRACHEN).map(([wert, titel]) => ({ wert, titel }));
+  const sprachOptionen = $derived(sprachWahl());
   const ART = { ton: "fa-file-audio", video: "fa-file-video" };
 
   // "2:14:08 · M4A · 186 MB · heute 08:12" wie im Entwurf; die Dauer, sobald sie bekannt ist

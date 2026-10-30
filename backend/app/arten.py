@@ -40,7 +40,8 @@ from . import altbestand, auswertung, export, korrektur, umzug
 from .ablage import orte
 from .ablage.transkripte import aufnahme_id, begleiter_ablegen
 from .dienste import KeineLeitstelle, Wechsel
-from .einstellungen import Sprache, SprecherWeg
+from .einstellungen import SprecherWeg
+from .sprachen import Sprache
 from .fassung import FASSUNG
 from .modell.transkript import Aenderung, ErzeugtMit, Marker, Quelle, Segment, Transkript
 from .sprechererkennung import an_wechseln_teilen, erkennen
@@ -235,6 +236,7 @@ def arten(teile: Teile) -> list[Art]:
         e: TranskribierenEingabe = k.eingabe
         einst = teile.einstellungen
         sprache = e.sprache or einst.sprache
+        await teile.sprachen.pruefen(sprache)          # vor aller Arbeit: kann der Hördienst sie?
         weg = e.sprecher or einst.sprecher_weg
         mit_sprechern = weg != "ohne"
         if "transkript_id" in k.zwischenstand:          # schon gespeichert, nur der Abschluss fehlte
@@ -460,6 +462,7 @@ def arten(teile: Teile) -> list[Art]:
 
     async def korrigieren(k: Kontext) -> dict:
         e: KorrigierenEingabe = k.eingabe
+        modell = teile.ki_modell()
         t, _ = await teile.transkripte_fuer(e.anfrage_id).lesen(e.transkript_id)
         bereiche = korrektur.fenster(len(t.segmente))
         gesammelt: list[dict] = list(k.zwischenstand.get("vorschlaege", []))
@@ -470,7 +473,7 @@ def arten(teile: Teile) -> list[Art]:
                 continue
             await k.pruefen()
             antwort = await geduldig(k, lambda: g_leitstelle().chat(
-                korrektur.anfrage(t.segmente, bereich), modell=teile.einstellungen.ki_modell or None,
+                korrektur.anfrage(t.segmente, bereich), modell=modell,
                 titel=f"{t.name}, Korrektur {n + 1} von {len(bereiche)}", prioritaet="hintergrund",
                 temperature=0.1, max_tokens=1200), "Korrektur")
             gesammelt += [v.model_dump(mode="json") for v in korrektur.vorschlaege(t.segmente, bereich, antwort.text)]
@@ -484,11 +487,12 @@ def arten(teile: Teile) -> list[Art]:
 
     async def auswerten(k: Kontext) -> dict:
         e: AuswertenEingabe = k.eingabe
+        modell = teile.ki_modell()
         kw = teile.zugang(e.anfrage_id)
         t, knoten = await teile.transkripte_fuer(e.anfrage_id).lesen(e.transkript_id)
         await k.fortschritt(None, auswertung.titel(e.vorlage), phase="auswerten")
         antwort = await geduldig(k, lambda: g_leitstelle().chat(
-            auswertung.anfrage(e.vorlage, export.als_markdown(t)), modell=teile.einstellungen.ki_modell or None,
+            auswertung.anfrage(e.vorlage, export.als_markdown(t)), modell=modell,
             titel=f"{t.name}, {auswertung.titel(e.vorlage)}", prioritaet="hintergrund", temperature=0.2,
             max_tokens=3000), "Auswertung")
         await k.fortschritt(None, "Speichern", phase="speichern")

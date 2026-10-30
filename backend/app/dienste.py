@@ -21,6 +21,13 @@ class KeineLeitstelle(Exception):
     """Die App ist noch nicht mit einer Leitstelle verbunden."""
 
 
+class KeinSprachmodell(Exception):
+    """Für Korrektur und Auswertung ist kein Sprachmodell gewählt (die App wählt es, nie die Leitstelle)."""
+
+    def __init__(self) -> None:
+        super().__init__("Kein Sprachmodell gewählt: unter Einstellungen, KI, Sprachmodell eines wählen")
+
+
 @dataclass(frozen=True)
 class HoerErgebnis:
     segmente: list[Segment]

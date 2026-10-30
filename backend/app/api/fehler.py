@@ -9,7 +9,8 @@ from appkern.kellerwolke import (
 from appkern.leitstelle import LeitstellenFehler
 
 from ..ablage.transkripte import KeineKellerwolke, Unlesbar
-from ..dienste import KeineLeitstelle
+from ..dienste import KeineLeitstelle, KeinSprachmodell
+from ..sprachen import UnbekannteSprache
 from appkern.ton import TonFehler
 
 
@@ -43,6 +44,14 @@ def behandeln(app: FastAPI) -> None:
     @app.exception_handler(KellerwolkeFehler)
     async def kellerwolke(_: Request, f: KellerwolkeFehler):
         return _kellerwolke(f)
+
+    @app.exception_handler(KeinSprachmodell)
+    async def kein_sprachmodell(_: Request, f: KeinSprachmodell):
+        return _antwort(422, str(f))
+
+    @app.exception_handler(UnbekannteSprache)
+    async def sprache(_: Request, f: UnbekannteSprache):
+        return _antwort(422, str(f))
 
     @app.exception_handler(Konflikt)
     async def konflikt(_: Request, f: Konflikt):

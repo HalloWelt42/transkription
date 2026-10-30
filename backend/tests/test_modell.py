@@ -102,5 +102,7 @@ def test_anfrage_einer_anderen_app_gibt_sprache_mit():
     t = eingabe_aus_anfrage(e)
     assert (t.sprache, t.sprecher, t.quelle_id) == ("en", None, e.knoten_id)
     assert eingabe_aus_anfrage(e.model_copy(update={"optionen": {}})).sprache is None   # dann gilt die Einstellung
+    # jede Sprache in der Form ISO 639-1 (ob der Hördienst sie kann, prüft der Auftrag), nur keine andere Form
+    assert eingabe_aus_anfrage(e.model_copy(update={"optionen": {"sprache": "ru"}})).sprache == "ru"
     with pytest.raises(ValidationError):
-        eingabe_aus_anfrage(e.model_copy(update={"optionen": {"sprache": "xx"}}))
+        eingabe_aus_anfrage(e.model_copy(update={"optionen": {"sprache": "russisch"}}))

@@ -1,7 +1,8 @@
 <script lang="ts">
   // Aufnehmen mit dem Rekorder des Appkerns: die Aufnahme kommt nach Aufnahmen; danach entscheidet der Nutzer, ob sie
   // transkribiert wird, der Live-Text das Transkript wird, sie nur liegen bleibt oder in den Papierkorb geht.
-  import { aufnahme, Auswahl, Rekorder, Rueckfrage, SPRACHEN, type NachDerAufnahme } from "appkern-oberflaeche";
+  import { aufnahme, Auswahl, Rekorder, Rueckfrage, type NachDerAufnahme } from "appkern-oberflaeche";
+  import { sprachOptionen as sprachWahl } from "../lib/sprachen.svelte";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
 
@@ -13,7 +14,7 @@
   let sprecher = $state<SprecherWeg>("ohne");
   let anzahl = $state<number | null>(null);
   let verwerfenFrage = $state(false);
-  const sprachOptionen = Object.entries(SPRACHEN).map(([wert, titel]) => ({ wert, titel }));
+  const sprachOptionen = $derived(sprachWahl());
 
   async function verwerfenJetzt(d: NachDerAufnahme) {
     sendet = true;

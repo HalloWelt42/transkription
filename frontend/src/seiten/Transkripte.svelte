@@ -4,7 +4,8 @@
   // aus der Kellerwolke geöffnet mit ihrer Anfrage (/transkripte/<kennung>/anfrage/<anfrage>).
   // Entwurf: mockups/transkription.html (2) und transkription-mobil.html (4).
   import { onMount } from "svelte";
-  import { Auswahl, gehe, geraet, marke, navigation, sprache as spracheName, SPRACHEN, wann } from "appkern-oberflaeche";
+  import { Auswahl, gehe, geraet, marke, navigation, wann } from "appkern-oberflaeche";
+  import { spracheName, sprachOptionen as sprachWahl } from "../lib/sprachen.svelte";
   import * as api from "../lib/api";
   import type { Eintrag, Verzeichnis } from "../lib/typen";
   import TranskriptAnsicht from "../teile/TranskriptAnsicht.svelte";
@@ -51,8 +52,8 @@
     void laden();
   }
 
-  const sprachOptionen = [{ wert: null as string | null, titel: "Alle Sprachen" },
-    ...Object.entries(SPRACHEN).filter(([k]) => k !== "auto").map(([wert, titel]) => ({ wert: wert as string | null, titel }))];
+  const sprachOptionen = $derived([{ wert: null as string | null, titel: "Alle Sprachen" },
+    ...sprachWahl(false).map((o) => ({ wert: o.wert as string | null, titel: o.titel }))]);
   const sprecherOptionen = $derived([{ wert: null as string | null, titel: "Sprecher" },
     ...namen.filter((n) => !sprecher.includes(n)).map((n) => ({ wert: n as string | null, titel: n }))]);
   const begriffe = $derived(suche.trim().toLowerCase().split(/\s+/).filter(Boolean));

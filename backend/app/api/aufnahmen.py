@@ -20,7 +20,8 @@ from appkern.kellerwolke import Kellerwolke, KellerwolkeFehler, Knoten
 from .. import umzug
 from ..ablage import orte
 from ..arten import TranskribierenAnfrage, TranskribierenEingabe
-from ..einstellungen import Sprache, SprecherWeg
+from ..einstellungen import SprecherWeg
+from ..sprachen import Sprache, SpracheEintrag
 from ..mitlesen import Bisher
 from ..teile import Teile
 from .gemeinsam import von
@@ -256,12 +257,18 @@ def router(teile: Teile) -> APIRouter:
     async def transkribieren(anfrage: TranskribierenAnfrage, konto: Konto = g.pflicht) -> Auftrag:
         if anfrage.anfrage_id is not None:
             raise HTTPException(422, "Dateien aus der Kellerwolke über /kellerwolke/transkribieren")
+        await teile.sprachen.pruefen(anfrage.sprache)
         kw = teile.zugang()
         quelle = await kw.knoten(anfrage.quelle_id)
         if orte.art_der_aufnahme(quelle) is None:
             raise HTTPException(422, f"{quelle.name} ist keine Ton- oder Videodatei")
         eingabe = TranskribierenEingabe(**anfrage.model_dump(), von=von(konto))
         return await g.auftraege.einreihen("transkribieren", eingabe, titel=anfrage.name or orte.anzeigename(quelle.name))
+
+    @r.get("/sprachen", response_model=list[SpracheEintrag])
+    async def sprachen() -> list[SpracheEintrag]:
+        """Zur Wahl beim Transkribieren: Erkennen und was der Hördienst laut Steckbrief kann, mit deutschem Namen."""
+        return await teile.sprachen.liste()
 
     @r.get("/transkribieren/{auftrag_id}/bisher", response_model=Bisher)
     async def bisher(auftrag_id: str) -> Bisher:
@@ -276,6 +283,7 @@ def router(teile: Teile) -> APIRouter:
     async def aus_kellerwolke(e: AusKellerwolke, request: Request, konto: Konto = g.mensch) -> list[str]:
         """In der App gewählte Dateien aus der ganzen Kellerwolke: je Datei eine Anfrage an diese App (Recht nur für
         diesen Auftrag), ausgeführt mit den gewählten Optionen; liefert die Aufträge."""
+        await teile.sprachen.pruefen(e.sprache)
         kw = teile.zugang()
         sitzung = request.headers.get(KOPF, "")
         auftraege: list[str] = []

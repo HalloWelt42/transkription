@@ -46,10 +46,10 @@ async def test_einrichten_anmelden_und_schutz(client):
     seite = (await client.get("/api/v1/transkripte", headers=h)).json()
     assert seite == {"gesamt": 0, "ab": 0, "anzahl": 20, "eintraege": []}
     felder = {f["name"]: f for f in (await client.get("/api/v1/einstellungen", headers=h)).json()}
-    assert felder["sprache"]["beschriftungen"]["de"] == "Deutsch" and felder["sprecher_sicher"]["schritt"] == 5
+    assert felder["sprecher_sicher"]["schritt"] == 5
     assert felder["sprecher_sicher"]["einheit"] == "% Ähnlichkeit" and felder["abschnitt_min"]["einheit"] == "Minuten"
     # was das System kennt, kommt als Auswahl: Dienste und Modell aus der Leitstelle; ffmpeg gibt es hier nicht
-    assert all(felder[n]["angebot"] for n in ("dienst_hoeren", "dienst_ton", "dienst_sprecher", "dienst_trennen", "ki_modell"))
+    assert all(felder[n]["angebot"] for n in ("sprache", "dienst_hoeren", "dienst_ton", "dienst_sprecher", "dienst_trennen", "ki_modell"))
     assert "ffmpeg_ordner" not in felder
     hoeren = (await client.get("/api/v1/einstellungen/angebot/dienst_hoeren", headers=h)).json()
     assert hoeren["stand"].startswith("Leitstelle noch nicht eingerichtet")
