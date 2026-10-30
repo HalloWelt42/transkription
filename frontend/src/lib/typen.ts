@@ -82,6 +82,7 @@ export interface Eintrag {
   erstellt_am: string;
   geaendert_am: string;
   treffer: number;
+  im_namen: boolean;          // der Name passt zur Suche
   fundstellen: Fundstelle[];
 }
 
@@ -203,4 +204,18 @@ export interface Umzugsplan {
   noetig: boolean;
   schritte: Umzugsschritt[];
   zahlen: Record<string, number>;
+}
+
+// Mitlesen beim Transkribieren (GET /transkribieren/<auftrag>/bisher)
+export interface Bisher {
+  zustand: string;
+  phase: string | null;
+  schritt: string;
+  stuecke: { start: number; ende: number; text: string }[];
+  abschnitte: number;          // 0: noch nicht geplant
+  abschnitte_fertig: number;
+  dauer_s: number | null;
+  gehoert_bis_s: number;
+  rest_s: number | null;       // geschätzte Sekunden, bis alles gehört ist; leer: noch keine Schätzung
+  geschaetzt_aus: "" | "auftrag" | "frueher";
 }

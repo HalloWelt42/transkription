@@ -19,6 +19,7 @@ from . import altbestand
 from .abgleich import Abgleich
 from .dienste import Klangwerk
 from .einstellungen import AppEinstellungen
+from .mitlesen import Mitlesen
 from .modell.transkript import Transkript
 from .sprechererkennung import Schwellen
 from .suchindex import Suchindex
@@ -33,6 +34,7 @@ class Teile(Begleiter):
         self.profile = Sprecherprofile(lambda: geruest.kellerwolke)
         self.index = Suchindex(geruest.db)
         self.vorschlaege = Vorschlaege(geruest.db)
+        self.mitlesen = Mitlesen(geruest.db)
         self.abgleich = Abgleich(geruest, self.transkripte, self.index)
         e = lambda: geruest.einstellungen.stand  # noqa: E731
         self.ton = TonDienst(lambda: geruest.leitstelle, lambda: e().dienst_ton)     # Tonarbeit nur auf dem Mac

@@ -10,6 +10,7 @@
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import type { Aufnahme } from "../lib/typen";
+  import Mitlesen from "./Mitlesen.svelte";
 
   let { id, anfrage = null }: { id: string; anfrage?: string | null } = $props();
 
@@ -116,7 +117,11 @@
 </script>
 
 {#snippet transkriptWahl()}
-  {#if a && a.transkripte.length}
+  {#if a && laufend && a.auftrag}
+    <!-- auch beim erneuten Transkribieren: der laufende Auftrag geht vor, das bisherige Transkript bleibt bis zum Ende -->
+    <h2>Wird transkribiert</h2>
+    {#key a.auftrag.id}<Mitlesen auftrag={a.auftrag.id} onspringen={springen} />{/key}
+  {:else if a && a.transkripte.length}
     <h2>Transkribiert</h2>
     <p>Zu dieser Aufnahme gibt es {a.transkripte.length === 1 ? "ein Transkript" : `${a.transkripte.length} Transkripte`}.</p>
     <div class="knopfzeile">
@@ -124,9 +129,6 @@
         <button class="knopf primaer" onclick={() => gehe(transkriptOrt(t))}><i class="fa-solid fa-file-lines"></i> {t.name}</button>
       {/each}
     </div>
-  {:else if a && laufend}
-    <h2>Wird transkribiert</h2>
-    <p><i class="fa-solid fa-circle-notch fa-spin"></i> {a.auftrag?.schritt || "wartet"}{a.auftrag?.fortschritt != null ? ` (${Math.round(a.auftrag.fortschritt * 100)} %)` : ""}</p>
   {:else}
     <h2>Noch kein Transkript</h2>
     <p>Abspielen, springen und Marker setzen geht schon. Transkribiert wird erst, wenn du es hier startest.</p>

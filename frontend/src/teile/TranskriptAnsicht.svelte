@@ -31,7 +31,7 @@
   let rollfeld = $state<HTMLElement>();
   let mitlaufen = $state(true);
   let suche = $state("");
-  let treffer = $state(0);
+  let trefferNr = $state(-1);       // der zuletzt angesprungene Treffer (Stelle in `passend`)
   let bearbeiten = $state(false);
   let entwurf = $state<Transkript | null>(null);
   let offen = $state<number | null>(null);
@@ -142,19 +142,30 @@
     spieler?.springe(s, true);
   }
 
-  function weiterSuchen() {
+  // Suche im Text: die Zahl der Treffer steht schon beim Tippen da, Eingabe springt zum nächsten (mit Umschalt zum
+  // vorigen), reihum; der Treffer rückt in die Mitte und der Spieler an seinen Anfang.
+  const passend = $derived.by(() => {
     const begriff = suche.trim().toLowerCase();
-    if (!begriff) return;
-    const passend = segmente.map((s, i) => (s.text.toLowerCase().includes(begriff) ? i : -1)).filter((i) => i >= 0);
-    if (!passend.length) {
-      treffer = 0;
-      return;
-    }
-    const naechster = passend.find((i) => segmente[i].start > zeit + 0.5) ?? passend[0];
-    treffer = passend.length;
-    mitlaufen = true;
-    spieler?.springe(segmente[naechster].start);
-    rollfeld?.querySelector(`[data-i="${naechster}"]`)?.scrollIntoView({ block: "center" });
+    return begriff ? segmente.flatMap((s, i) => (s.text.toLowerCase().includes(begriff) ? [i] : [])) : [];
+  });
+  $effect(() => {
+    void suche;
+    trefferNr = -1;
+  });
+
+  function weiterSuchen(rueckwaerts = false) {
+    if (!passend.length) return;
+    trefferNr = rueckwaerts ? (trefferNr <= 0 ? passend.length - 1 : trefferNr - 1) : (trefferNr + 1) % passend.length;
+    const i = passend[trefferNr];
+    selbstGerollt();
+    spieler?.springe(segmente[i].start);
+    rollfeld?.querySelector(`[data-i="${i}"]`)?.scrollIntoView({ block: "center" });
+  }
+
+  function suchTaste(e: KeyboardEvent) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    weiterSuchen(e.shiftKey);
   }
 
   // --- Bearbeiten -----------------------------------------------------------------------------------------------
@@ -390,6 +401,16 @@
   }
 </script>
 
+{#snippet trefferStand()}
+  {#if suche.trim()}
+    {#if passend.length}
+      <span class="treffer-stand" title="Eingabe: nächster Treffer, Umschalt und Eingabe: voriger">{trefferNr >= 0 ? `${trefferNr + 1}/` : ""}{passend.length}</span>
+      <button class="knopf still treffer-knopf" aria-label="Nächster Treffer" title="Nächster Treffer (Eingabe)"
+              onclick={(e) => { e.preventDefault(); weiterSuchen(); }}><i class="fa-solid fa-chevron-down"></i></button>
+    {:else}<span class="treffer-stand keiner">keine Treffer</span>{/if}
+  {/if}
+{/snippet}
+
 {#snippet vorschlagBox(v: Vorschlag, s: Segment)}
   {#if vorschlagGilt(v, s)}
     <div class="vorschlag">
@@ -434,7 +455,8 @@
   {#if anfrage}<AnfrageBand {anfrage} pfad={herkunft(antwort)} />{/if}
   <div class="knopfzeile" style="margin-bottom:8px">
     <label class="suche" style="flex:1; min-width:0"><i class="fa-solid fa-magnifying-glass"></i>
-      <input class="eingabe-roh" placeholder="Im Text suchen" bind:value={suche} onkeydown={(e) => e.key === "Enter" && weiterSuchen()} /></label>
+      <input class="eingabe-roh" placeholder="Im Text suchen" enterkeyhint="next" bind:value={suche} onkeydown={suchTaste} />
+      {@render trefferStand()}</label>
     <button class="rund" aria-label="Mehr" class:aktiv={mehr} onclick={() => (mehr = !mehr)}><i class="fa-solid fa-ellipsis-vertical"></i></button>
   </div>
   {#if mehr}
@@ -468,8 +490,8 @@
           {#if !ungespeichert && !Object.keys(entscheidungen).length}<button class="knopf" onclick={bearbeitenBeenden}>Fertig</button>{/if}
         {:else}
           <label class="suche" style="min-width:180px"><i class="fa-solid fa-magnifying-glass"></i>
-            <input class="eingabe-roh" placeholder="Im Text suchen" bind:value={suche} onkeydown={(e) => e.key === "Enter" && weiterSuchen()} />
-            {#if suche && treffer}<span style="color:var(--text-3)">{treffer}</span>{/if}</label>
+            <input class="eingabe-roh" placeholder="Im Text suchen" bind:value={suche} onkeydown={suchTaste} />
+            {@render trefferStand()}</label>
           <button class="knopf" onclick={bearbeitenBeginnen}><i class="fa-solid fa-pen"></i> Bearbeiten</button>
         {/if}
         <button class="knopf nur-schmal" title="Sprecher, Marker, Export, KI, Versionen" onclick={leisteOeffnen}>

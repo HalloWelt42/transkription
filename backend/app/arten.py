@@ -19,8 +19,10 @@ from __future__ import annotations
 
 import asyncio
 import shutil
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Literal, TypeVar
 from uuid import UUID
@@ -261,6 +263,9 @@ def arten(teile: Teile) -> list[Art]:
                     continue
                 await k.pruefen()
                 await k.fortschritt(len(fertig) / len(plan), f"Abschnitt {a.nummer} von {len(plan)}")
+                # Beginn und Rechenzeit je Abschnitt: daraus schätzt das Mitlesen, wie lange es noch dauert
+                await k.merken(abschnitt_beginn=datetime.now(UTC).isoformat())
+                beginn = time.monotonic()
                 stueck = await ausschneiden(wav, a.start, a.ende, ordner / f"abschnitt-{a.nummer}.wav")
                 titel = f"{name}, Abschnitt {a.nummer} von {len(plan)}"
                 erg = await geduldig(k, lambda: teile.klangwerk.hoeren(stueck, sprache, versatz=a.start, titel=titel,
@@ -273,7 +278,8 @@ def arten(teile: Teile) -> list[Art]:
                                                "Stimmabdrücke")
                 stueck.unlink(missing_ok=True)
                 fertig[str(a.nummer)] = {"segmente": [s.model_dump(mode="json") for s in erg.segmente],
-                                         "abdruecke": abdruecke, "sprache": erg.sprache, "modell": erg.modell}
+                                         "abdruecke": abdruecke, "sprache": erg.sprache, "modell": erg.modell,
+                                         "gerechnet_s": round(time.monotonic() - beginn, 1)}
                 await k.merken(hoeren=fertig)
                 await k.fortschritt(len(fertig) / len(plan), f"Abschnitt {a.nummer} von {len(plan)} fertig")
 

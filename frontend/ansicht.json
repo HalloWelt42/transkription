@@ -3,6 +3,7 @@
     { "name": "aufnahmen", "pfad": "/aufnahmen" },
     { "name": "kellerwolke", "pfad": "/aufnahmen/kellerwolke" },
     { "name": "transkripte", "pfad": "/transkripte" },
+    { "name": "transkript", "abfrage": "/api/v1/transkripte?anzahl=1", "pfad": "/transkripte/{eintraege.0.id}" },
     { "name": "sprecher", "pfad": "/sprecher" },
     { "name": "auftraege", "pfad": "/auftraege" },
     { "name": "protokoll", "pfad": "/protokoll" },

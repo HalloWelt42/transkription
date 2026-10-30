@@ -1,9 +1,10 @@
 """Verzeichnis und Suchindex der Transkripte in der SQLite-Datei der App. Nur ein Abbild der Dateien in der
 Kellerwolke: jederzeit aus ihnen neu aufbaubar (siehe `abgleich`).
 
-Gesucht wird im Text der Segmente und in den Titeln der Marker, als Teilwort (Trigramm-Index: "kosten" findet auch
-"Nebenkostenabrechnung"), Groß- und Kleinschreibung egal. Begriffe unter drei Zeichen gehen den langsameren Weg über
-LIKE. Die Liste ist seitenweise; je Transkript kommen die Zahl der Treffer und die ersten Fundstellen mit Zeit.
+Gesucht wird im Namen des Transkripts, im Text der Segmente und in den Titeln der Marker, als Teilwort
+(Trigramm-Index: "kosten" findet auch "Nebenkostenabrechnung"), Groß- und Kleinschreibung egal, auch bei Umlauten.
+Begriffe unter drei Zeichen gehen den langsameren Weg über LIKE. Die Liste ist seitenweise; je Transkript kommen die
+Zahl der Treffer im Text, ob der Name passt, und die ersten Fundstellen mit Zeit.
 """
 
 from __future__ import annotations
@@ -57,7 +58,12 @@ STUFEN = [
     );
     CREATE TABLE abgleich (ordner_id TEXT PRIMARY KEY, seit INTEGER NOT NULL);
     """,
+    # der Name ist eine Fundstelle der Art "name" (gefunden wird er wie Text, gezählt und gezeigt nicht)
+    """
+    INSERT INTO fundstelle (text, transkript_id, zeit, art) SELECT name, id, 0, 'name' FROM transkript;
+    """,
 ]
+NAME = "name"
 FUNDSTELLEN_JE_TRANSKRIPT = 3
 _RAND = 60
 
@@ -82,6 +88,7 @@ class Eintrag(BaseModel):
     erstellt_am: datetime
     geaendert_am: datetime
     treffer: int = 0
+    im_namen: bool = Field(False, description="der Name passt zur Suche")
     fundstellen: list[Fundstelle] = Field(default_factory=list)
 
 
@@ -117,11 +124,21 @@ def _like(begriff: str) -> str:
     return "%" + begriff.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
+def _schreibweisen(begriff: str) -> list[str]:
+    """LIKE übersieht Groß und Klein nur bei ASCII; für Umlaute ("äh" und "Äh") jede übliche Schreibweise."""
+    return list(dict.fromkeys([begriff, begriff.lower(), begriff.upper(), begriff.capitalize()]))
+
+
 def _bedingung(begriffe: list[str]) -> tuple[str, list[str]]:
     """Bedingung auf `fundstelle` für alle Begriffe (UND)."""
     if all(len(b) >= 3 for b in begriffe):
         return "fundstelle MATCH ?", [" AND ".join('"' + b.replace('"', '""') + '"' for b in begriffe)]
-    return " AND ".join("text LIKE ? ESCAPE '\\'" for _ in begriffe), [_like(b) for b in begriffe]
+    teile, werte = [], []
+    for b in begriffe:
+        weisen = _schreibweisen(b)
+        teile.append("(" + " OR ".join("text LIKE ? ESCAPE '\\'" for _ in weisen) + ")")
+        werte += [_like(w) for w in weisen]
+    return " AND ".join(teile), werte
 
 
 def _notiz(v: sqlite3.Connection, t: Transkript, knoten: Knoten) -> None:
@@ -161,7 +178,8 @@ class Suchindex:
                           [(tid, n) for n in namen])
             v.execute("DELETE FROM fundstelle WHERE transkript_id=?", (tid,))
             v.executemany("INSERT INTO fundstelle (text, transkript_id, zeit, art) VALUES (?,?,?,?)",
-                          [(s.text, tid, s.start, "text") for s in t.segmente if s.text.strip()]
+                          [(t.name, tid, 0, NAME)]
+                          + [(s.text, tid, s.start, "text") for s in t.segmente if s.text.strip()]
                           + [(m.titel, tid, m.zeit, "marker") for m in t.marker])
             _notiz(v, t, knoten)
 
@@ -205,10 +223,11 @@ class Suchindex:
         treffer_sql = ""
         if begriffe:
             bed, bed_werte = _bedingung(begriffe)
-            treffer_sql = f"JOIN (SELECT transkript_id, count(*) AS treffer FROM fundstelle WHERE {bed} GROUP BY transkript_id) f ON f.transkript_id = t.id"
-            werte = bed_werte + werte
+            treffer_sql = ("JOIN (SELECT transkript_id, sum(art != ?) AS treffer, max(art = ?) AS im_namen FROM fundstelle "
+                           f"WHERE {bed} GROUP BY transkript_id) f ON f.transkript_id = t.id")
+            werte = [NAME, NAME, *bed_werte, *werte]
         wo = f"WHERE {' AND '.join(bedingungen)}" if bedingungen else ""
-        auswahl = "t.*, f.treffer" if begriffe else "t.*, 0 AS treffer"
+        auswahl = "t.*, f.treffer, f.im_namen" if begriffe else "t.*, 0 AS treffer, 0 AS im_namen"
         basis = f"FROM transkript t {treffer_sql} {wo}"
         gesamt = (await self.db.zeile(f"SELECT count(*) AS n {basis}", werte))["n"]
         zeilen = await self.db.zeilen(f"SELECT {auswahl} {basis} ORDER BY t.geaendert_am DESC, t.id LIMIT ? OFFSET ?",
@@ -222,8 +241,8 @@ class Suchindex:
     async def _fundstellen(self, tid: str, begriffe: list[str]) -> list[Fundstelle]:
         bed, werte = _bedingung(begriffe)
         zeilen = await self.db.zeilen(
-            f"SELECT text, zeit, art FROM fundstelle WHERE {bed} AND transkript_id = ? ORDER BY zeit LIMIT ?",
-            [*werte, tid, FUNDSTELLEN_JE_TRANSKRIPT])
+            f"SELECT text, zeit, art FROM fundstelle WHERE {bed} AND transkript_id = ? AND art != ? ORDER BY zeit LIMIT ?",
+            [*werte, tid, NAME, FUNDSTELLEN_JE_TRANSKRIPT])
         return [Fundstelle(zeit=z["zeit"], art=z["art"], ausschnitt=ausschnitt(z["text"], begriffe)) for z in zeilen]
 
     async def zur_quelle(self, quelle_ids: list[str]) -> dict[str, list[Eintrag]]:
@@ -262,4 +281,4 @@ def _eintrag(z: dict) -> Eintrag:
     return Eintrag(id=z["id"], name=z["name"], pfad=z["pfad"], stand=z["stand"], quelle_id=z["quelle_id"],
                    quelle_pfad=z["quelle_pfad"], sprache=z["sprache"], dauer_s=z["dauer_s"], segmente=z["segmente"],
                    sprecher=json.loads(z["sprecher"]), erstellt_am=z["erstellt_am"], geaendert_am=z["geaendert_am"],
-                   treffer=z.get("treffer") or 0)
+                   treffer=z.get("treffer") or 0, im_namen=bool(z.get("im_namen")))

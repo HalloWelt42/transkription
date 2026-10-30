@@ -13,6 +13,11 @@
 .treffer div { font-size: var(--klein); color: var(--text-2); }
 .treffer .zeit { font-family: var(--schrift-code); color: var(--akzent); margin-right: 8px; }
 .treffer mark { background: var(--warn-weich); color: var(--text); border-radius: 3px; }
+mark.fund { background: var(--warn-weich); color: inherit; border-radius: 3px; }
+/* Suche im Text eines Transkripts: Zahl der Treffer im Suchfeld, Knopf zum nächsten */
+.treffer-stand { font-size: var(--klein); color: var(--text-3); white-space: nowrap; }
+.treffer-stand.keiner { color: var(--warn); }
+.knopf.treffer-knopf { height: auto; padding: 0 2px; }
 
 /* ----- Spieler ----- */
 
@@ -154,6 +159,18 @@ kbd.taste { font-family: var(--schrift-code); font-size: var(--marke); color: va
 .ohne-text { max-width: 980px; padding: 22px; background: var(--flaeche); border-radius: var(--r3); box-shadow: var(--schatten); }
 .ohne-text h2 { margin: 0 0 6px; font-size: 1.15em; }
 .ohne-text p { margin: 0 0 14px; color: var(--text-2); }
+/* Mitlesen beim Transkribieren: Lage und Schätzung, Stecknadel fürs Mitrollen, der Text bis jetzt im eigenen Rollfeld */
+.mitlesen-kopf { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.mitlesen-lage { flex: 1; min-width: 0; color: var(--text-2); }
+.mitlesen-lage b { color: var(--text); font-weight: 600; }
+.knopf.mitlesen-nadel.aktiv { color: var(--akzent); }
+.mitlesen-unter { margin: 6px 0 10px; font-size: var(--klein); color: var(--text-3); }
+.mitlesen-text { max-height: 52vh; overflow-y: auto; padding-right: 6px; }
+.ohne-text .mitlesen-text p { margin: 0 0 10px; color: var(--text); line-height: 1.65; }
+.mitlesen-text .zeit { border: 0; background: none; padding: 0; margin-right: 10px; font-family: var(--schrift-code);
+                       font-size: var(--klein); color: var(--text-3); cursor: pointer; }
+.mitlesen-text .zeit:hover { color: var(--akzent); }
+.mobil .mitlesen-text { max-height: 40vh; }
 .vorschau-ziel { flex-basis: 100%; font-size: var(--klein); color: var(--text-2); }
 .vorschau-ziel code { font-family: var(--schrift-code); color: var(--text); }
 /* Aufnahme am Telefon (1b): großer Knopf zum Transkribieren, Marker als Karte, Papierkorb darunter */

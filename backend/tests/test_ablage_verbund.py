@@ -94,15 +94,16 @@ async def test_unlesbares_transkript_meldet_sich(umgebung):
 async def test_abgleich_folgt_der_kellerwolke(umgebung):
     kw, transkripte, index, abgleich, angelegt = umgebung
     wort = f"Zauberwort{secrets.token_hex(3)}"
-    eins = await _aufnahme(kw, angelegt, f"Vorher {wort}")
-    _, vorher = await transkripte.speichern(probe(f"Vorher {wort}", f"{wort} ist schon da"), eins, Aenderung(was="erzeugt"))
+    lauf = secrets.token_hex(3)                      # Namen ohne das Wort: gesucht wird auch im Namen
+    eins = await _aufnahme(kw, angelegt, f"Vorher {lauf}")
+    _, vorher = await transkripte.speichern(probe(f"Vorher {lauf}", f"{wort} ist schon da"), eins, Aenderung(was="erzeugt"))
     await abgleich.verbunden()
     await asyncio.wait_for(abgleich.bereit.wait(), 30)
     assert [e.id for e in (await index.seite(suche=wort)).eintraege] == [vorher.id]
 
     # danach: neu, geändert (außerhalb der App, etwa von einer anderen App), gelöscht
-    zwei = await _aufnahme(kw, angelegt, f"Neu {wort}")
-    _, neu = await transkripte.speichern(probe(f"Neu {wort}", f"{wort} kam später"), zwei, Aenderung(was="erzeugt"))
+    zwei = await _aufnahme(kw, angelegt, f"Neu {lauf}")
+    _, neu = await transkripte.speichern(probe(f"Neu {lauf}", f"{wort} kam später"), zwei, Aenderung(was="erzeugt"))
     t, k = await transkripte.lesen(vorher.id)
     await transkripte.schreiben(vorher.id, t.model_copy(update={"segmente": [Segment(start=0, ende=1, text="ohne das Wort")]}),
                                 k.etag, Aenderung(was="extern"))

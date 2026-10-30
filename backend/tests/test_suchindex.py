@@ -87,3 +87,16 @@ def test_ausschnitt():
     a = ausschnitt(text, ["kosten"], rand=20)
     assert a.startswith("... ") and a.endswith(" ...") and "Nebenkostenabrechnung" in a
     assert ausschnitt("kurz", ["kurz"]) == "kurz"
+
+
+async def test_suche_findet_namen_und_kurze_begriffe_mit_umlaut(index):
+    """Der Name eines Transkripts ist suchbar (zählt aber nicht als Treffer im Text); kurze Begriffe mit Umlaut finden
+    jede Schreibweise ("äh" auch "Äh")."""
+    await index.eintragen(transkript("REKO 2026 Januar", ["Äh, wir fangen an."]), knoten("REKO 2026 Januar"))
+    await index.eintragen(transkript("Sprachnotiz", ["Der Reko-Termin ist verschoben, äh, auf Montag."]), knoten("Sprachnotiz"))
+
+    s = await index.seite(suche="reko")
+    assert {(e.name, e.treffer, e.im_namen) for e in s.eintraege} == {("REKO 2026 Januar", 0, True), ("Sprachnotiz", 1, False)}
+    assert all(f.art != "name" for e in s.eintraege for f in e.fundstellen)   # der Name ist keine Fundstelle mit Zeit
+    for begriff in ("äh", "Äh", "ÄH"):
+        assert (await index.seite(suche=begriff)).gesamt == 2, begriff

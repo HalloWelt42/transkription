@@ -15,12 +15,13 @@ from pydantic import BaseModel, Field
 from appkern.anmeldung import Konto
 from appkern.anmeldung.api import KOPF
 from appkern.auftraege import Auftrag
-from appkern.kellerwolke import KellerwolkeFehler
+from appkern.kellerwolke import Kellerwolke, KellerwolkeFehler, Knoten
 
 from .. import umzug
 from ..ablage import orte
 from ..arten import TranskribierenAnfrage, TranskribierenEingabe
 from ..einstellungen import Sprache, SprecherWeg
+from ..mitlesen import Bisher
 from ..teile import Teile
 from .gemeinsam import von
 
@@ -109,6 +110,34 @@ def aufnahme_aus(k, verweise: list[TranskriptVerweis], auftrag, transkript_dauer
                             phase=auftrag.phase) if auftrag else None)
 
 
+ORDNER_HOECHSTENS = 500          # so viele Ordner durchsucht die Namenssuche höchstens (Schutz vor riesigen Bäumen)
+
+
+async def ordner_lesen(kw: Kellerwolke, ordner_id: UUID) -> tuple[list[Ordner], list[Knoten]]:
+    """Unterordner und Aufnahmen direkt in einem Ordner."""
+    unterordner, dateien = [], []
+    async for k in kw.alle_kinder(ordner_id):
+        if k.ist_ordner:
+            unterordner.append(Ordner(id=k.id, name=k.name, pfad=k.pfad, recht=k.recht))
+        elif orte.art_der_aufnahme(k):
+            dateien.append(k)
+    return unterordner, dateien
+
+
+async def durchsuchen(kw: Kellerwolke, ort: Knoten, suche: str) -> tuple[list[Ordner], list[Knoten]]:
+    """Ordner und Aufnahmen unter `ort` samt allen Unterordnern, deren Name den Suchtext enthält (Groß und Klein egal)."""
+    gesucht = suche.casefold()
+    ordner_treffer, dateien, offen, gesehen = [], [], [ort.id], 0
+    while offen and gesehen < ORDNER_HOECHSTENS:
+        aktuell = offen.pop(0)
+        gesehen += 1
+        unter, darin = await ordner_lesen(kw, aktuell)
+        dateien += [k for k in darin if gesucht in k.name.casefold()]
+        ordner_treffer += [o for o in unter if gesucht in o.name.casefold()]
+        offen += [o.id for o in unter]
+    return ordner_treffer, dateien
+
+
 def router(teile: Teile) -> APIRouter:
     g = teile.geruest
     r = APIRouter(prefix="/api/v1", tags=["aufnahmen"], dependencies=[g.pflicht])
@@ -141,12 +170,7 @@ def router(teile: Teile) -> APIRouter:
                         ab: int = Query(0, ge=0), anzahl: int = Query(50, ge=1, le=200)) -> AufnahmenSeite:
         kw = teile.zugang()
         ort = await kw.knoten(ordner) if ordner else await eigener_ordner()
-        unterordner, dateien = [], []
-        async for k in kw.alle_kinder(ort.id):
-            if k.ist_ordner:
-                unterordner.append(Ordner(id=k.id, name=k.name, pfad=k.pfad, recht=k.recht))
-            elif orte.art_der_aufnahme(k) and (not suche or suche.lower() in k.name.lower()):
-                dateien.append(k)
+        unterordner, dateien = await (durchsuchen(kw, ort, suche) if suche else ordner_lesen(kw, ort.id))
         transkripte = await teile.index.zur_quelle([str(k.id) for k in dateien])
         laufend = await laufende()
         alle: list[Aufnahme] = []
@@ -238,6 +262,15 @@ def router(teile: Teile) -> APIRouter:
             raise HTTPException(422, f"{quelle.name} ist keine Ton- oder Videodatei")
         eingabe = TranskribierenEingabe(**anfrage.model_dump(), von=von(konto))
         return await g.auftraege.einreihen("transkribieren", eingabe, titel=anfrage.name or orte.anzeigename(quelle.name))
+
+    @r.get("/transkribieren/{auftrag_id}/bisher", response_model=Bisher)
+    async def bisher(auftrag_id: str) -> Bisher:
+        """Mitlesen: was ein Auftrag zum Transkribieren schon gehört hat (je fertigem Abschnitt) und wie lange er
+        geschätzt noch braucht."""
+        stand = await teile.mitlesen.bisher(auftrag_id)
+        if stand is None:
+            raise HTTPException(404, "Kein Auftrag zum Transkribieren")
+        return stand
 
     @r.post("/kellerwolke/transkribieren", status_code=201, response_model=list[str])
     async def aus_kellerwolke(e: AusKellerwolke, request: Request, konto: Konto = g.mensch) -> list[str]:

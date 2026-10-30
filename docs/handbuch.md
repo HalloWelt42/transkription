@@ -22,7 +22,8 @@ stand: 520c4ab
 Die Transkription macht aus Aufnahmen Text: in Abschnitten an Sprechpausen, mit Wortzeiten, auf Wunsch mit Sprechern
 (gruppiert oder getrennt, mit Profilen), Korrekturvorschlägen und Auswertungen durch ein Sprachmodell. Quelle ist jede
 Datei der [[Kellerwolke]]; das Transkript liegt danach als Begleitdatei neben ihr, und Verschieben, Umbenennen und
-Papierkorb nehmen es mit. Im Dateimenü der Kellerwolke stehen "Transkribieren" und "In Transkription öffnen". Aufnehmen
+Papierkorb nehmen es mit. Während ein Auftrag läuft, zeigt die Aufnahme den schon gehörten Text je Abschnitt und
+die geschätzte Restzeit. Im Dateimenü der Kellerwolke stehen "Transkribieren" und "In Transkription öffnen". Aufnehmen
 geht im Browser und auf dem Telefon (HTTPS ist dafür nötig). Andere Apps (etwa [[Assistent]] für die Spracheingabe)
 melden sich mit ihrem App-Schlüssel der Kellerwolke an.
 
@@ -107,5 +108,7 @@ transkription`. Probe wie in Schritt 3.
   schläft); Aufträge warten und laufen am nächsten Abschnitt weiter.
 - Das Mikrofon geht nicht: die Seite muss über HTTPS kommen ({{adresse}}), und das Gerät muss der Hausstelle vertrauen.
 - Eine Aktion im Dateimenü der Kellerwolke fehlt: "Adresse dieser App" ist nicht gesetzt (Schritt 5).
+- Die Suche findet etwas nicht: unter Transkripte sucht sie in Namen, Text und Markern der eigenen Transkripte
+  (nicht in denen, die andere Apps bestellen), unter Aufnahmen nur nach Dateinamen ab dem gewählten Ordner abwärts.
 - Das Ausrollen wartet lange: es wartet auf eine Lücke ohne laufenden Auftrag (bis vier Stunden); `--sofort` rollt
   trotzdem aus.

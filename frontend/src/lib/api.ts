@@ -2,7 +2,7 @@
 import type { ErkennenWeg, SprecherWeg } from "./sprecherwahl";
 import { hochladen, hole, json, type Auftrag, type Gespeichert } from "appkern-oberflaeche";
 import type {
-  AltbestandSeite, Aufnahme, AufnahmenSeite, ExportFormat, Ordner, Profil, TranskriptAntwort, Verzeichnis, Version, Vorlage, Vorschlag,
+  AltbestandSeite, Aufnahme, Bisher, AufnahmenSeite, ExportFormat, Ordner, Profil, TranskriptAntwort, Verzeichnis, Version, Vorlage, Vorschlag,
   Marker, Segment, Transkript, Umzugsplan,
 } from "./typen";
 
@@ -36,6 +36,9 @@ export const aufnahmen = (o: { ordner?: string | null; filter?: string; suche?: 
 
 export const transkribieren = (e: { quelle_id: string; name?: string; sprache?: string; sprecher?: SprecherWeg; anzahl?: number | null }) =>
   hole<Auftrag>("/transkribieren", { method: "POST", ...json(e) });
+
+// Mitlesen: was ein laufender Auftrag schon gehört hat und wie lange er noch braucht
+export const bisher = (auftrag: string) => hole<Bisher>(`/transkribieren/${encodeURIComponent(auftrag)}/bisher`);
 
 // --- Transkripte ------------------------------------------------------------------------------------------------
 

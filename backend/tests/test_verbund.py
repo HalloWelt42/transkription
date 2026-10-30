@@ -231,7 +231,16 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert a["zustand"] == "fertig", a.get("fehler")
                 assert a["ergebnis"]["pfad"].endswith(f"/Aufnahmen/{unter}/{name} unten.transkript.json")
                 angelegt.append(a["ergebnis"]["transkript_id"])
-                im_verzeichnis = lambda seite: a["ergebnis"]["transkript_id"] in [e["id"] for e in seite["eintraege"]]  # noqa: E731
+                # die Namenssuche unter Aufnahmen reicht in Unterordner, passende Ordner stehen dabei
+                gefunden = (await c.get("/api/v1/aufnahmen", headers=h, params={"suche": f"{name} UNTEN"})).json()
+                assert [e["id"] for e in gefunden["eintraege"]] == [unten["id"]]
+                gefunden = (await c.get("/api/v1/aufnahmen", headers=h, params={"suche": unter})).json()
+                assert [o["name"] for o in gefunden["unterordner"]] == [unter] and gefunden["eintraege"] == []
+                # Mitlesen: der fertige Auftrag zeigt seinen Text, geschätzt wird nur, solange er läuft
+                bisher = (await c.get(f"/api/v1/transkribieren/{a['id']}/bisher", headers=h)).json()
+                assert bisher["stuecke"] and bisher["abschnitte_fertig"] == bisher["abschnitte"] > 0 and bisher["rest_s"] is None
+                assert (await c.get("/api/v1/transkribieren/unbekannt/bisher", headers=h)).status_code == 404
+                im_verzeichnis =lambda seite: a["ergebnis"]["transkript_id"] in [e["id"] for e in seite["eintraege"]]  # noqa: E731
                 assert im_verzeichnis((await c.get("/api/v1/transkripte", headers=h, params={"anzahl": 100})).json())
                 await app.state.teile.abgleich.vollstaendig()
                 assert im_verzeichnis((await c.get("/api/v1/transkripte", headers=h, params={"anzahl": 100})).json())

@@ -246,7 +246,11 @@
   // "2:14:08 · M4A · 186 MB · heute 08:12" wie im Entwurf; die Dauer, sobald sie bekannt ist
   function metazeile(a: Aufnahme): string {
     const format = a.name.includes(".") ? a.name.slice(a.name.lastIndexOf(".") + 1).toUpperCase() : "";
-    const teile = [a.dauer_s ? marke(a.dauer_s) : "", a.name.startsWith("Sprachnotiz") ? "aufgenommen" : format, groesse(a.groesse), wann(a.geaendert_am)];
+    // die Suche reicht in Unterordner: dann steht dabei, in welchem
+    const basis = seite?.ordner.pfad ?? "";
+    const ort = a.pfad.startsWith(`${basis}/`) ? a.pfad.slice(basis.length + 1).split("/").slice(0, -1).join("/") : "";
+    const teile = [ort ? `in ${ort}` : "", a.dauer_s ? marke(a.dauer_s) : "", a.name.startsWith("Sprachnotiz") ? "aufgenommen" : format,
+                   groesse(a.groesse), wann(a.geaendert_am)];
     return teile.filter(Boolean).join(" · ");
   }
 

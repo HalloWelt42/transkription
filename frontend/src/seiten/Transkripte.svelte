@@ -6,7 +6,7 @@
   import { onMount } from "svelte";
   import { Auswahl, gehe, geraet, marke, navigation, sprache as spracheName, SPRACHEN, wann } from "appkern-oberflaeche";
   import * as api from "../lib/api";
-  import type { Verzeichnis } from "../lib/typen";
+  import type { Eintrag, Verzeichnis } from "../lib/typen";
   import TranskriptAnsicht from "../teile/TranskriptAnsicht.svelte";
 
   const SEITE = 20;
@@ -57,6 +57,10 @@
     ...namen.filter((n) => !sprecher.includes(n)).map((n) => ({ wert: n as string | null, titel: n }))]);
   const begriffe = $derived(suche.trim().toLowerCase().split(/\s+/).filter(Boolean));
 
+  // Treffer im Text zählen; passt nur der Name, steht das statt einer Null da
+  const trefferText = (e: Eintrag) =>
+    e.treffer ? `${e.treffer} Treffer${e.im_namen ? ", Name" : ""}` : e.im_namen ? "im Namen" : "0 Treffer";
+
   function markiert(text: string): { t: string; treffer: boolean }[] {
     if (!begriffe.length) return [{ t: text, treffer: false }];
     const muster = new RegExp(`(${begriffe.map((b) => b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "gi");
@@ -64,7 +68,7 @@
   }
 </script>
 
-{#snippet ausschnitt(text: string)}{#each markiert(text) as x, i (i)}{#if x.treffer}<mark>{x.t}</mark>{:else}{x.t}{/if}{/each}{/snippet}
+{#snippet ausschnitt(text: string)}{#each markiert(text) as x, i (i)}{#if x.treffer}<mark class="fund">{x.t}</mark>{:else}{x.t}{/if}{/each}{/snippet}
 
 {#if kennung}
   {#key `${kennung}/${anfrage}`}<TranskriptAnsicht id={kennung} {beginn} {anfrage} />{/key}
@@ -77,8 +81,8 @@
   <div class="t-liste">
     {#each liste?.eintraege ?? [] as e (e.id)}
       <button class="t-zeile" onclick={() => gehe(`transkripte/${e.id}`)}><i class="fa-solid fa-file-lines"></i>
-        <span class="t-text"><span class="t-name">{e.name}</span>
-          <span class="t-meta">{wann(e.geaendert_am)} · {suche.trim() ? `${e.treffer} Treffer` : marke(e.dauer_s)}</span></span></button>
+        <span class="t-text"><span class="t-name">{@render ausschnitt(e.name)}</span>
+          <span class="t-meta">{wann(e.geaendert_am)} · {suche.trim() ? trefferText(e) : marke(e.dauer_s)}</span></span></button>
       {#each e.fundstellen.slice(0, 1) as f, i (i)}
         <button class="t-treffer" style="border:0; background:none; text-align:left; font:inherit; width:100%" onclick={() => gehe(`transkripte/${e.id}/${f.zeit}`)}>
           <span class="zeit">{marke(f.zeit)}</span>{@render ausschnitt(f.ausschnitt)}</button>
@@ -112,9 +116,9 @@
     {#each liste?.eintraege ?? [] as e (e.id)}
       <div class="zeile" role="button" tabindex="0" onclick={() => gehe(`transkripte/${e.id}`)} onkeydown={(k) => k.key === "Enter" && gehe(`transkripte/${e.id}`)}>
         <span class="art"><i class="fa-solid fa-file-lines"></i></span>
-        <div style="min-width:0"><div class="name">{e.name}</div>
+        <div style="min-width:0"><div class="name">{@render ausschnitt(e.name)}</div>
           <div class="meta">{marke(e.dauer_s)} · {spracheName(e.sprache)}{e.sprecher.length ? ` · ${e.sprecher.join(", ")}` : ""} · geändert {wann(e.geaendert_am)}</div></div>
-        {#if suche.trim()}<span class="stand-pille fertig">{e.treffer} Treffer</span>{:else}<span></span>{/if}
+        {#if suche.trim()}<span class="stand-pille fertig">{trefferText(e)}</span>{:else}<span></span>{/if}
         <i class="fa-solid fa-chevron-right" style="color:var(--text-3); padding-right:10px"></i>
       </div>
       {#if e.fundstellen.length}
