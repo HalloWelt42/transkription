@@ -9,6 +9,7 @@
            zurueckZurKellerwolke } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import { neueKennung } from "../lib/kennung";
+  import { abweichung, korrigierteWoerter } from "../lib/wortvergleich";
   import type { Marker, Segment, Transkript, TranskriptAntwort, Vorschlag } from "../lib/typen";
   import Beitrag from "./Beitrag.svelte";
   import Bearbeitungsleiste from "./Bearbeitungsleiste.svelte";
@@ -45,6 +46,10 @@
   let anker = $state<number | null>(null);
   let anhalten = $state(gemerktesAnhalten());
   let angehaltenBei = $state<number | null>(null);
+  // Fachwörter-Wörterbuch: nach dem Speichern schlägt die App korrigierte Wörter zur Aufnahme vor (nie von selbst)
+  let bekannteWoerter = $state<string[]>([]);
+  let wortVorschlag = $state<string[]>([]);
+  let wortMeldung = $state("");
   let welle = $state<number[] | null>(null);
   let ruhePause: ReturnType<typeof setTimeout>;
 
@@ -203,6 +208,9 @@
     entwurf = structuredClone($state.snapshot(antwort.transkript)) as Transkript;
     bearbeiten = true;
     entscheidungen = {};
+    wortVorschlag = [];
+    wortMeldung = "";
+    api.woerterbuch().then((w) => (bekannteWoerter = w.woerter)).catch(() => {});
   }
 
   function verwerfen() {
@@ -391,6 +399,9 @@
     if (!antwort || !entwurf) return;
     speichert = true;
     fehler = "";
+    // was der Nutzer an Text geändert hat (je Beitrag mit gleichem Beginn), für den Vorschlag ans Wörterbuch
+    const vorher = new Map(antwort.transkript.segmente.map((s) => [s.start, s.text]));
+    const paare = entwurf.segmente.flatMap((s) => (vorher.has(s.start) && vorher.get(s.start) !== s.text ? [{ alt: vorher.get(s.start)!, neu: s.text }] : []));
     try {
       antwort = await api.aendern(id, {
         stand: antwort.stand,
@@ -404,6 +415,8 @@
       entscheidungen = {};
       offen = null;
       gewaehlt = [];
+      wortVorschlag = korrigierteWoerter(paare, bekannteWoerter);
+      wortMeldung = "";
     } catch (f) {
       const meldung = (f as Error).message;
       if ((f as { status?: number }).status === 409) konflikt = true;
@@ -413,33 +426,19 @@
     }
   }
 
+  async function woerterAufnehmen(woerter: string[]) {
+    try {
+      const erg = await api.woerterAufnehmen(woerter);
+      bekannteWoerter = erg.woerter;
+      wortMeldung = erg.neu.length ? `Im Wörterbuch: ${erg.neu.join(", ")}` : "Stand schon im Wörterbuch.";
+    } catch (f) {
+      wortMeldung = (f as Error).message;
+    }
+    wortVorschlag = [];
+  }
+
   const passendVorschlag = (s: Segment) => offeneVorschlaege.filter((v) => Math.abs(v.start - s.start) < 0.01);
   const vorschlagGilt = (v: Vorschlag, s: Segment) => v.alt === (antwort?.transkript.segmente.find((x) => Math.abs(x.start - s.start) < 0.01)?.text ?? s.text);
-
-  // Wortweiser Vergleich (längste gemeinsame Folge): was wegfällt, was neu ist, was bleibt.
-  function abweichung(alt: string, neu: string): { teil: string; art: "gleich" | "weg" | "neu" }[] {
-    const a = alt.split(/\s+/).filter(Boolean);
-    const b = neu.split(/\s+/).filter(Boolean);
-    const l = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
-    for (let i = a.length - 1; i >= 0; i--)
-      for (let j = b.length - 1; j >= 0; j--) l[i][j] = a[i] === b[j] ? l[i + 1][j + 1] + 1 : Math.max(l[i + 1][j], l[i][j + 1]);
-    const aus: { teil: string; art: "gleich" | "weg" | "neu" }[] = [];
-    const dazu = (teil: string, art: "gleich" | "weg" | "neu") => {
-      const letzte = aus.at(-1);
-      if (letzte && letzte.art === art) letzte.teil += ` ${teil}`;
-      else aus.push({ teil, art });
-    };
-    let i = 0;
-    let j = 0;
-    while (i < a.length || j < b.length) {
-      if (i < a.length && j < b.length && a[i] === b[j]) {
-        dazu(a[i++], "gleich");
-        j++;
-      } else if (i < a.length && (j >= b.length || l[i + 1][j] >= l[i][j + 1])) dazu(a[i++], "weg");
-      else dazu(b[j++], "neu");
-    }
-    return aus.map((x, n) => ({ ...x, teil: n < aus.length - 1 ? `${x.teil} ` : x.teil }));
-  }
 </script>
 
 {#snippet trefferStand()}
@@ -495,7 +494,9 @@
   {#if bearbeiten && entwurf}
     <Bearbeitungsleiste mobil={geraet.mobil} aenderungen={ungespeichert} {speichert} bind:anhalten sprecher={entwurf.sprecher}
                         gewaehlt={gewaehlt.length} onzuweisen={zuweisen} onneuerSprecher={neuerSprecherFuerAuswahl}
-                        onverwerfen={verwerfen} onspeichern={speichern} onfertig={bearbeitenBeenden} />
+                        onverwerfen={verwerfen} onspeichern={speichern} onfertig={bearbeitenBeenden}
+                        woerter={wortVorschlag} {wortMeldung} onaufnehmen={woerterAufnehmen}
+                        onnichtaufnehmen={() => (wortVorschlag = [])} />
   {/if}
   {#if fehler}
     <div class="fehlertext" style="margin-bottom:12px">{fehler}

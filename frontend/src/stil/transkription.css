@@ -218,3 +218,23 @@ kbd.taste { font-family: var(--schrift-code); font-size: var(--marke); color: va
 .umzug-liste .u-zeile .fa-arrow-right { color: var(--text-3); }
 .umzug-liste .u-kopf { font-weight: 600; color: var(--text-2); background: var(--flaeche-2, var(--hg)); }
 .umzug-liste .u-mehr { display: block; color: var(--text-3); }
+
+/* Vorschlag fürs Wörterbuch in der Bearbeitungsleiste: Wörter einzeln an- und abwählbar */
+.bearbeitungsleiste .bl-woerter { padding: 8px 10px; border-radius: var(--r2); background: var(--akzent-weich); }
+.wort-wahl { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 1px solid var(--rand);
+  border-radius: var(--r2); background: var(--flaeche); color: var(--text-2); font: inherit; cursor: pointer; }
+.wort-wahl.an { color: var(--text); border-color: var(--akzent); }
+.wort-wahl.an i { color: var(--akzent); }
+
+/* Fachwörter-Wörterbuch */
+.wb-erklaerung { margin: 0 0 14px; color: var(--text-2); max-width: 760px; }
+.wb-eingabe { margin-bottom: 14px; }
+.wb-feld { flex: 1; min-width: 0; max-width: 520px; }
+.wb-suche { min-width: 200px; }
+.wb-woerter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.wb-wort { display: inline-flex; align-items: center; gap: 4px; height: 36px; padding: 0 4px 0 12px; border-radius: var(--r2);
+  background: var(--flaeche); box-shadow: 0 0 0 1px var(--rand); }
+.wb-weg { border: 0; background: transparent; color: var(--text-3); cursor: pointer; width: 30px; height: 30px; border-radius: var(--r1); }
+.wb-weg:hover { color: var(--gefahr); }
+.wb-mobil { padding: 4px 0 16px; }
+.mobil .wb-mobil .knopfzeile { flex-wrap: nowrap; }

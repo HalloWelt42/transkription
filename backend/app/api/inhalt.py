@@ -103,7 +103,7 @@ def router(teile: Teile) -> APIRouter:
             if dauer > HOEREN_HOECHSTENS_S:
                 raise HTTPException(413, f"Höchstens {HOEREN_HOECHSTENS_S} s; Längeres als Aufnahme transkribieren")
             erg = await teile.klangwerk.hoeren(wav, sprache or teile.einstellungen.sprache, titel="Kurz hören",
-                                               prioritaet="hoch")
+                                               hinweis=await teile.hoer_hinweis(), prioritaet="hoch")
             return Gehoert(text=" ".join(s.text for s in erg.segmente), sprache=erg.sprache, dauer_s=round(dauer, 3),
                            segmente=erg.segmente)
         finally:

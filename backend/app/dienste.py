@@ -75,12 +75,14 @@ class Klangwerk:
             raise KeineLeitstelle("Keine Leitstelle eingerichtet")
         return ls
 
-    async def hoeren(self, datei: Path, sprache: str, *, versatz: float = 0.0, titel: str = "",
+    async def hoeren(self, datei: Path, sprache: str, *, versatz: float = 0.0, titel: str = "", hinweis: str = "",
                      prioritaet=None) -> HoerErgebnis:
+        """`hinweis`: Stilsatz und Fachwörter, die der Hördienst jedem Fenster mitgibt (siehe Klangwerk)."""
         name = self._namen()[0]
+        daten = {"language": sprache, "diarize": "false", **({"prompt": hinweis} if hinweis else {})}
         with open(datei, "rb") as inhalt:          # gestreamt, nie am Stück im Speicher
             antwort = await self._leitstelle().dienst(name).json(
-                "POST", "/stt", titel=titel, prioritaet=prioritaet, data={"language": sprache, "diarize": "false"},
+                "POST", "/stt", titel=titel, prioritaet=prioritaet, data=daten,
                 files={"file": (datei.name, inhalt, _typ(datei))})
         return HoerErgebnis(segmente=segmente_aus(antwort.get("segments") or [], versatz),
                             sprache=antwort.get("language"), modell=antwort.get("model"))

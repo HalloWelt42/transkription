@@ -42,6 +42,7 @@ from .ablage.transkripte import aufnahme_id, begleiter_ablegen
 from .dienste import KeineLeitstelle, Wechsel
 from .einstellungen import SprecherWeg
 from .sprachen import Sprache
+from .zusammenfuegen import an_satzenden
 from .fassung import FASSUNG
 from .modell.transkript import Aenderung, ErzeugtMit, Marker, Quelle, Segment, Transkript
 from .sprechererkennung import an_wechseln_teilen, erkennen
@@ -258,6 +259,7 @@ def arten(teile: Teile) -> list[Art]:
                 except KellerwolkeFehler:
                     pass
 
+            hinweis = await teile.hoer_hinweis()
             fertig: dict[str, dict] = dict(k.zwischenstand.get("hoeren", {}))
             await k.fortschritt(len(fertig) / max(len(plan), 1), "Hören", phase="hoeren")
             for a in plan:
@@ -271,7 +273,7 @@ def arten(teile: Teile) -> list[Art]:
                 stueck = await ausschneiden(wav, a.start, a.ende, ordner / f"abschnitt-{a.nummer}.wav")
                 titel = f"{name}, Abschnitt {a.nummer} von {len(plan)}"
                 erg = await geduldig(k, lambda: teile.klangwerk.hoeren(stueck, sprache, versatz=a.start, titel=titel,
-                                                                        prioritaet="hintergrund"), "Hören")
+                                                                        hinweis=hinweis, prioritaet="hintergrund"), "Hören")
                 abdruecke: list = []
                 if mit_sprechern and erg.segmente:
                     zeiten = [(round(s.start - a.start, 3), round(s.ende - a.start, 3)) for s in erg.segmente]
@@ -300,6 +302,7 @@ def arten(teile: Teile) -> list[Art]:
                 segmente, sprecher = await sprecher_bestimmen(k, wav, ordner, segmente, abdruecke_alle, e.anzahl, name,
                                                               trennung=weg == "trennung", plan=plan)
 
+            segmente = an_satzenden(segmente)       # Beiträge enden an Satzenden, nicht an jeder Sprechpause
             await k.pruefen()
             await k.fortschritt(None, "Speichern", phase="speichern")
             marker = [Marker(zeit=m["zeit"], titel=m["titel"]) for m in quelle.felder.get(orte.FELD_MARKER) or []

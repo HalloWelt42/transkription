@@ -17,6 +17,9 @@ KI = {"gruppe": "KI"}
 TECHNIK = {"gruppe": "Technik"}
 ALTBESTAND = {"gruppe": "Altbestand"}
 
+# Ohne Hinweis kippt der Hördienst in langen Strecken in Kleinschrift ohne Satzzeichen (HELF-3)
+STILSATZ = "Hallo, schön, dass du da bist. Wir sprechen heute über das Projekt: Wie ist der Stand, und was fehlt noch?"
+
 SprecherWeg = Literal["ohne", "stimmen", "trennung"]
 SPRECHER_WEGE = {"ohne": "Ohne Sprecher", "stimmen": "Stimmen gruppieren", "trennung": "Mit Sprechertrennung"}
 
@@ -28,6 +31,10 @@ class AppEinstellungen(Grundeinstellungen):
     abschnitt_min: int = Field(10, ge=2, le=30, title="Abschnittslänge", json_schema_extra={**HOEREN, "einheit": "Minuten"},
                                description="Lange Aufnahmen gehen in Abschnitten dieser Länge an den Hördienst, geschnitten in "
                                            "Sprechpausen. Nach einem Abbruch geht es beim nächsten Abschnitt weiter.")
+    hoer_stil: str = Field(STILSATZ, max_length=400, title="Stilsatz für den Hördienst", json_schema_extra=HOEREN,
+                           description="Geht mit den Fachwörtern aus dem Wörterbuch jedem Stück der Aufnahme als Hinweis mit, "
+                                       "damit der Hördienst mit Groß- und Kleinschreibung und Satzzeichen schreibt. In der "
+                                       "Sprache, die meist gesprochen wird; leer: ohne Stilsatz.")
     dienst_hoeren: str = Field("klangwerk-hoeren", title="Dienst zum Hören", json_schema_extra=HOEREN,
                                description="Macht aus Ton Text mit Wortzeiten. Zur Wahl steht, was die Leitstelle dieser App "
                                            "anbietet.")

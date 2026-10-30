@@ -10,6 +10,7 @@
         { "klick": "[data-i='1'] .beitrag, [data-i='1'] .t-beitrag", "warten_ms": 500 }
       ] },
     { "name": "sprecher", "pfad": "/sprecher" },
+    { "name": "woerterbuch", "pfad": "/woerterbuch" },
     { "name": "auftraege", "pfad": "/auftraege" },
     { "name": "protokoll", "pfad": "/protokoll" },
     { "name": "einstellungen", "pfad": "/einstellungen" },

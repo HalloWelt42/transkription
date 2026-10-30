@@ -12,6 +12,7 @@ from appkern.app import Begleiter, Geruest
 from appkern.einstellungen import Angebot, Option
 
 from .ablage.profile import Sprecherprofile
+from .ablage.woerterbuch import Fachwoerter
 from appkern.kellerwolke import Kellerwolke, Knoten
 
 from .ablage.transkripte import Transkripte, zugang
@@ -22,6 +23,7 @@ from .einstellungen import AppEinstellungen
 from .mitlesen import Mitlesen
 from .sprachen import Sprachen
 from .modell.transkript import Transkript
+from .modell.woerterbuch import hinweis
 from .sprechererkennung import Schwellen
 from .suchindex import Suchindex
 from appkern.ton import Abspielfassungen, TonDienst
@@ -33,6 +35,7 @@ class Teile(Begleiter):
         self.geruest = geruest
         self.transkripte = Transkripte(lambda: geruest.kellerwolke)
         self.profile = Sprecherprofile(lambda: geruest.kellerwolke)
+        self.woerterbuch = Fachwoerter(lambda: geruest.kellerwolke)
         self.index = Suchindex(geruest.db)
         self.vorschlaege = Vorschlaege(geruest.db)
         self.mitlesen = Mitlesen(geruest.db)
@@ -45,6 +48,11 @@ class Teile(Begleiter):
         self.klangwerk = Klangwerk(lambda: geruest.leitstelle,
                                    lambda: (e().dienst_hoeren, e().dienst_sprecher, e().dienst_trennen))
         self.angebote()
+
+    async def hoer_hinweis(self) -> str:
+        """Der Hinweis an den Hördienst: Stilsatz aus den Einstellungen und die Wörter des Fachwörter-Wörterbuchs."""
+        wb, _ = await self.woerterbuch.lesen()
+        return hinweis(self.einstellungen.hoer_stil, wb.woerter)
 
     def zugang(self, anfrage: UUID | None = None) -> Kellerwolke:
         """Der Zugang zur Kellerwolke; mit einer Anfrage (Datei außerhalb der App, aus der Kellerwolke angefragt) der

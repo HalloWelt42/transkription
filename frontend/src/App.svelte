@@ -1,11 +1,12 @@
 <script lang="ts">
   // Die Bereiche der Transkription in der gemeinsamen Schale (Kopf, Navigation, Aufträge, Protokoll, Einstellungen).
-  // Am Telefon sind Aufnahmen und Transkripte Reiter, Sprecher liegt unter Mehr.
+  // Am Telefon sind Aufnahmen und Transkripte Reiter, Sprecher und Wörterbuch liegen unter Mehr.
   import { ereignisseBenennen, Schale, type Anfrage, type Bereich } from "appkern-oberflaeche";
   import * as api from "./lib/api";
   import Aufnahmen from "./seiten/Aufnahmen.svelte";
   import Sprecher from "./seiten/Sprecher.svelte";
   import Transkripte from "./seiten/Transkripte.svelte";
+  import Woerterbuch from "./seiten/Woerterbuch.svelte";
 
   ereignisseBenennen({
     "aufnahme.hochgeladen": "Aufnahme hochgeladen",
@@ -18,6 +19,7 @@
     { schluessel: "aufnahmen", titel: "Aufnahmen", symbol: "fa-microphone-lines", seite: Aufnahmen, reiter: true },
     { schluessel: "transkripte", titel: "Transkripte", symbol: "fa-file-lines", seite: Transkripte, reiter: true },
     { schluessel: "sprecher", titel: "Sprecher", symbol: "fa-user-group", seite: Sprecher },
+    { schluessel: "woerterbuch", titel: "Wörterbuch", symbol: "fa-book", seite: Woerterbuch },
   ];
 
   // Aus der Kellerwolke geöffnet ("In Transkription öffnen", auch auf dem Transkript: dann gilt die Anfrage der

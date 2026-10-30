@@ -219,3 +219,9 @@ export interface Bisher {
   rest_s: number | null;       // geschätzte Sekunden, bis alles gehört ist; leer: noch keine Schätzung
   geschaetzt_aus: "" | "auftrag" | "frueher";
 }
+
+// Fachwörter-Wörterbuch (Hinweis an den Hördienst); ohne Änderungsdatum: noch der Startinhalt
+export interface WoerterbuchStand {
+  woerter: string[];
+  geaendert_am: string | null;
+}

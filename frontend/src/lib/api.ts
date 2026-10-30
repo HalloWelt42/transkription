@@ -3,7 +3,7 @@ import type { ErkennenWeg, SprecherWeg } from "./sprecherwahl";
 import { hochladen, hole, json, type Auftrag, type Gespeichert } from "appkern-oberflaeche";
 import type {
   AltbestandSeite, Aufnahme, Bisher, AufnahmenSeite, ExportFormat, Ordner, Profil, TranskriptAntwort, Verzeichnis, Version, Vorlage, Vorschlag,
-  Marker, Segment, Transkript, Umzugsplan,
+  Marker, Segment, Transkript, Umzugsplan, WoerterbuchStand,
 } from "./typen";
 
 function abfrage(werte: Record<string, string | number | null | undefined | string[]>): string {
@@ -114,6 +114,12 @@ export const auswerten = (id: string, vorlage: Vorlage, anfrage?: AnfrageId) =>
 // --- Sprecherprofile --------------------------------------------------------------------------------------------
 
 export const profile = () => hole<Profil[]>("/sprecher");
+
+// --- Fachwörter-Wörterbuch ------------------------------------------------------------------------------------
+export const woerterbuch = () => hole<WoerterbuchStand>("/woerterbuch");
+export const woerterbuchSetzen = (woerter: string[]) => hole<WoerterbuchStand>("/woerterbuch", { method: "PUT", ...json({ woerter }) });
+export const woerterAufnehmen = (woerter: string[]) =>
+  hole<WoerterbuchStand & { neu: string[] }>("/woerterbuch/woerter", { method: "POST", ...json({ woerter }) });
 export const profilUmbenennen = (id: string, name: string) => hole<Profil[]>(`/sprecher/${id}`, { method: "PATCH", ...json({ name }) });
 export const profileZusammenfuehren = (ziel: string, quelle: string) =>
   hole<Profil[]>(`/sprecher/${ziel}/zusammenfuehren`, { method: "POST", ...json({ quelle_id: quelle }) });

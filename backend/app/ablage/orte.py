@@ -15,6 +15,7 @@ AUFNAHMEN = "Aufnahmen"            # Wurzel des einen Baums: Aufnahmen mit ihren
 ALT_TRANSKRIPTE = "Transkripte"    # nur noch für das Zusammenführen der früheren getrennten Ablage
 SPRECHER = "Sprecher"
 PROFILE = "profile.json"
+WOERTERBUCH = "Fachwörter.json"   # Fachwörter, die dem Hördienst als Hinweis mitgehen
 ROLLE = "transkript"               # Rolle des Transkripts als Begleiter seiner Aufnahme
 ENDUNG = ".transkript.json"        # zugleich der Zusatz hinter dem Stamm der Aufnahme
 INHALTSTYP = "application/json"

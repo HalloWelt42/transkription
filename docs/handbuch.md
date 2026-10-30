@@ -3,7 +3,7 @@ zweck: "Macht aus Ton und Video Text mit Wortzeiten und Sprechern; das Transkrip
 geraet: [pi]
 abhaengigkeiten: [kellerwolke, leitstelle, klangwerk, appkern]
 daten:
-  - "Kellerwolke: die einzige Wahrheit, je Aufnahme ein Transkript `<name>.transkript.json` als Begleitdatei (mit Versionen), dazu Exporte, Auswertungen und `Sprecher/profile.json`"
+  - "Kellerwolke: die einzige Wahrheit, je Aufnahme ein Transkript `<name>.transkript.json` als Begleitdatei (mit Versionen), dazu Exporte, Auswertungen, `Sprecher/profile.json` und das Fachwörter-Wörterbuch `Fachwörter.json`"
   - "Pi: `{{wurzel}}/daten/transkription.sqlite` (Verzeichnis, Suchindex, Aufträge, Vorschläge, Protokoll; folgt der Kellerwolke), `abspielen/` (Abspielfassungen, rund 20 GB, neu erzeugbar), `arbeit/`, `umzug/`"
 sicherung:
   - "nach der Regel des Appkerns eine Kopie von `transkription.sqlite` nach `{{wurzel}}/sicherungen`, wöchentlich und vor dem Ausrollen (nur, wenn die jüngste älter als 24 Stunden ist), nie ohne Änderung, höchstens drei Stände (Einstellungen, Sicherung); das Werkzeug Sicherungen holt sie täglich nach `~/Sicherungen/transkription/pi`"
@@ -112,6 +112,9 @@ transkription`. Probe wie in Schritt 3.
   bietet das gewählte der Anwendung Transkription nicht an (Fähigkeit text).
 - Eine Sprache fehlt zur Wahl: die Sprachen kommen aus dem Steckbrief des Hördienstes (Selbstauskunft in seiner
   Dienstdatei, siehe [[Klangwerk]]); antwortet die Leitstelle nicht, steht nur Erkennen und die eingestellte zur Wahl.
+- Fachwörter kommen falsch an: unter Wörterbuch fehlt das Wort, oder der Hördienst ist älter als Klangwerk 0.4.0 (kennt
+  den Hinweis noch nicht). Schreibt er lange Strecken klein und ohne Satzzeichen, unter Einstellungen, Hören den
+  Stilsatz prüfen (in der Sprache der Aufnahme).
 - Die Suche findet etwas nicht: unter Transkripte sucht sie in Namen, Text und Markern der eigenen Transkripte
   (nicht in denen, die andere Apps bestellen), unter Aufnahmen nur nach Dateinamen ab dem gewählten Ordner abwärts.
 - Das Ausrollen wartet lange: es wartet auf eine Lücke ohne laufenden Auftrag (bis vier Stunden); `--sofort` rollt
