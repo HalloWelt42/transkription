@@ -95,9 +95,11 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert ohne["transkript"]["sprecher"] == [] and all(s["sprecher"] is None for s in ohne["transkript"]["segmente"])
                 assert ohne["pfad"].endswith(f"/Aufnahmen/{name}.transkript.json")      # neben der Aufnahme
 
-                # Transkribieren mit gewählter Sprechertrennung: zwei Abschnitte; die Trennung fehlt, also gruppiert
+                # Transkribieren mit gewählter Sprechertrennung: zwei Abschnitte; die Trennung fehlt, also gruppiert. Andere
+                # Herkunft der Sprecher ist eine andere Fassung (HELF-90); als Hauptfassung gewünscht rückt die bisherige
+                # unter die Fassungen
                 a = (await c.post("/api/v1/transkribieren", headers=h, json={"quelle_id": aufnahme["id"], "name": name,
-                                                                              "sprecher": "trennung"})).json()
+                                                                              "sprecher": "trennung", "hauptfassung": True})).json()
                 a = await warten(c, h, a["id"])
                 assert a["zustand"] == "fertig", a.get("fehler")
                 tid = a["ergebnis"]["transkript_id"]
@@ -107,6 +109,8 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert len(segmente) == 4 and segmente[2]["start"] > 100 and segmente[0]["woerter"][0]["wort"] == "Hallo"
                 assert [s["sprecher"] for s in segmente] == ["s1", "s2", "s1", "s2"]
                 assert all(s.get("abdruck") is None for s in t["transkript"]["sprecher"])
+                assert t["transkript"]["erzeugt_mit"]["sprecher_aus"] == "stimmen"          # die Trennung fehlte
+                assert [f["erzeugt_mit"]["sprecher_aus"] for f in t["transkript"]["fassungen"]] == ["ohne"]
                 assert len(t["transkript"]["wellenform"]) == 800
                 welle = (await c.get(f"/api/v1/inhalt/aufnahmen/{aufnahme['id']}/wellenform", headers=h)).json()
                 assert len(welle) == 800 and max(welle) > 50 and min(welle) < 30      # aus dem Ton, Sprache und Pausen
@@ -210,14 +214,17 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert {d["kennung"]: d["vorgabe"] for d in dienste} == {"klangwerk-hoeren": True, "klangwerk-hoeren-moss": False}
                 vorher = (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()["transkript"]
                 a = (await c.post("/api/v1/transkribieren", headers=h, json={
-                    "quelle_id": aufnahme["id"], "hoerdienst": "klangwerk-hoeren-moss", "sprecher": "stimmen"})).json()
+                    "quelle_id": aufnahme["id"], "hoerdienst": "klangwerk-hoeren-moss", "sprecher": "trennung",
+                    "trenndienst": "klangwerk-hoeren-moss"})).json()
                 a = await warten(c, h, a["id"])
                 assert a["zustand"] == "fertig" and a["ergebnis"]["transkript_id"] == tid, a.get("fehler")
                 t = (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()
                 assert t["transkript"]["segmente"] == vorher["segmente"] and t["transkript"]["erzeugt_mit"]["dienst"] == "klangwerk-hoeren"
-                [moss] = t["transkript"]["fassungen"]
+                # daneben steht noch die Fassung ohne Sprecher vom Anfang (andere Herkunft der Sprecher, HELF-90)
+                assert [f["erzeugt_mit"]["sprecher_aus"] for f in t["transkript"]["fassungen"]] == ["ohne", "klangwerk-hoeren-moss"]
+                moss = t["transkript"]["fassungen"][1]
                 assert moss["erzeugt_mit"]["dienst"] == "klangwerk-hoeren-moss" and moss["erzeugt_mit"]["modell"] == "MOSS (Schein)"
-                assert moss["erzeugt_mit"]["hoeren_s"] is not None
+                assert moss["erzeugt_mit"]["hoeren_s"] is not None and moss["erzeugt_mit"]["sprecher_aus"] == "klangwerk-hoeren-moss"
                 assert [s["sprecher"] for s in moss["segmente"]] == ["s1", "s2", "s1", "s2"]
                 assert len(moss["sprecher"]) == 2 and all(x.get("abdruck") is None for x in moss["sprecher"])
                 versionen = (await c.get(f"/api/v1/transkripte/{tid}/versionen", headers=h)).json()
@@ -228,8 +235,8 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert r.status_code == 200, r.text
                 getauscht = r.json()["transkript"]
                 assert getauscht["erzeugt_mit"]["dienst"] == "klangwerk-hoeren-moss" and getauscht["segmente"][0]["sprecher"] == "s1"
-                assert [f["erzeugt_mit"]["dienst"] for f in getauscht["fassungen"]] == ["klangwerk-hoeren"]
-                assert getauscht["fassungen"][0]["segmente"] == vorher["segmente"] and getauscht["marker"] == vorher["marker"]
+                assert [f["erzeugt_mit"]["dienst"] for f in getauscht["fassungen"]] == ["klangwerk-hoeren", "klangwerk-hoeren"]
+                assert getauscht["fassungen"][1]["segmente"] == vorher["segmente"] and getauscht["marker"] == vorher["marker"]
                 assert (await c.post(f"/api/v1/transkripte/{tid}/hauptfassung", headers=h,
                                      json={"stand": t["stand"], "fassung_id": moss["id"]})).status_code == 409
                 # Alle Hördienste nacheinander (Reihe): je einer ein Auftrag im selben Stapel, der nächste erst nach dem
@@ -237,7 +244,8 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert (await c.post("/api/v1/transkribieren", headers=h, json={
                     "quelle_id": aufnahme["id"], "reihe": ["klangwerk-hoeren", "klangwerk-hoeren"]})).status_code == 422
                 erster = (await c.post("/api/v1/transkribieren", headers=h, json={
-                    "quelle_id": aufnahme["id"], "reihe": ["klangwerk-hoeren-moss", "klangwerk-hoeren"], "sprecher": "stimmen"})).json()
+                    "quelle_id": aufnahme["id"], "reihe": ["klangwerk-hoeren-moss", "klangwerk-hoeren"], "sprecher": "trennung",
+                    "trenndienst": "klangwerk-hoeren-moss"})).json()
                 assert erster["eingabe"]["hoerdienst"] == "klangwerk-hoeren-moss" and erster["titel"].endswith("1 von 2 Hördiensten")
                 assert (await warten(c, h, erster["id"]))["zustand"] == "fertig"
                 reihe = []
@@ -251,7 +259,16 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert all(x["zustand"] == "fertig" for x in reihe)
                 nach = (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()["transkript"]
                 assert nach["erzeugt_mit"]["dienst"] == "klangwerk-hoeren-moss"
-                assert [f["erzeugt_mit"]["dienst"] for f in nach["fassungen"]] == ["klangwerk-hoeren"]
+                # Mischung (HELF-90): Text von Whisper, Sprecher von MOSS als Dienst der Sprechertrennung, eine eigene
+                # Fassung neben Whisper mit gruppierten Stimmen
+                assert [(f["erzeugt_mit"]["dienst"], f["erzeugt_mit"]["sprecher_aus"]) for f in nach["fassungen"]] == [
+                    ("klangwerk-hoeren", "ohne"), ("klangwerk-hoeren", "stimmen"), ("klangwerk-hoeren", "klangwerk-hoeren-moss")]
+                misch = nach["fassungen"][2]
+                # die Schein-Trennung nennt nur die Sätze des ersten Abschnitts; dort teilt sie die Beiträge
+                assert [s["sprecher"] for s in misch["segmente"][:2]] == ["s1", "s2"] and len(misch["sprecher"]) == 2
+                assert misch["segmente"][0]["woerter"] and misch["erzeugt_mit"]["modell"] == "Schein"
+                trenner = (await c.get("/api/v1/trenndienste", headers=h)).json()
+                assert {d["kennung"]: d["vorgabe"] for d in trenner} == {"klangwerk-hoeren-moss": False, "klangwerk-trennen": True}
                 # Ein Ausschnitt mit eigener Abschnittslänge (Messung): kommt als eigene Fassung daneben, nie als Hauptfassung
                 assert (await c.post("/api/v1/transkribieren", headers=h, json={
                     "quelle_id": aufnahme["id"], "bereich": [0, 2], "hauptfassung": True})).status_code == 422

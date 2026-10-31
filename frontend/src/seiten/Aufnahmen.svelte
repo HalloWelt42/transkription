@@ -10,7 +10,8 @@
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import { sprachOptionen as sprachWahl } from "../lib/sprachen.svelte";
-  import { hoerdiensteLaden, hoerdienstOptionen, vorgabeHoerdienst } from "../lib/hoerdienste.svelte";
+  import { hoerdiensteLaden, hoerdienstOptionen, trenndiensteLaden, trenndienstOptionen, vorgabeHoerdienst,
+           vorgabeTrenndienst } from "../lib/hoerdienste.svelte";
   import type { Aufnahme, AufnahmenSeite, Ordner } from "../lib/typen";
   import Altbestand from "../teile/Altbestand.svelte";
   import AufnahmeAnsicht from "../teile/AufnahmeAnsicht.svelte";
@@ -39,6 +40,7 @@
   let sprecher = $state<SprecherWeg>("ohne");
   let anzahl = $state<number | null>(null);
   let hoerdienst = $state<string | null>(null);      // je Auftrag; Vorgabe der eingestellte
+  let trenndienst = $state<string | null>(null);     // Sprecher aus (mit Sprechertrennung); Vorgabe der eingestellte
   let fehler = $state("");
   let meldung = $state("");
   let ueber = $state(false);
@@ -70,6 +72,8 @@
         sprecher = (await api.einstellung<SprecherWeg>("sprecher_weg")) ?? "ohne";
         await hoerdiensteLaden();
         hoerdienst = vorgabeHoerdienst();
+        await trenndiensteLaden();
+        trenndienst = vorgabeTrenndienst();
       } catch (f) {
         fehler = (f as Error).message;
       }
@@ -201,7 +205,8 @@
     fehler = "";
     try {
       for (const id of gewaehlt) {
-        await api.transkribieren({ quelle_id: id, sprache, sprecher, anzahl: sprecher !== "ohne" ? anzahl : null, hoerdienst });
+        await api.transkribieren({ quelle_id: id, sprache, sprecher, anzahl: sprecher !== "ohne" ? anzahl : null, hoerdienst,
+                                   trenndienst: sprecher === "trennung" ? trenndienst : null });
       }
       meldung = `${gewaehlt.length} ${gewaehlt.length === 1 ? "Aufnahme wird" : "Aufnahmen werden"} transkribiert.`;
       gewaehlt = [];
@@ -424,6 +429,7 @@
         <label>Hördienst <Auswahl bind:wert={hoerdienst} optionen={hoerdienstOptionen()} /></label>
         <label>Sprache <Auswahl bind:wert={sprache} optionen={sprachOptionen} /></label>
         <label>Sprecher <Auswahl bind:wert={sprecher} optionen={SPRECHER_WEGE} /></label>
+        {#if sprecher === "trennung"}<label>Sprecher aus <Auswahl bind:wert={trenndienst} optionen={trenndienstOptionen()} /></label>{/if}
         {#if sprecher !== "ohne"}<label>Anzahl <Auswahl bind:wert={anzahl} optionen={ANZAHL_OPTIONEN} /></label>{/if}
         <span class="knopfzeile" style="margin-left:auto">
           <button class="knopf still" onclick={() => (gewaehlt = [])}>Auswahl aufheben</button>

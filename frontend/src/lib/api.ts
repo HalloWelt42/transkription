@@ -36,7 +36,7 @@ export const aufnahmen = (o: { ordner?: string | null; filter?: string; suche?: 
 
 // `reihe`: mehrere Hördienste nacheinander (je einer ein Auftrag im selben Stapel; der Auftrag hört mit dem ersten)
 export const transkribieren = (e: { quelle_id: string; name?: string; sprache?: string; sprecher?: SprecherWeg; anzahl?: number | null;
-                                    hoerdienst?: string | null; reihe?: string[];
+                                    hoerdienst?: string | null; reihe?: string[]; trenndienst?: string | null;
                                     abschnitt_s?: number | null; bereich?: [number, number] | null }) =>
   hole<Auftrag>("/transkribieren", { method: "POST", ...json(e) });
 
@@ -45,6 +45,9 @@ export const sprachen = (dienst?: string | null) => hole<{ code: string; name: s
 
 // Hördienste zur Wahl je Auftrag: was die Leitstelle dieser App anbietet, der eingestellte als Vorgabe
 export const hoerdienste = () => hole<Hoerdienst[]>("/hoerdienste");
+
+// "Sprecher aus" bei der Sprechertrennung: die Dienste mit der Fähigkeit sprecher_trennen (etwa pyannote und MOSS)
+export const trenndienste = () => hole<Hoerdienst[]>("/trenndienste");
 
 // Mitlesen: was ein laufender Auftrag schon gehört hat und wie lange er noch braucht
 export const bisher = (auftrag: string) => hole<Bisher>(`/transkribieren/${encodeURIComponent(auftrag)}/bisher`);
@@ -114,8 +117,9 @@ export const profilZuordnen = (id: string, kennung: string, z: { stand: string; 
                               anfrage?: AnfrageId) =>
   hole<TranskriptAntwort>(mit(`/transkripte/${id}/sprecher/${kennung}/profil`, anfrage), { method: "POST", ...json(z) });
 
-export const sprecherErkennen = (id: string, weg: ErkennenWeg, anzahl: number | null, anfrage?: AnfrageId) =>
-  hole<Auftrag>(mit(`/transkripte/${id}/sprecher-erkennen`, anfrage), { method: "POST", ...json({ weg, anzahl }) });
+export const sprecherErkennen = (id: string, weg: ErkennenWeg, anzahl: number | null, anfrage?: AnfrageId,
+                                trenndienst?: string | null) =>
+  hole<Auftrag>(mit(`/transkripte/${id}/sprecher-erkennen`, anfrage), { method: "POST", ...json({ weg, anzahl, trenndienst }) });
 export const korrigieren = (id: string, anfrage?: AnfrageId) =>
   hole<Auftrag>(mit(`/transkripte/${id}/korrigieren`, anfrage), { method: "POST" });
 export const auswerten = (id: string, vorlage: Vorlage, anfrage?: AnfrageId) =>
@@ -156,7 +160,7 @@ export const altUebernehmen = (e: { schluessel: string; zielordner: string; name
 // In der App gewählte Dateien aus der ganzen Kellerwolke mit Optionen transkribieren (je Datei eine Anfrage, Recht nur
 // für diesen Auftrag); liefert die Aufträge.
 export const ausKellerwolke = (e: { knoten_ids: string[]; sprache?: string; sprecher?: SprecherWeg; anzahl?: number | null;
-                                    hoerdienst?: string | null }) =>
+                                    hoerdienst?: string | null; trenndienst?: string | null }) =>
   hole<string[]>("/kellerwolke/transkribieren", { method: "POST", ...json(e) });
 
 export const zusammenfuehrenPlan = () => hole<Umzugsplan>("/ablage/zusammenfuehren");

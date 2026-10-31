@@ -122,11 +122,15 @@ class Klangwerk:
         return abdruecke
 
     async def trennen(self, datei: Path, *, anzahl: int | None = None, zugang: str = "", titel: str = "",
-                      prioritaet=None) -> list[Wechsel]:
-        name = self._namen()[2]
+                      prioritaet=None, dienst: str | None = None, sprache: str | None = None) -> list[Wechsel]:
+        """Wer spricht wann (`POST /speaker/diarize`, gleiche Schnittstelle bei pyannote und MOSS); `dienst`: der Dienst
+        der Sprechertrennung dieses Auftrags (sonst der eingestellte), `sprache` hilft einem Dienst, der dabei hört."""
+        name = dienst or self._namen()[2]
         daten: dict[str, str] = {"hf_token": zugang} if zugang else {}
         if anzahl:
             daten["num_speakers"] = str(anzahl)
+        if sprache:
+            daten["language"] = sprache
         with open(datei, "rb") as inhalt:
             antwort = await self._leitstelle().dienst(name).json(
                 "POST", "/speaker/diarize", titel=titel, prioritaet=prioritaet, data=daten,

@@ -22,14 +22,49 @@ export function vorgabeHoerdienst(): string | null {
   return hoerdienste.liste.find((d) => d.vorgabe)?.kennung ?? null;
 }
 
+// "Sprecher aus" bei der Sprechertrennung (HELF-90): die Dienste mit der Fähigkeit sprecher_trennen (GET /trenndienste),
+// der eingestellte als Vorgabe. Ist es der Hördienst selbst und nennt er Sprecher, gelten seine ohne zweiten Lauf.
+export const trenndienste = $state<{ liste: Hoerdienst[] }>({ liste: [] });
+let trennGeladen: Promise<void> | null = null;
+
+export function trenndiensteLaden(): Promise<void> {
+  trennGeladen ??= api.trenndienste().then((l) => { trenndienste.liste = l; }).catch(() => { trennGeladen = null; });
+  return trennGeladen;
+}
+
+export function trenndienstOptionen(): { wert: string; titel: string }[] {
+  void trenndiensteLaden();
+  return trenndienste.liste.map((d) => ({ wert: d.kennung, titel: d.name }));
+}
+
+export function vorgabeTrenndienst(): string | null {
+  return trenndienste.liste.find((d) => d.vorgabe)?.kennung ?? null;
+}
+
+// Woher die Sprecher einer Fassung kommen, kurz für Reiter und Vergleich; ohne Sprecher oder unbekannt: nichts
+export function sprecherHerkunft(e: ErzeugtMit | null | undefined): string {
+  const aus = e?.sprecher_aus;
+  if (!aus || aus === "ohne" || aus === "unbekannt") return "";
+  if (aus === "stimmen") return "Stimmen gruppiert";
+  const dienst = trenndienste.liste.find((d) => d.kennung === aus) ?? hoerdienste.liste.find((d) => d.kennung === aus);
+  return `Sprecher aus ${dienst?.name ?? aus}`;
+}
+
 // Name eines Modells für Reiter und Vergleich: wie der Hördienst sein Modell nennt, sonst wie die Leitstelle den Dienst;
-// ein Ausschnitt nennt seinen Bereich und eine gewählte Abschnittslänge
+// dazu die Herkunft der Sprecher, ein Ausschnitt nennt seinen Bereich und eine gewählte Abschnittslänge
 export function modellName(e: ErzeugtMit | null | undefined): string {
   if (!e) return "Ohne Angabe";
   const name = e.modell || hoerdienste.liste.find((d) => d.kennung === e.dienst)?.name || e.dienst;
-  const zusatz = [e.bereich ? `${marke(e.bereich[0])} bis ${marke(e.bereich[1])}` : "",
+  const zusatz = [sprecherHerkunft(e), e.bereich ? `${marke(e.bereich[0])} bis ${marke(e.bereich[1])}` : "",
                   e.abschnitt_s ? `Abschnitte ${e.abschnitt_s} s` : ""].filter(Boolean).join(", ");
   return zusatz ? `${name} (${zusatz})` : name;
+}
+
+// Woher die Sprecher eines neuen Auftrags kommen werden (wie im Backend): so erkennt "Nur fehlende", welche Fassung es
+// mit dieser Wahl schon gibt
+export function erwarteteHerkunft(weg: string, trenndienst: string | null): string {
+  if (weg === "trennung") return trenndienst || vorgabeTrenndienst() || "";
+  return weg === "stimmen" ? "stimmen" : "ohne";
 }
 
 // Eine Fassung zum Zeigen: die Hauptfassung (Felder des Transkripts, Kennung "haupt") oder eine weitere

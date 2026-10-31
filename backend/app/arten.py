@@ -7,6 +7,12 @@ transkribieren      Vorbereiten (Ton holen, wandeln, Abschnitte an Sprechpausen 
 aus_anfrage         Transkribieren auf Anfrage aus der Kellerwolke (Dateimenü): die Aufnahme liegt außerhalb der App,
                     gelesen und geschrieben wird nur mit dem Recht der Anfrage.
 sprecher_erkennen   für ein vorhandenes Transkript neu, auf Wunsch mit bekannter Sprecherzahl.
+
+Sprecher kommen auf einem von drei Wegen: ohne, Stimmen gruppieren (Stimmabdrücke) oder Sprechertrennung. Bei der
+Sprechertrennung wählt der Auftrag den Dienst ("Sprecher aus", etwa pyannote oder MOSS; leer: der eingestellte). Ist
+das der Hördienst selbst und nennt er Sprecher, gelten seine, ohne zweiten Lauf; sonst trennt der gewählte Dienst die
+ganze Aufnahme, und die Beiträge werden an seinen Wechseln geteilt. Wie die Sprecher entstanden, steht in der Fassung
+(`ErzeugtMit.sprecher_aus`); Whisper mit Sprechern aus pyannote und Whisper mit Sprechern aus MOSS sind so zwei Fassungen.
 korrigieren         KI-Korrektur in Fenstern von drei Segmenten; Ergebnis sind Vorschläge, nichts wird überschrieben.
 auswerten           KI-Auswertung nach Vorlage als Markdown-Datei neben dem Transkript.
 
@@ -45,7 +51,8 @@ from .sprachen import Sprache
 from .zusammenfuegen import an_satzenden
 from .mitlesen import takt as mitlesen_takt
 from .fassung import FASSUNG
-from .modell.transkript import Aenderung, ErzeugtMit, Marker, Quelle, Segment, Transkript
+from .modell.transkript import (SPRECHER_OHNE, SPRECHER_STIMMEN, Aenderung, ErzeugtMit, Marker, Quelle, Segment,
+                               Transkript)
 from .sprechererkennung import an_wechseln_teilen, erkennen
 from .teile import Teile
 from appkern.ton import ABSPIELEN, HOEREN, Aufbereiten, Ausgabe, Messen, Pause, PausenWahl
@@ -99,6 +106,9 @@ class TranskribierenAnfrage(BaseModel):
     sprecher: SprecherWeg | None = Field(None, description="ohne, Stimmen gruppieren oder mit Sprechertrennung; leer: Vorgabe "
                                                             "aus den Einstellungen (ab Werk ohne)")
     anzahl: int | None = Field(None, ge=1, le=20, description="bekannte Zahl der Sprecher")
+    trenndienst: str | None = Field(None, max_length=120, description="Sprecher aus: Dienst der Sprechertrennung für "
+                                    "diesen Auftrag (GET /trenndienste, etwa pyannote oder MOSS); nur mit Sprechertrennung; "
+                                    "leer: der eingestellte")
     hoerdienst: str | None = Field(None, max_length=120, description="Hördienst der Leitstelle für diesen Auftrag (GET "
                                    "/hoerdienste); leer: der eingestellte. Gibt es schon ein Transkript, wird es die "
                                    "Fassung dieses Hördienstes daneben (vom Hördienst der Hauptfassung: neue Hauptfassung)")
@@ -146,6 +156,7 @@ class AnfrageOptionen(BaseModel):
     sprecher: SprecherWeg | None = None
     anzahl: int | None = Field(None, ge=1, le=20)
     hoerdienst: str | None = Field(None, max_length=120)
+    trenndienst: str | None = Field(None, max_length=120)
 
 
 def eingabe_aus_anfrage(e: AnfrageEingabe) -> TranskribierenEingabe:
@@ -176,6 +187,8 @@ class SprecherEingabe(BaseModel):
     transkript_id: UUID
     anfrage_id: UUID | None = Field(None, description="Anfrage der Kellerwolke, wenn das Transkript außerhalb der App liegt")
     weg: Literal["stimmen", "trennung"] = Field("stimmen", description="Stimmen gruppieren oder erst die Sprechertrennung fragen")
+    trenndienst: str | None = Field(None, max_length=120, description="Sprecher aus: Dienst der Sprechertrennung; leer: "
+                                                                      "der eingestellte")
     anzahl: int | None = Field(None, ge=1, le=20)
     von: str | None = None
 
@@ -276,26 +289,37 @@ def arten(teile: Teile) -> list[Art]:
 
     async def sprecher_bestimmen(k: Kontext, wav: Path, ordner: Path, segmente: list[Segment],
                                  abdruecke: list[list[float] | None], anzahl: int | None, titel: str, trennung: bool,
-                                 plan: list[Abschnitt], vom_hoerdienst: list[Wechsel] | None = None):
-        """Nur auf ausdrücklichen Wunsch: mit `trennung` fragt sie erst die Sprechertrennung (scheitert die, wird
-        gruppiert), sonst gruppiert sie die Stimmabdrücke. Mit Trennung werden die Segmente an den Sprecherwechseln
-        geteilt und ihre Abdrücke neu bestimmt (sonst mischen lange Segmente zwei Stimmen). Nennt der Hördienst die
-        Sprecher selbst (`vom_hoerdienst`), gelten sie als Trennung; gleiche Stimmen über Abschnitte hinweg legen die
-        Abdrücke zusammen."""
+                                 plan: list[Abschnitt], trenndienst: str | None = None, hoerdienst: str | None = None,
+                                 vom_hoerdienst: list[Wechsel] | None = None, sprache: str | None = None):
+        """Nur auf ausdrücklichen Wunsch: ohne `trennung` gruppiert sie die Stimmabdrücke. Mit `trennung` trennt der
+        gewählte Dienst (`trenndienst`, sonst der eingestellte); ist es der Hördienst selbst und nennt er Sprecher
+        (`vom_hoerdienst`), gelten seine ohne zweiten Lauf. Scheitert die Trennung, wird gruppiert (mit Warnung). Die
+        Segmente werden an den Sprecherwechseln geteilt und ihre Abdrücke neu bestimmt (sonst mischen lange Segmente
+        zwei Stimmen). Liefert Segmente, Sprecher und woher sie kommen (`ErzeugtMit.sprecher_aus`)."""
         e = teile.einstellungen
-        wechsel: list[Wechsel] | None = vom_hoerdienst or None
-        if wechsel:
-            await k.fortschritt(None, "Sprecher aus dem Hördienst", phase="sprecher")
-        elif trennung:
-            await k.fortschritt(None, "Sprechertrennung", phase="sprecher")
-            try:
-                wechsel = await geduldig(k, lambda: teile.klangwerk.trennen(
-                    wav, anzahl=anzahl, zugang=e.trennen_zugang.get_secret_value(), titel=titel,
-                    prioritaet="hintergrund"), "Sprechertrennung", warten_bei=(Halt,))
-            except (DienstWeg, DienstFehler, NichtGefunden, NichtErreichbar) as f:
-                await g.protokoll.eintragen("sprecher.ohne_trennung", f"{titel}: {f.meldung}", stufe="warnung",
-                                            bezug_art="auftrag", bezug_name=titel)
-                await k.fortschritt(None, "Sprechertrennung nicht verfügbar; gruppiere nach Stimmen")
+        wechsel: list[Wechsel] | None = None
+        herkunft = SPRECHER_STIMMEN
+        if trennung:
+            dienst = trenndienst or e.dienst_trennen
+            if dienst == hoerdienst:
+                await k.fortschritt(None, "Sprecher aus dem Hördienst", phase="sprecher")
+                wechsel = vom_hoerdienst or None
+                if wechsel is None:
+                    await g.protokoll.eintragen("sprecher.ohne_trennung", f"{titel}: der Hördienst nannte nicht in jedem "
+                                                "Abschnitt Sprecher", stufe="warnung", bezug_art="auftrag", bezug_name=titel)
+                    await k.fortschritt(None, "Der Hördienst nannte keine Sprecher; gruppiere nach Stimmen")
+            else:
+                await k.fortschritt(None, "Sprechertrennung", phase="sprecher")
+                try:
+                    wechsel = await geduldig(k, lambda: teile.klangwerk.trennen(
+                        wav, anzahl=anzahl, zugang=e.trennen_zugang.get_secret_value(), titel=titel,
+                        prioritaet="hintergrund", dienst=dienst, sprache=sprache), "Sprechertrennung", warten_bei=(Halt,))
+                except (DienstWeg, DienstFehler, NichtGefunden, NichtErreichbar) as f:
+                    await g.protokoll.eintragen("sprecher.ohne_trennung", f"{titel}: {f.meldung}", stufe="warnung",
+                                                bezug_art="auftrag", bezug_name=titel)
+                    await k.fortschritt(None, "Sprechertrennung nicht verfügbar; gruppiere nach Stimmen")
+            if wechsel:
+                herkunft = dienst
         if wechsel:
             geteilt = an_wechseln_teilen(segmente, wechsel)
             if len(geteilt) != len(segmente):
@@ -304,7 +328,8 @@ def arten(teile: Teile) -> list[Art]:
                 segmente, abdruecke = geteilt, await abdruecke_fuer(k, wav, ordner, geteilt, plan, titel)
         await k.fortschritt(None, "Sprecher zuordnen", phase="sprecher")
         profile, _ = await teile.profile.lesen()
-        return erkennen(segmente, abdruecke, wechsel, profile, teile.schwellen, anzahl)
+        segmente, sprecher = erkennen(segmente, abdruecke, wechsel, profile, teile.schwellen, anzahl)
+        return segmente, sprecher, herkunft
 
     # --- transkribieren -------------------------------------------------------------------------------------------
 
@@ -394,11 +419,12 @@ def arten(teile: Teile) -> list[Art]:
             vom_hoerdienst = ([Wechsel(*w) for t in mit_text for w in t.get("wechsel") or []]
                               if mit_text and all(t.get("wechsel") for t in mit_text) else None)
 
-            sprecher = []
+            sprecher, sprecher_aus = [], SPRECHER_OHNE
             if mit_sprechern and segmente:
-                segmente, sprecher = await sprecher_bestimmen(k, wav, ordner, segmente, abdruecke_alle, e.anzahl, name,
-                                                              trennung=weg == "trennung", plan=plan,
-                                                              vom_hoerdienst=vom_hoerdienst)
+                segmente, sprecher, sprecher_aus = await sprecher_bestimmen(
+                    k, wav, ordner, segmente, abdruecke_alle, e.anzahl, name, trennung=weg == "trennung", plan=plan,
+                    trenndienst=e.trenndienst, hoerdienst=hoerdienst, vom_hoerdienst=vom_hoerdienst,
+                    sprache=None if sprache == "auto" else sprache)
 
             segmente = an_satzenden(segmente)       # Beiträge enden an Satzenden, nicht an jeder Sprechpause
             await k.pruefen()
@@ -410,7 +436,7 @@ def arten(teile: Teile) -> list[Art]:
                            sprecher=sprecher, segmente=segmente, wellenform=wellenform,
                            erzeugt_mit=ErzeugtMit(dienst=hoerdienst, modell=modell, app=FASSUNG, hoeren_s=hoeren_s,
                                                   bereich=(plan[0].start, plan[-1].ende) if e.bereich and plan else None,
-                                                  abschnitt_s=e.abschnitt_s),
+                                                  abschnitt_s=e.abschnitt_s, sprecher_aus=sprecher_aus),
                            aenderung=Aenderung(was="erzeugt", wer=e.von))
             t, knoten = await transkripte.speichern(t, quelle, Aenderung(was="erzeugt", wer=e.von),
                                                     erneut=Aenderung(was="neu transkribiert", wer=e.von),
@@ -572,10 +598,16 @@ def arten(teile: Teile) -> list[Art]:
                 stueck.unlink(missing_ok=True)
                 await k.merken(abdruecke=gesammelt)
             abdruecke = [x for a in plan for x in gesammelt[str(a.nummer)]]
-            segmente, sprecher = await sprecher_bestimmen(k, wav, ordner, t.segmente, abdruecke, e.anzahl, t.name,
-                                                          trennung=e.weg == "trennung", plan=plan)
+            # hier wird nicht gehört: auch ein Hördienst, der Sprecher nennt, trennt die Aufnahme als Dienst der Trennung
+            segmente, sprecher, sprecher_aus = await sprecher_bestimmen(
+                k, wav, ordner, t.segmente, abdruecke, e.anzahl, t.name, trennung=e.weg == "trennung", plan=plan,
+                trenndienst=e.trenndienst, sprache=t.sprache)
             await k.fortschritt(None, "Speichern", phase="speichern")
-            neu = t.model_copy(update={"segmente": segmente, "sprecher": sprecher,
+            erzeugt_mit = t.erzeugt_mit.model_copy(update={"sprecher_aus": sprecher_aus}) if t.erzeugt_mit else None
+            if erzeugt_mit and any(f.erzeugt_mit.art() == erzeugt_mit.art() for f in t.fassungen):
+                raise ValueError("Es gibt schon eine Fassung dieses Hördienstes mit Sprechern von dort; sie zur "
+                                 "Hauptfassung machen oder die Sprecher anders erkennen")
+            neu = t.model_copy(update={"segmente": segmente, "sprecher": sprecher, "erzeugt_mit": erzeugt_mit,
                                        "wellenform": t.wellenform or v.wellenform})
             try:
                 neu, knoten = await transkripte.schreiben(e.transkript_id, neu, knoten.etag,

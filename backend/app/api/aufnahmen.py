@@ -89,10 +89,13 @@ class AusKellerwolke(BaseModel):
     sprecher: SprecherWeg | None = None
     anzahl: int | None = Field(None, ge=1, le=20)
     hoerdienst: str | None = Field(None, max_length=120, description="Hördienst der Leitstelle; leer: der eingestellte")
+    trenndienst: str | None = Field(None, max_length=120, description="Sprecher aus (mit Sprechertrennung); leer: der "
+                                                                      "eingestellte Dienst der Sprechertrennung")
 
 
 class Hoerdienst(BaseModel):
-    """Ein Hördienst zur Wahl beim Transkribieren (was die Leitstelle dieser App mit der Fähigkeit hoeren anbietet)."""
+    """Ein Dienst zur Wahl beim Transkribieren: ein Hördienst (Fähigkeit hoeren) oder ein Dienst der Sprechertrennung
+    (Fähigkeit sprecher_trennen), so wie die Leitstelle ihn dieser App anbietet."""
 
     kennung: str
     name: str
@@ -305,6 +308,18 @@ def router(teile: Teile) -> APIRouter:
             aus.insert(0, Hoerdienst(kennung=vorgabe, name=vorgabe, hinweis=angebot.stand, vorgabe=True))
         return aus
 
+    @r.get("/trenndienste", response_model=list[Hoerdienst])
+    async def trenndienste() -> list[Hoerdienst]:
+        """Zur Wahl "Sprecher aus" bei der Sprechertrennung: die Dienste, die die Leitstelle dieser App mit der Fähigkeit
+        sprecher_trennen anbietet (etwa pyannote und MOSS); der eingestellte ist die Vorgabe."""
+        vorgabe = teile.einstellungen.dienst_trennen
+        angebot = await g.leitstelle_angebot("sprecher_trennen")()
+        aus = [Hoerdienst(kennung=o.wert, name=o.titel, hinweis=o.hinweis or "", vorgabe=o.wert == vorgabe)
+               for o in angebot.optionen]
+        if not any(d.vorgabe for d in aus):
+            aus.insert(0, Hoerdienst(kennung=vorgabe, name=vorgabe, hinweis=angebot.stand, vorgabe=True))
+        return aus
+
     @r.get("/transkribieren/{auftrag_id}/bisher", response_model=Bisher)
     async def bisher(auftrag_id: str) -> Bisher:
         """Mitlesen: was ein Auftrag zum Transkribieren schon gehört hat (je fertigem Abschnitt) und wie lange er
@@ -326,7 +341,8 @@ def router(teile: Teile) -> APIRouter:
             for knoten_id in e.knoten_ids:
                 neu = await kw.waehlen(sitzung, knoten_id, "transkribieren")
                 eingabe = TranskribierenEingabe(quelle_id=knoten_id, anfrage_id=neu.anfrage.id, sprache=e.sprache,
-                                                sprecher=e.sprecher, anzahl=e.anzahl, hoerdienst=e.hoerdienst, von=von(konto))
+                                                sprecher=e.sprecher, anzahl=e.anzahl, hoerdienst=e.hoerdienst,
+                                                trenndienst=e.trenndienst, von=von(konto))
                 auftrag_id = await g.abholer.uebernehmen(neu.anfrage, kw, auftrag="transkribieren",
                                                          eingabe=eingabe.model_dump(mode="json"),
                                                          titel=orte.anzeigename(neu.anfrage.knoten_name))

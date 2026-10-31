@@ -82,10 +82,27 @@ class ErzeugtMit(_Teil):
     bereich: tuple[float, float] | None = Field(None, description="nur dieser Ausschnitt der Aufnahme (Sekunden, in "
                                                 "Sprechpausen); ohne: die ganze Aufnahme")
     abschnitt_s: float | None = Field(None, gt=0, description="gewünschte Abschnittslänge des Hördienstes; ohne: seine Vorgabe")
+    sprecher_aus: str | None = Field(None, max_length=120, description=(
+        "woher die Sprecher kommen: ohne, stimmen (gruppierte Stimmabdrücke) oder die Kennung des Dienstes der "
+        "Sprechertrennung (auch der Hördienst selbst, wenn er Sprecher nennt); unbekannt bei älteren Fassungen mit "
+        "Sprechern"))
 
-    def art(self) -> tuple[str, bool]:
-        """Wofür eine Fassung steht: je Hördienst höchstens eine ganze und eine Ausschnitt-Fassung."""
-        return self.dienst, self.bereich is not None
+    def art(self) -> tuple[str, str | None, bool]:
+        """Wofür eine Fassung steht: Hördienst, Herkunft der Sprecher, Ausschnitt. Je Art höchstens eine Fassung; so stehen
+        etwa Whisper ohne Sprecher, Whisper mit Sprechern aus pyannote und Whisper mit Sprechern aus MOSS nebeneinander."""
+        return self.dienst, self.sprecher_aus, self.bereich is not None
+
+
+SPRECHER_OHNE = "ohne"
+SPRECHER_STIMMEN = "stimmen"
+SPRECHER_UNBEKANNT = "unbekannt"
+
+
+def _herkunft_ergaenzen(erzeugt_mit: ErzeugtMit | None, sprecher: list) -> None:
+    """Ältere Fassungen nennen die Herkunft ihrer Sprecher nicht: ohne Sprecher ist sie ohne, sonst unbekannt (nie gleich
+    einer neuen, so ersetzt neu Gehörtes keine ältere Fassung mit Sprechern unbemerkt)."""
+    if erzeugt_mit is not None and erzeugt_mit.sprecher_aus is None:
+        erzeugt_mit.sprecher_aus = SPRECHER_UNBEKANNT if sprecher else SPRECHER_OHNE
 
 
 class Hoerfassung(_Teil):
@@ -102,6 +119,7 @@ class Hoerfassung(_Teil):
     @model_validator(mode="after")
     def _stimmig(self) -> Hoerfassung:
         _sprecher_pruefen(self.sprecher, self.segmente)
+        _herkunft_ergaenzen(self.erzeugt_mit, self.sprecher)
         self.segmente.sort(key=lambda s: (s.start, s.ende))
         return self
 
@@ -134,9 +152,10 @@ class Transkript(_Teil):
     @model_validator(mode="after")
     def _stimmig(self) -> Transkript:
         _sprecher_pruefen(self.sprecher, self.segmente)
+        _herkunft_ergaenzen(self.erzeugt_mit, self.sprecher)
         arten = [f.erzeugt_mit.art() for f in self.fassungen]
         if len(set(arten)) != len(arten):
-            raise ValueError("Je Hördienst höchstens eine ganze Fassung und ein Ausschnitt")
+            raise ValueError("Je Hördienst und Herkunft der Sprecher höchstens eine ganze Fassung und ein Ausschnitt")
         self.segmente.sort(key=lambda s: (s.start, s.ende))
         self.marker.sort(key=lambda m: m.zeit)
         return self
@@ -177,9 +196,9 @@ def _sprecher_pruefen(sprecher: list[Sprecher], segmente: list[Segment]) -> None
 
 
 # --- Fassungen je Hördienst -------------------------------------------------------------------------------------
-# Die Hauptfassung sind die Felder des Transkripts (so lesen es auch andere Apps); weitere Hördienste stehen unter
-# `fassungen`. Neu gehört ersetzt nur, was vom selben Hördienst stammt; jeder frühere Stand bleibt als Version der
-# Kellerwolke erhalten.
+# Die Hauptfassung sind die Felder des Transkripts (so lesen es auch andere Apps); weitere Fassungen stehen unter
+# `fassungen`, je Art (Hördienst und Herkunft der Sprecher, siehe `ErzeugtMit.art`) eine. Neu gehört ersetzt nur, was
+# von derselben Art stammt; jeder frühere Stand bleibt als Version der Kellerwolke erhalten.
 
 _HAUPT = ("erzeugt_mit", "sprache", "sprecher", "segmente")
 
@@ -191,12 +210,12 @@ def als_fassung(t: Transkript) -> Hoerfassung:
 
 
 def gehoert_einfuegen(bisher: Transkript, neu: Transkript, hauptfassung: bool = False) -> tuple[Transkript, bool]:
-    """Ein frisch gehörtes Transkript in das bisherige derselben Aufnahme. Vom Hördienst der Hauptfassung oder mit
-    `hauptfassung`: es wird die Hauptfassung; eine bisherige eines anderen Hördienstes rückt unter die Fassungen.
-    Sonst wird es die Fassung seines Hördienstes (ersetzt eine frühere desselben Dienstes) und die Hauptfassung
-    bleibt. Liefert das Ergebnis und ob es die Hauptfassung ist."""
-    dienst = neu.erzeugt_mit.dienst if neu.erzeugt_mit else None
-    haupt_dienst = bisher.erzeugt_mit.dienst if bisher.erzeugt_mit else None
+    """Ein frisch gehörtes Transkript in das bisherige derselben Aufnahme. Von der Art der Hauptfassung (Hördienst und
+    Herkunft der Sprecher) oder mit `hauptfassung`: es wird die Hauptfassung; eine bisherige anderer Art rückt unter die
+    Fassungen. Sonst wird es die Fassung seiner Art (ersetzt eine frühere derselben Art) und die Hauptfassung bleibt.
+    Liefert das Ergebnis und ob es die Hauptfassung ist."""
+    art = neu.erzeugt_mit.art() if neu.erzeugt_mit else None
+    haupt_art = bisher.erzeugt_mit.art() if bisher.erzeugt_mit else None
     if neu.erzeugt_mit and neu.erzeugt_mit.bereich is not None:
         # Ein Ausschnitt (Messung, Vergleich einer Stelle) wird nie Hauptfassung; er ersetzt nur den vorigen Ausschnitt
         # desselben Hördienstes
@@ -206,9 +225,9 @@ def gehoert_einfuegen(bisher: Transkript, neu: Transkript, hauptfassung: bool = 
         return bisher.model_copy(update={"fassungen": [*andere, als_fassung(neu)]}), False
     # Marker gehören zur Aufnahme: die gesetzten bleiben, auch wenn neu Gehörtes die Hauptfassung wird
     marker = [*neu.marker, *(m for m in bisher.marker if (m.zeit, m.titel) not in {(n.zeit, n.titel) for n in neu.marker})]
-    if dienst is None or dienst == haupt_dienst:
+    if art is None or art == haupt_art:
         return neu.model_copy(update={"fassungen": bisher.fassungen, "marker": sorted(marker, key=lambda m: m.zeit)}), True
-    andere = [f for f in bisher.fassungen if f.erzeugt_mit.bereich is not None or f.erzeugt_mit.dienst not in (dienst, haupt_dienst)]
+    andere = [f for f in bisher.fassungen if f.erzeugt_mit.art() not in (art, haupt_art)]
     if hauptfassung:
         return neu.model_copy(update={"fassungen": [*andere, als_fassung(bisher)],
                                       "marker": sorted(marker, key=lambda m: m.zeit)}), True

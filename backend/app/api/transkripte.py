@@ -99,6 +99,8 @@ class ExportEingabe(BaseModel):
 
 class ErkennenEingabe(BaseModel):
     weg: Literal["stimmen", "trennung"] = Field("stimmen", description="Stimmen gruppieren oder erst die Sprechertrennung fragen")
+    trenndienst: str | None = Field(None, max_length=120, description="Sprecher aus (mit Sprechertrennung, GET "
+                                                                      "/trenndienste); leer: der eingestellte")
     anzahl: int | None = Field(None, ge=1, le=20, description="bekannte Zahl der Sprecher")
 
 
@@ -340,7 +342,8 @@ def router(teile: Teile) -> APIRouter:
         """Nur auf ausdrücklichen Wunsch; ersetzt die Zuordnung (der alte Stand bleibt als Version)."""
         t, _ = await lesen(transkript_id, anfrage)
         return await g.auftraege.einreihen("sprecher_erkennen", SprecherEingabe(
-            transkript_id=transkript_id, anfrage_id=anfrage, weg=eingabe.weg, anzahl=eingabe.anzahl, von=von(konto)),
+            transkript_id=transkript_id, anfrage_id=anfrage, weg=eingabe.weg, trenndienst=eingabe.trenndienst,
+            anzahl=eingabe.anzahl, von=von(konto)),
             titel=f"{t.name}: Sprecher")
 
     @r.post("/{transkript_id}/korrigieren", status_code=201, response_model=Auftrag)

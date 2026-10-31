@@ -59,7 +59,7 @@ def antworten(request: httpx.Request, *, gespraech: bool = False) -> httpx.Respo
         return httpx.Response(200, json={"data": [
             {"id": "klein", "x-leitstelle": {"name": "Kleines Sprachmodell (Schein)", "faehigkeiten": ["text"], "geladen": True}},
             {"id": "klangwerk-hoeren", "x-leitstelle": {"name": "Klangwerk Hören (Schein)", "faehigkeiten": ["hoeren"]}},
-            {"id": "klangwerk-hoeren-moss", "x-leitstelle": {"name": "MOSS-Transcribe-Diarize 0.9B (Schein)", "faehigkeiten": ["hoeren"]}},
+            {"id": "klangwerk-hoeren-moss", "x-leitstelle": {"name": "MOSS-Transcribe-Diarize 0.9B (Schein)", "faehigkeiten": ["hoeren", "sprecher_trennen"]}},
             {"id": "klangwerk-sprecher", "x-leitstelle": {"name": "Klangwerk Sprechermerkmal (Schein)", "faehigkeiten": ["sprecher_erkennen"]}},
             {"id": "klangwerk-trennen", "x-leitstelle": {"name": "Klangwerk Sprechertrennung (Schein)", "faehigkeiten": ["sprecher_trennen"]}},
             {"id": "klangwerk-ton", "x-leitstelle": {"name": "Klangwerk Ton", "faehigkeiten": ["ton"]}},
@@ -78,6 +78,9 @@ def antworten(request: httpx.Request, *, gespraech: bool = False) -> httpx.Respo
         treffer = re.search(rb'name="segments"\r\n\r\n(.*?)\r\n', request.content, re.S)
         segmente = json.loads(treffer.group(1)) if treffer else []
         return httpx.Response(200, json={"embeddings": [STIMMEN[i % 2] for i in range(len(segmente))], "dim": STIMMEN_GROESSE})
+    if pfad.endswith("-hoeren-moss/speaker/diarize"):   # trennt wie pyannote (HELF-90): je Satz der andere Sprecher
+        return httpx.Response(200, json={"model": "MOSS (Schein)", "turns": [
+            {"start": a, "end": b, "speaker": f"S0{i % 2 + 1}"} for i, (_, a, b) in enumerate(SAETZE)]})
     if pfad.endswith("/speaker/diarize"):
         return httpx.Response(503, json={"detail": "Modell ist nicht bereit (ohne_zugang)"})
     if pfad == "/v1/chat/completions":

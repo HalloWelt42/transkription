@@ -8,7 +8,8 @@
   import { AnfrageBand, Auswahl, beiAuftrag, gehe, geraet, groesse, Leiste, leisteOeffnen, marke, navigation,
            Rueckfrage, Spieler, wann, zurueckZurKellerwolke } from "appkern-oberflaeche";
   import { sprachOptionen as sprachWahl } from "../lib/sprachen.svelte";
-  import { hoerdiensteLaden, hoerdienstOptionen, vorgabeHoerdienst } from "../lib/hoerdienste.svelte";
+  import { hoerdiensteLaden, hoerdienstOptionen, trenndiensteLaden, trenndienstOptionen, vorgabeHoerdienst,
+           vorgabeTrenndienst } from "../lib/hoerdienste.svelte";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import type { Aufnahme } from "../lib/typen";
@@ -27,6 +28,7 @@
   let sprecher = $state<SprecherWeg>("ohne");
   let anzahl = $state<number | null>(null);
   let hoerdienst = $state<string | null>(null);      // je Auftrag; Vorgabe der eingestellte
+  let trenndienst = $state<string | null>(null);     // Sprecher aus (mit Sprechertrennung); Vorgabe der eingestellte
   let startet = $state(false);
   let markerTitel = $state("");
   let markerOffen = $state(false);
@@ -57,6 +59,8 @@
         sprecher = (await api.einstellung<SprecherWeg>("sprecher_weg")) ?? "ohne";
         await hoerdiensteLaden();
         hoerdienst = vorgabeHoerdienst();
+        await trenndiensteLaden();
+        trenndienst = vorgabeTrenndienst();
       } catch {
         // Vorgaben bleiben
       }
@@ -74,7 +78,8 @@
     startet = true;
     fehler = "";
     try {
-      const optionen = { sprache, sprecher, anzahl: sprecher !== "ohne" ? anzahl : null, hoerdienst };
+      const optionen = { sprache, sprecher, anzahl: sprecher !== "ohne" ? anzahl : null, hoerdienst,
+                         trenndienst: sprecher === "trennung" ? trenndienst : null };
       if (anfrage) await api.ausKellerwolke({ knoten_ids: [a.id], ...optionen });
       else await api.transkribieren({ quelle_id: a.id, ...optionen });
       meldung = "Wird transkribiert; der Stand steht hier und unter Aufträge.";
@@ -193,6 +198,10 @@
           <Auswahl bind:wert={sprache} optionen={sprachOptionen} /></span></div>
         <div class="t-zeile"><i class="fa-solid fa-user-group"></i><span class="t-text"><span class="t-meta">Sprecher</span>
           <Auswahl bind:wert={sprecher} optionen={SPRECHER_WEGE} /></span></div>
+        {#if sprecher === "trennung"}
+          <div class="t-zeile"><i class="fa-solid fa-people-arrows"></i><span class="t-text"><span class="t-meta">Sprecher aus</span>
+            <Auswahl bind:wert={trenndienst} optionen={trenndienstOptionen()} /></span></div>
+        {/if}
         {#if sprecher !== "ohne"}
           <div class="t-zeile"><i class="fa-solid fa-hashtag"></i><span class="t-text"><span class="t-meta">Anzahl</span>
             <Auswahl bind:wert={anzahl} optionen={ANZAHL_OPTIONEN} /></span></div>
@@ -230,6 +239,7 @@
               <label>Hördienst <Auswahl bind:wert={hoerdienst} optionen={hoerdienstOptionen()} /></label>
               <label>Sprache <Auswahl bind:wert={sprache} optionen={sprachOptionen} /></label>
               <label>Sprecher <Auswahl bind:wert={sprecher} optionen={SPRECHER_WEGE} /></label>
+              {#if sprecher === "trennung"}<label>Sprecher aus <Auswahl bind:wert={trenndienst} optionen={trenndienstOptionen()} /></label>{/if}
               {#if sprecher !== "ohne"}<label>Anzahl <Auswahl bind:wert={anzahl} optionen={ANZAHL_OPTIONEN} /></label>{/if}
               <span class="knopfzeile" style="margin-left:auto">
                 <button class="knopf primaer" onclick={transkribieren} disabled={startet}>

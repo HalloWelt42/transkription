@@ -64,6 +64,8 @@ export interface ErzeugtMit {
   hoeren_s?: number | null;       // Rechenzeit des Hördienstes für die ganze Aufnahme
   bereich?: [number, number] | null;   // nur dieser Ausschnitt der Aufnahme (Sekunden); ohne: die ganze
   abschnitt_s?: number | null;    // gewünschte Abschnittslänge des Hördienstes; ohne: seine Vorgabe
+  // woher die Sprecher kommen: ohne, stimmen (gruppiert), unbekannt (ältere) oder der Dienst der Sprechertrennung
+  sprecher_aus?: string | null;
 }
 
 // Dieselbe Aufnahme von einem anderen Hördienst gehört (zum Vergleich neben der Hauptfassung)
@@ -76,7 +78,7 @@ export interface Hoerfassung {
   segmente: Segment[];
 }
 
-// Ein Hördienst der Leitstelle zur Wahl beim Transkribieren
+// Ein Dienst der Leitstelle zur Wahl beim Transkribieren: Hördienst oder Dienst der Sprechertrennung ("Sprecher aus")
 export interface Hoerdienst {
   kennung: string;
   name: string;

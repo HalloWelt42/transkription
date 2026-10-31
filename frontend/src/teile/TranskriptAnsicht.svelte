@@ -9,11 +9,14 @@
   // Hördienst. Bearbeiten, Suche und Export gelten der Hauptfassung. Neu hören hört ab Werk mit allen Hördiensten, die die
   // Leitstelle gerade anbietet (Liste bei jedem Öffnen frisch), nacheinander als Reihe; gibt es schon Fassungen, wählt man
   // nur die fehlenden oder alle neu; ein einzelner Hördienst bleibt wählbar. Sind alle da, öffnet sich der Vergleich.
+  // Mit Sprechertrennung wählt man, woher die Sprecher kommen ("Sprecher aus", HELF-90, etwa pyannote oder MOSS); eine
+  // Fassung ist Hördienst plus Herkunft der Sprecher, so steht Whisper mit Sprechern aus MOSS neben Whisper ohne.
   import { onMount, tick } from "svelte";
   import { AnfrageBand, arbeit, Auswahl, beiAuftrag, farbe, gehe, geraet, Leiste, leisteOeffnen, lesen, marke, navigation, Spieler,
            zurueckZurKellerwolke } from "appkern-oberflaeche";
   import * as api from "../lib/api";
-  import { alleFassungen, HAUPT, hoerdiensteLaden, tempo } from "../lib/hoerdienste.svelte";
+  import { alleFassungen, erwarteteHerkunft, HAUPT, hoerdiensteLaden, tempo, trenndiensteLaden, trenndienstOptionen,
+           vorgabeTrenndienst } from "../lib/hoerdienste.svelte";
   import { aktiverBeitrag, Mitrollen } from "../lib/mitlesen.svelte";
   import { sprachOptionen } from "../lib/sprachen.svelte";
   import { SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
@@ -54,6 +57,7 @@
   let neuDienst = $state<string>("");
   let neuSprache = $state<string>("de");
   let neuSprecher = $state<SprecherWeg>("ohne");
+  let neuTrenndienst = $state<string | null>(null);      // Sprecher aus (nur mit Sprechertrennung); leer: der eingestellte
   // Für Messungen und Vergleiche einer Stelle: Abschnittslänge des Hördienstes und ein Ausschnitt (von, bis)
   let neuAbschnitt = $state<string>("");
   let neuVon = $state("");
@@ -178,6 +182,7 @@
 
   onMount(() => {
     void hoerdiensteLaden();
+    void trenndiensteLaden();
     const abmelden = beiAuftrag((a) => {
       if (a.art !== "transkribieren" || !neuStapel || a.stapel !== neuStapel) return;
       const dienst = String(a.eingabe.hoerdienst ?? "");
@@ -228,9 +233,11 @@
     }
   }
 
-  // Hördienste, von denen es schon eine Fassung gibt, und die noch fehlen (aus der frisch geholten Liste)
-  const vorhandeneDienste = $derived(new Set(fassungen.filter((f) => !f.erzeugt_mit?.bereich)
-    .map((f) => f.erzeugt_mit?.dienst).filter(Boolean)));
+  // Hördienste, von denen es mit der gewählten Herkunft der Sprecher schon eine Fassung gibt, und die noch fehlen (aus
+  // der frisch geholten Liste)
+  const neuHerkunft = $derived(erwarteteHerkunft(neuSprecher, neuTrenndienst));
+  const vorhandeneDienste = $derived(new Set(fassungen.filter((f) => !f.erzeugt_mit?.bereich
+    && (f.erzeugt_mit?.sprecher_aus ?? "ohne") === neuHerkunft).map((f) => f.erzeugt_mit?.dienst).filter(Boolean)));
   const fehlende = $derived(neuListe.filter((d) => !vorhandeneDienste.has(d.kennung)).map((d) => d.kennung));
 
   async function neuOeffnen() {
@@ -244,6 +251,8 @@
       neuStand = (f as Error).message;
     }
     neuDienst = fehlende[0] ?? neuListe.find((d) => d.vorgabe)?.kennung ?? neuListe[0]?.kennung ?? "";
+    await trenndiensteLaden();
+    neuTrenndienst ??= vorgabeTrenndienst();
   }
 
   async function neuHoeren(reihe: string[]) {
@@ -253,6 +262,7 @@
     try {
       const bereich = neuBereich === "falsch" ? null : neuBereich;
       const a = await api.transkribieren({ quelle_id: quelle, reihe, sprache: neuSprache, sprecher: neuSprecher,
+                                           trenndienst: neuSprecher === "trennung" ? neuTrenndienst : null,
                                            abschnitt_s: neuAbschnitt ? Number(neuAbschnitt) : null, bereich });
       neuReihe = reihe;
       neuStapel = a.stapel;
@@ -624,6 +634,10 @@
         {/if}
         <label>Sprache <Auswahl bind:wert={neuSprache} optionen={sprachOptionen()} /></label>
         <label>Sprecher <Auswahl bind:wert={neuSprecher} optionen={SPRECHER_WEGE} /></label>
+        {#if neuSprecher === "trennung"}
+          <label title="Welcher Dienst sagt, wer wann spricht; ist es der Hördienst selbst, gelten seine Sprecher ohne zweiten Lauf">
+            Sprecher aus <Auswahl bind:wert={neuTrenndienst} optionen={trenndienstOptionen()} /></label>
+        {/if}
         <label title="Wie lang der Hördienst höchstens am Stück hört; geschnitten wird immer in Sprechpausen">Abschnitt
           <Auswahl bind:wert={neuAbschnitt} optionen={ABSCHNITTE} /></label>
         <label class="ausschnitt" title="Nur diese Stelle hören (etwa 1:00 bis 3:00); die Grenzen rücken in die nächste Sprechpause. Das Ergebnis kommt als eigener Reiter neben die Fassungen, nie als Hauptfassung">
@@ -652,9 +666,10 @@
         {:else if neuBereich && neuBereich !== "falsch"}
           <span class="leer-zeile" style="flex-basis:100%">Ausschnitt: das Ergebnis kommt als eigener Reiter neben die
             Fassungen (je Hördienst einer), nie als Hauptfassung.</span>
-        {:else if neuWeg === "einer" && neuDienst && neuDienst === t?.erzeugt_mit?.dienst}
-          <span class="leer-zeile" style="flex-basis:100%">Derselbe Hördienst wie die Hauptfassung: das Ergebnis wird die neue
-            Hauptfassung, die bisherige bleibt unter Versionen.</span>
+        {:else if neuWeg === "einer" && neuDienst && neuDienst === t?.erzeugt_mit?.dienst
+                 && neuHerkunft === (t?.erzeugt_mit?.sprecher_aus ?? "ohne")}
+          <span class="leer-zeile" style="flex-basis:100%">Derselbe Hördienst mit derselben Herkunft der Sprecher wie die
+            Hauptfassung: das Ergebnis wird die neue Hauptfassung, die bisherige bleibt unter Versionen.</span>
         {/if}
         {#if neuBereich === "falsch"}<span class="leer-zeile" style="flex-basis:100%">Ausschnitt: von und bis als Zeit (etwa
           1:00 und 3:00), mindestens 1 s auseinander.</span>{/if}

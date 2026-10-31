@@ -123,11 +123,35 @@ def test_anderer_hoerdienst_wird_fassung_und_die_alte_bleibt():
     t, haupt = gehoert_einfuegen(alt, _gehoert("klangwerk-hoeren-moss", "moss", True))
     assert not haupt and t.segmente[0].text == "alt" and [f.erzeugt_mit.dienst for f in t.fassungen] == ["klangwerk-hoeren-moss"]
     assert t.fassungen[0].sprecher[0].kennung == "s1" and t.fassungen[0].erzeugt_mit.hoeren_s == 1.5
-    t, _ = gehoert_einfuegen(t, _gehoert("klangwerk-hoeren-moss", "moss neu"))       # derselbe Dienst ersetzt seine Fassung
+    t, _ = gehoert_einfuegen(t, _gehoert("klangwerk-hoeren-moss", "moss neu", True))  # dieselbe Art ersetzt ihre Fassung
     t, _ = gehoert_einfuegen(t, _gehoert("klangwerk-hoeren-turbo", "turbo"))
     assert [f.segmente[0].text for f in t.fassungen] == ["moss neu", "turbo"] and t.segmente[0].text == "alt"
     t, haupt = gehoert_einfuegen(t, _gehoert("klangwerk-hoeren", "alt neu"))        # Dienst der Hauptfassung: neue Hauptfassung
     assert haupt and t.segmente[0].text == "alt neu" and len(t.fassungen) == 2
+
+
+def test_herkunft_der_sprecher_ist_eine_eigene_fassung():
+    # HELF-90: Whisper ohne Sprecher, Whisper mit Sprechern aus pyannote und Whisper mit Sprechern aus MOSS stehen
+    # nebeneinander; keine ersetzt die Hauptfassung, nur dieselbe Art ersetzt ihre Fassung
+    from app.modell.transkript import ErzeugtMit, gehoert_einfuegen
+
+    def whisper(text: str, sprecher_aus: str) -> Transkript:
+        t = _gehoert("klangwerk-hoeren", text, sprecher_aus != "ohne")
+        return t.model_copy(update={"erzeugt_mit": ErzeugtMit(dienst="klangwerk-hoeren", app="t", sprecher_aus=sprecher_aus)})
+
+    alt = _gehoert("klangwerk-hoeren", "alt")
+    assert alt.erzeugt_mit.sprecher_aus == "ohne"                       # ältere ohne Angabe und ohne Sprecher: ohne
+    assert _gehoert("klangwerk-hoeren", "x", True).erzeugt_mit.sprecher_aus == "unbekannt"
+    t, haupt = gehoert_einfuegen(alt, whisper("pyannote", "klangwerk-trennen"))
+    assert not haupt and t.segmente[0].text == "alt"
+    t, haupt = gehoert_einfuegen(t, whisper("moss", "klangwerk-hoeren-moss"))
+    assert not haupt and [f.segmente[0].text for f in t.fassungen] == ["pyannote", "moss"]
+    t, haupt = gehoert_einfuegen(t, whisper("moss neu", "klangwerk-hoeren-moss"))
+    assert not haupt and [f.segmente[0].text for f in t.fassungen] == ["pyannote", "moss neu"]
+    t, haupt = gehoert_einfuegen(t, whisper("ohne neu", "ohne"))         # Art der Hauptfassung: neue Hauptfassung
+    assert haupt and t.segmente[0].text == "ohne neu" and len(t.fassungen) == 2
+    gelesen = Transkript.model_validate_json(t.model_dump_json())
+    assert [f.erzeugt_mit.sprecher_aus for f in gelesen.fassungen] == ["klangwerk-trennen", "klangwerk-hoeren-moss"]
 
 
 def test_mit_hauptfassung_rueckt_die_bisherige_unter_die_fassungen():

@@ -10,6 +10,7 @@
   import * as api from "../lib/api";
   import { neueKennung } from "../lib/kennung";
   import { ANZAHL_OPTIONEN, ERKENNEN_WEGE, type ErkennenWeg } from "../lib/sprecherwahl";
+  import { trenndienstOptionen, vorgabeTrenndienst } from "../lib/hoerdienste.svelte";
   import type { ExportFormat, Marker, Profil, Transkript, TranskriptAntwort, Version, Vorlage } from "../lib/typen";
 
   let {
@@ -56,6 +57,7 @@
   let alsProfil = $state(true);
   let anzahl = $state<number | null>(null);
   let erkennenWeg = $state<ErkennenWeg>("stimmen");
+  let trenndienst = $state<string | null>(null);         // Sprecher aus (mit Sprechertrennung); leer: der eingestellte
   let markerTitel = $state("");
   let ablegen = $state(false);
   let laufend = $state<Record<string, Auftrag>>({});
@@ -266,8 +268,12 @@
         <button class="knopf klein still" onclick={() => (modus = "")}>Abbrechen</button></div>
     {:else if modus === "erkennen"}
       <div class="knopfreihe"><span class="beschriftung">Weg</span><Auswahl bind:wert={erkennenWeg} optionen={ERKENNEN_WEGE} klein /></div>
+      {#if erkennenWeg === "trennung"}
+        <div class="knopfreihe"><span class="beschriftung">Sprecher aus</span>
+          <Auswahl bind:wert={trenndienst} optionen={trenndienstOptionen()} klein /></div>
+      {/if}
       <div class="knopfreihe"><span class="beschriftung">Anzahl</span><Auswahl bind:wert={anzahl} optionen={ANZAHL_OPTIONEN} klein />
-        <button class="knopf klein primaer" onclick={() => machen(async () => { await api.sprecherErkennen(antwort.id, erkennenWeg, anzahl, anfrage); modus = ""; })}>Starten</button>
+        <button class="knopf klein primaer" onclick={() => machen(async () => { await api.sprecherErkennen(antwort.id, erkennenWeg, anzahl, anfrage, erkennenWeg === "trennung" ? trenndienst ?? vorgabeTrenndienst() : null); modus = ""; })}>Starten</button>
         <button class="knopf klein still" onclick={() => (modus = "")}>Abbrechen</button></div>
       <p class="leer-zeile" style="margin-top:8px">Ersetzt die Zuordnung; der jetzige Stand bleibt als Version und lässt sich zurückholen.</p>
     {:else if zuordnung}
