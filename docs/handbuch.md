@@ -12,7 +12,7 @@ schluessel_orte:
   - "Pi: Einstellungen im Verzeichnis `transkription.sqlite`: App-Schlüssel der Kellerwolke, Schlüssel der Leitstelle (in der Oberfläche unter Einstellungen, verdeckt)"
   - "Pi: `{{wurzel}}/zertifikate/`, Blattzertifikat mit Schlüssel aus der Hausstelle (vom Ausrollen)"
 einrichten: einrichten.sh
-stand: 520c4ab
+stand: e8c96cc
 ---
 
 # Transkription
@@ -26,6 +26,10 @@ Papierkorb nehmen es mit. Während ein Auftrag läuft, zeigt die Aufnahme den sc
 die geschätzte Restzeit. Im Dateimenü der Kellerwolke stehen "Transkribieren" und "In Transkription öffnen". Aufnehmen
 geht im Browser und auf dem Telefon (HTTPS ist dafür nötig). Andere Apps (etwa [[Assistent]] für die Spracheingabe)
 melden sich mit ihrem App-Schlüssel der Kellerwolke an.
+
+Den Hördienst wählt man je Auftrag (Whisper Large V3 in drei Varianten oder MOSS-Transcribe-Diarize mit Sprechern);
+dieselbe Aufnahme lässt sich mit weiteren Hördiensten neu hören, jede Fassung bekommt oben einen Reiter, und der
+Vergleich zeigt zwei davon auf einer Zeitachse nebeneinander.
 
 Der Pi rechnet keinen Ton: Hören, Stimmabdrücke und Sprechertrennung kommen aus dem [[Klangwerk]] über die
 [[Leitstelle]], Wandeln, Sprechpausen, Wellenform und Abspielfassung macht der Tondienst. Auf dem Pi läuft sie als

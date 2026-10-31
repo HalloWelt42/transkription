@@ -29,13 +29,6 @@ class KeinSprachmodell(Exception):
 
 
 @dataclass(frozen=True)
-class HoerErgebnis:
-    segmente: list[Segment]
-    sprache: str | None
-    modell: str | None
-
-
-@dataclass(frozen=True)
 class Wechsel:
     """Ein Abschnitt eines Sprechers aus der Sprechertrennung (Kennung des Dienstes, etwa SPEAKER_00)."""
 
@@ -44,8 +37,27 @@ class Wechsel:
     sprecher: str
 
 
+@dataclass(frozen=True)
+class HoerErgebnis:
+    segmente: list[Segment]
+    sprache: str | None
+    modell: str | None
+    wechsel: list[Wechsel]       # Sprecher, die der Hördienst selbst nennt (etwa MOSS-Transcribe-Diarize), sonst leer
+
+
 def _typ(datei: Path) -> str:
     return INHALTSTYPEN.get(datei.suffix.lower(), "application/octet-stream")
+
+
+def wechsel_aus(roh: list[dict], versatz: float = 0.0, vorsilbe: str = "") -> list[Wechsel]:
+    """Sprecher, die der Hördienst je Segment nennt (`speaker`), als Wechsel wie aus der Sprechertrennung. Nur wenn er
+    sie für jedes Segment mit Text nennt; `vorsilbe` hält Kennungen verschiedener Aufrufe auseinander (jeder Aufruf
+    zählt von S01)."""
+    mit_text = [s for s in roh if (s.get("text") or "").strip()]
+    if not mit_text or any(not s.get("speaker") for s in mit_text):
+        return []
+    return [Wechsel(round(float(s["start"]) + versatz, 3), round(float(s["end"]) + versatz, 3), f"{vorsilbe}{s['speaker']}")
+            for s in mit_text]
 
 
 def segmente_aus(roh: list[dict], versatz: float = 0.0) -> list[Segment]:
@@ -65,7 +77,8 @@ def segmente_aus(roh: list[dict], versatz: float = 0.0) -> list[Segment]:
 
 class Klangwerk:
     def __init__(self, leitstelle: Callable[[], Leitstelle | None], namen: Callable[[], tuple[str, str, str]]) -> None:
-        """`namen` liefert die Kennungen von Hören, Sprechermerkmal und Sprechertrennung (aus den Einstellungen)."""
+        """`namen` liefert die Kennungen von Hören, Sprechermerkmal und Sprechertrennung (aus den Einstellungen); den
+        Hördienst kann ein Auftrag selbst wählen."""
         self._ls = leitstelle
         self._namen = namen
 
@@ -76,16 +89,18 @@ class Klangwerk:
         return ls
 
     async def hoeren(self, datei: Path, sprache: str, *, versatz: float = 0.0, titel: str = "", hinweis: str = "",
-                     prioritaet=None) -> HoerErgebnis:
-        """`hinweis`: Stilsatz und Fachwörter, die der Hördienst jedem Fenster mitgibt (siehe Klangwerk)."""
-        name = self._namen()[0]
+                     prioritaet=None, dienst: str | None = None, vorsilbe: str = "") -> HoerErgebnis:
+        """`hinweis`: Stilsatz und Fachwörter, die der Hördienst jedem Fenster mitgibt (siehe Klangwerk); `dienst`: der
+        Hördienst dieses Auftrags (sonst der eingestellte); `vorsilbe` für die Sprecher, die der Hördienst nennt."""
+        name = dienst or self._namen()[0]
         daten = {"language": sprache, "diarize": "false", **({"prompt": hinweis} if hinweis else {})}
         with open(datei, "rb") as inhalt:          # gestreamt, nie am Stück im Speicher
             antwort = await self._leitstelle().dienst(name).json(
                 "POST", "/stt", titel=titel, prioritaet=prioritaet, data=daten,
                 files={"file": (datei.name, inhalt, _typ(datei))})
-        return HoerErgebnis(segmente=segmente_aus(antwort.get("segments") or [], versatz),
-                            sprache=antwort.get("language"), modell=antwort.get("model"))
+        roh = antwort.get("segments") or []
+        return HoerErgebnis(segmente=segmente_aus(roh, versatz), sprache=antwort.get("language"), modell=antwort.get("model"),
+                            wechsel=wechsel_aus(roh, versatz, vorsilbe))
 
     async def abdruecke(self, datei: Path, zeiten: list[tuple[float, float]], *, titel: str = "",
                         prioritaet=None) -> list[list[float] | None]:

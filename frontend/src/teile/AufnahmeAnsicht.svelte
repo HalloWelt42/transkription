@@ -8,6 +8,7 @@
   import { AnfrageBand, Auswahl, beiAuftrag, gehe, geraet, groesse, Leiste, leisteOeffnen, marke, navigation,
            Rueckfrage, Spieler, wann, zurueckZurKellerwolke } from "appkern-oberflaeche";
   import { sprachOptionen as sprachWahl } from "../lib/sprachen.svelte";
+  import { hoerdiensteLaden, hoerdienstOptionen, vorgabeHoerdienst } from "../lib/hoerdienste.svelte";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import type { Aufnahme } from "../lib/typen";
@@ -25,6 +26,7 @@
   let sprache = $state("de");
   let sprecher = $state<SprecherWeg>("ohne");
   let anzahl = $state<number | null>(null);
+  let hoerdienst = $state<string | null>(null);      // je Auftrag; Vorgabe der eingestellte
   let startet = $state(false);
   let markerTitel = $state("");
   let markerOffen = $state(false);
@@ -53,6 +55,8 @@
       try {
         sprache = (await api.einstellung<string>("sprache")) ?? "de";
         sprecher = (await api.einstellung<SprecherWeg>("sprecher_weg")) ?? "ohne";
+        await hoerdiensteLaden();
+        hoerdienst = vorgabeHoerdienst();
       } catch {
         // Vorgaben bleiben
       }
@@ -70,7 +74,7 @@
     startet = true;
     fehler = "";
     try {
-      const optionen = { sprache, sprecher, anzahl: sprecher !== "ohne" ? anzahl : null };
+      const optionen = { sprache, sprecher, anzahl: sprecher !== "ohne" ? anzahl : null, hoerdienst };
       if (anfrage) await api.ausKellerwolke({ knoten_ids: [a.id], ...optionen });
       else await api.transkribieren({ quelle_id: a.id, ...optionen });
       meldung = "Wird transkribiert; der Stand steht hier und unter Aufträge.";
@@ -183,6 +187,8 @@
     {#if !a.transkripte.length && !laufend}
       <div class="t-gruppe">Noch kein Transkript</div>
       <div class="t-liste">
+        <div class="t-zeile"><i class="fa-solid fa-ear-listen"></i><span class="t-text"><span class="t-meta">Hördienst</span>
+          <Auswahl bind:wert={hoerdienst} optionen={hoerdienstOptionen()} /></span></div>
         <div class="t-zeile"><i class="fa-solid fa-language"></i><span class="t-text"><span class="t-meta">Sprache</span>
           <Auswahl bind:wert={sprache} optionen={sprachOptionen} /></span></div>
         <div class="t-zeile"><i class="fa-solid fa-user-group"></i><span class="t-text"><span class="t-meta">Sprecher</span>
@@ -221,6 +227,7 @@
           {@render transkriptWahl()}
           {#if !a.transkripte.length && !laufend}
             <div class="optionen" style="margin:0">
+              <label>Hördienst <Auswahl bind:wert={hoerdienst} optionen={hoerdienstOptionen()} /></label>
               <label>Sprache <Auswahl bind:wert={sprache} optionen={sprachOptionen} /></label>
               <label>Sprecher <Auswahl bind:wert={sprecher} optionen={SPRECHER_WEGE} /></label>
               {#if sprecher !== "ohne"}<label>Anzahl <Auswahl bind:wert={anzahl} optionen={ANZAHL_OPTIONEN} /></label>{/if}

@@ -45,13 +45,14 @@ class Sprachen:
         self._leitstelle = leitstelle
         self._dienst = dienst
         self._vorgabe = vorgabe
-        self._merk: tuple[float, str, list[str] | None] | None = None
+        self._merk: dict[str, tuple[float, list[str] | None]] = {}
 
-    async def des_dienstes(self) -> list[str] | None:
-        """Was der Hördienst laut Steckbrief kann; None, wenn er nichts nennt oder die Leitstelle nicht antwortet."""
-        dienst = self._dienst()
-        if self._merk and self._merk[1] == dienst and time.monotonic() - self._merk[0] < GUELTIG_S:
-            return self._merk[2]
+    async def des_dienstes(self, dienst: str | None = None) -> list[str] | None:
+        """Was der Hördienst (ohne Angabe der eingestellte) laut Steckbrief kann; None, wenn er nichts nennt oder die
+        Leitstelle nicht antwortet."""
+        dienst = dienst or self._dienst()
+        if (merk := self._merk.get(dienst)) and time.monotonic() - merk[0] < GUELTIG_S:
+            return merk[1]
         ls = self._leitstelle()
         if ls is None:
             return None
@@ -61,23 +62,23 @@ class Sprachen:
             return None
         brief = next((m.steckbrief for m in modelle if m.id == dienst), None)
         liste = list(brief.sprachen) if brief and brief.sprachen else None
-        self._merk = (time.monotonic(), dienst, liste)
+        self._merk[dienst] = (time.monotonic(), liste)
         return liste
 
-    async def liste(self) -> list[SpracheEintrag]:
+    async def liste(self, dienst: str | None = None) -> list[SpracheEintrag]:
         """Zur Wahl: Erkennen, dann die Sprachen des Hördienstes nach Namen; nennt er keine, die eingestellte."""
-        bekannt = await self.des_dienstes()
+        bekannt = await self.des_dienstes(dienst)
         vorgabe = self._vorgabe()
         codes = sorted(bekannt if bekannt is not None else ([] if vorgabe == AUTO else [vorgabe]), key=lambda c: name(c).casefold())
         return [SpracheEintrag(code=c, name=name(c)) for c in [AUTO, *codes]]
 
-    async def pruefen(self, code: str | None) -> None:
+    async def pruefen(self, code: str | None, dienst: str | None = None) -> None:
         """Lässt nur durch, was der Hördienst nennt (oder "auto", oder alles, wenn er nichts nennt)."""
         if not code or code == AUTO:
             return
-        bekannt = await self.des_dienstes()
+        bekannt = await self.des_dienstes(dienst)
         if bekannt is not None and code not in bekannt:
-            raise UnbekannteSprache(f"Der Hördienst {self._dienst()} kann die Sprache {name(code)} ({code}) nicht; "
+            raise UnbekannteSprache(f"Der Hördienst {dienst or self._dienst()} kann die Sprache {name(code)} ({code}) nicht; "
                                     "Erkennen wählen oder eine Sprache aus seiner Liste")
 
     async def angebot(self) -> Angebot:

@@ -204,6 +204,35 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 gesamt = int(r.headers["content-range"].split("/")[1])
                 assert gesamt == pytest.approx(44 + 150 * 44100 * 2, rel=0.01)          # 150 s, 16 Bit mono
 
+                # Hördienst je Auftrag (HELF-79): ein anderer Hördienst wird eine Fassung daneben, die Hauptfassung
+                # bleibt; seine Sprecher gelten wie eine Trennung, gleiche Stimmen über Abschnitte hinweg werden einer
+                dienste = (await c.get("/api/v1/hoerdienste", headers=h)).json()
+                assert {d["kennung"]: d["vorgabe"] for d in dienste} == {"klangwerk-hoeren": True, "klangwerk-hoeren-moss": False}
+                vorher = (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()["transkript"]
+                a = (await c.post("/api/v1/transkribieren", headers=h, json={
+                    "quelle_id": aufnahme["id"], "hoerdienst": "klangwerk-hoeren-moss", "sprecher": "stimmen"})).json()
+                a = await warten(c, h, a["id"])
+                assert a["zustand"] == "fertig" and a["ergebnis"]["transkript_id"] == tid, a.get("fehler")
+                t = (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()
+                assert t["transkript"]["segmente"] == vorher["segmente"] and t["transkript"]["erzeugt_mit"]["dienst"] == "klangwerk-hoeren"
+                [moss] = t["transkript"]["fassungen"]
+                assert moss["erzeugt_mit"]["dienst"] == "klangwerk-hoeren-moss" and moss["erzeugt_mit"]["modell"] == "MOSS (Schein)"
+                assert moss["erzeugt_mit"]["hoeren_s"] is not None
+                assert [s["sprecher"] for s in moss["segmente"]] == ["s1", "s2", "s1", "s2"]
+                assert len(moss["sprecher"]) == 2 and all(x.get("abdruck") is None for x in moss["sprecher"])
+                versionen = (await c.get(f"/api/v1/transkripte/{tid}/versionen", headers=h)).json()
+                assert versionen[0]["notiz"]["was"] == "Fassung von MOSS (Schein) ergänzt"
+                # zur Hauptfassung: die bisherige rückt unter die Fassungen, Marker bleiben
+                r = await c.post(f"/api/v1/transkripte/{tid}/hauptfassung", headers=h,
+                                 json={"stand": t["stand"], "fassung_id": moss["id"]})
+                assert r.status_code == 200, r.text
+                getauscht = r.json()["transkript"]
+                assert getauscht["erzeugt_mit"]["dienst"] == "klangwerk-hoeren-moss" and getauscht["segmente"][0]["sprecher"] == "s1"
+                assert [f["erzeugt_mit"]["dienst"] for f in getauscht["fassungen"]] == ["klangwerk-hoeren"]
+                assert getauscht["fassungen"][0]["segmente"] == vorher["segmente"] and getauscht["marker"] == vorher["marker"]
+                assert (await c.post(f"/api/v1/transkripte/{tid}/hauptfassung", headers=h,
+                                     json={"stand": t["stand"], "fassung_id": moss["id"]})).status_code == 409
+
                 # Eine andere App mit ihrem App-Schlüssel: Arbeit ja, Einstellungen nein
                 app_kopf = {"Authorization": f"Bearer {W['KELLERWOLKE_SCHLUESSEL']}"}
                 assert (await c.get(f"/api/v1/transkripte/{tid}", headers=app_kopf)).status_code == 200

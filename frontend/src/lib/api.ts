@@ -3,7 +3,7 @@ import type { ErkennenWeg, SprecherWeg } from "./sprecherwahl";
 import { hochladen, hole, json, type Auftrag, type Gespeichert } from "appkern-oberflaeche";
 import type {
   AltbestandSeite, Aufnahme, Bisher, AufnahmenSeite, ExportFormat, Ordner, Profil, TranskriptAntwort, Verzeichnis, Version, Vorlage, Vorschlag,
-  Marker, Segment, Transkript, Umzugsplan, WoerterbuchStand,
+  Hoerdienst, Marker, Segment, Transkript, Umzugsplan, WoerterbuchStand,
 } from "./typen";
 
 function abfrage(werte: Record<string, string | number | null | undefined | string[]>): string {
@@ -34,11 +34,15 @@ export const ordnerListe = () => hole<Ordner[]>("/aufnahmen/ordner");
 export const aufnahmen = (o: { ordner?: string | null; filter?: string; suche?: string; ab?: number; anzahl?: number }) =>
   hole<AufnahmenSeite>(`/aufnahmen${abfrage(o)}`);
 
-export const transkribieren = (e: { quelle_id: string; name?: string; sprache?: string; sprecher?: SprecherWeg; anzahl?: number | null }) =>
+export const transkribieren = (e: { quelle_id: string; name?: string; sprache?: string; sprecher?: SprecherWeg; anzahl?: number | null;
+                                    hoerdienst?: string | null }) =>
   hole<Auftrag>("/transkribieren", { method: "POST", ...json(e) });
 
-// Sprachen zur Wahl: was der Hördienst laut Steckbrief kann (mit "auto" zum Erkennen)
-export const sprachen = () => hole<{ code: string; name: string }[]>("/sprachen");
+// Sprachen zur Wahl: was der Hördienst (ohne Angabe der eingestellte) laut Steckbrief kann (mit "auto" zum Erkennen)
+export const sprachen = (dienst?: string | null) => hole<{ code: string; name: string }[]>(`/sprachen${abfrage({ dienst })}`);
+
+// Hördienste zur Wahl je Auftrag: was die Leitstelle dieser App anbietet, der eingestellte als Vorgabe
+export const hoerdienste = () => hole<Hoerdienst[]>("/hoerdienste");
 
 // Mitlesen: was ein laufender Auftrag schon gehört hat und wie lange er noch braucht
 export const bisher = (auftrag: string) => hole<Bisher>(`/transkribieren/${encodeURIComponent(auftrag)}/bisher`);
@@ -75,6 +79,10 @@ export const version = (id: string, v: string, anfrage?: AnfrageId) =>
   hole<Transkript>(mit(`/transkripte/${id}/versionen/${v}`, anfrage));
 export const zurueckholen = (id: string, v: string, stand: string, anfrage?: AnfrageId) =>
   hole<TranskriptAntwort>(mit(`/transkripte/${id}/versionen/${v}/zurueck`, anfrage), { method: "POST", ...json({ stand }) });
+
+// Eine Fassung eines anderen Hördienstes wird Hauptfassung (Bearbeiten, Suche, Export); die bisherige bleibt daneben
+export const hauptfassung = (id: string, fassung_id: string, stand: string, anfrage?: AnfrageId) =>
+  hole<TranskriptAntwort>(mit(`/transkripte/${id}/hauptfassung`, anfrage), { method: "POST", ...json({ stand, fassung_id }) });
 
 export const exportAblegen = (id: string, format: ExportFormat, anfrage?: AnfrageId) =>
   hole<{ id: string; pfad: string; name: string }>(mit(`/transkripte/${id}/export`, anfrage), { method: "POST", ...json({ format }) });
@@ -145,7 +153,8 @@ export const altUebernehmen = (e: { schluessel: string; zielordner: string; name
 
 // In der App gewählte Dateien aus der ganzen Kellerwolke mit Optionen transkribieren (je Datei eine Anfrage, Recht nur
 // für diesen Auftrag); liefert die Aufträge.
-export const ausKellerwolke = (e: { knoten_ids: string[]; sprache?: string; sprecher?: SprecherWeg; anzahl?: number | null }) =>
+export const ausKellerwolke = (e: { knoten_ids: string[]; sprache?: string; sprecher?: SprecherWeg; anzahl?: number | null;
+                                    hoerdienst?: string | null }) =>
   hole<string[]>("/kellerwolke/transkribieren", { method: "POST", ...json(e) });
 
 export const zusammenfuehrenPlan = () => hole<Umzugsplan>("/ablage/zusammenfuehren");

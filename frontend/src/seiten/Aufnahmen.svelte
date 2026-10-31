@@ -10,6 +10,7 @@
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import { sprachOptionen as sprachWahl } from "../lib/sprachen.svelte";
+  import { hoerdiensteLaden, hoerdienstOptionen, vorgabeHoerdienst } from "../lib/hoerdienste.svelte";
   import type { Aufnahme, AufnahmenSeite, Ordner } from "../lib/typen";
   import Altbestand from "../teile/Altbestand.svelte";
   import AufnahmeAnsicht from "../teile/AufnahmeAnsicht.svelte";
@@ -37,6 +38,7 @@
   let sprache = $state("de");
   let sprecher = $state<SprecherWeg>("ohne");
   let anzahl = $state<number | null>(null);
+  let hoerdienst = $state<string | null>(null);      // je Auftrag; Vorgabe der eingestellte
   let fehler = $state("");
   let meldung = $state("");
   let ueber = $state(false);
@@ -66,6 +68,8 @@
         sprache = (await api.einstellung<string>("sprache")) ?? "de";
         alteApp = (await api.einstellung<string>("altbestand_adresse").catch(() => "")) ?? "";
         sprecher = (await api.einstellung<SprecherWeg>("sprecher_weg")) ?? "ohne";
+        await hoerdiensteLaden();
+        hoerdienst = vorgabeHoerdienst();
       } catch (f) {
         fehler = (f as Error).message;
       }
@@ -197,7 +201,7 @@
     fehler = "";
     try {
       for (const id of gewaehlt) {
-        await api.transkribieren({ quelle_id: id, sprache, sprecher, anzahl: sprecher !== "ohne" ? anzahl : null });
+        await api.transkribieren({ quelle_id: id, sprache, sprecher, anzahl: sprecher !== "ohne" ? anzahl : null, hoerdienst });
       }
       meldung = `${gewaehlt.length} ${gewaehlt.length === 1 ? "Aufnahme wird" : "Aufnahmen werden"} transkribiert.`;
       gewaehlt = [];
@@ -417,6 +421,7 @@
     {#if gewaehlt.length}
       <div class="optionen">
         <span class="titel"><i class="fa-solid fa-closed-captioning"></i> {gewaehlt.length} gewählt</span>
+        <label>Hördienst <Auswahl bind:wert={hoerdienst} optionen={hoerdienstOptionen()} /></label>
         <label>Sprache <Auswahl bind:wert={sprache} optionen={sprachOptionen} /></label>
         <label>Sprecher <Auswahl bind:wert={sprecher} optionen={SPRECHER_WEGE} /></label>
         {#if sprecher !== "ohne"}<label>Anzahl <Auswahl bind:wert={anzahl} optionen={ANZAHL_OPTIONEN} /></label>{/if}

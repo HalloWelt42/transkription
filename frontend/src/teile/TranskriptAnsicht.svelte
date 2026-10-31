@@ -4,10 +4,18 @@
   // steht fest die Bearbeitungsleiste (Anleitung, Zahl der Änderungen, Verwerfen, Speichern), Änderungen sammeln sich
   // in einem Entwurf, Vorschläge der KI-Korrektur stehen unter ihrem Beitrag, Speichern legt eine neue Version an (nur
   // mit dem gelesenen Stand; sonst neu laden). Entwurf: mockups/transkription.html (3, 3b, 3c, 4), transkription-mobil.html (3).
+  // Fassungen (HELF-79): oben ein Reiter je Hördienst (die Hauptfassung zuerst, weitere nur zum Lesen und Mitlesen, eine
+  // davon lässt sich zur Hauptfassung machen), dazu der Vergleich zweier Fassungen und "Neu hören" mit einem anderen
+  // Hördienst. Bearbeiten, Suche und Export gelten der Hauptfassung.
   import { onMount, tick } from "svelte";
-  import { AnfrageBand, arbeit, farbe, gehe, geraet, Leiste, leisteOeffnen, marke, navigation, Spieler,
+  import { AnfrageBand, arbeit, Auswahl, beiAuftrag, farbe, gehe, geraet, Leiste, leisteOeffnen, marke, navigation, Spieler,
            zurueckZurKellerwolke } from "appkern-oberflaeche";
   import * as api from "../lib/api";
+  import { alleFassungen, HAUPT, hoerdiensteLaden, hoerdienstOptionen, tempo, vorgabeHoerdienst } from "../lib/hoerdienste.svelte";
+  import { aktiverBeitrag, Mitrollen } from "../lib/mitlesen.svelte";
+  import { sprachOptionen } from "../lib/sprachen.svelte";
+  import { SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
+  import Vergleich from "./Vergleich.svelte";
   import { neueKennung } from "../lib/kennung";
   import { abweichung, korrigierteWoerter } from "../lib/wortvergleich";
   import type { Marker, Segment, Transkript, TranskriptAntwort, Vorschlag } from "../lib/typen";
@@ -32,7 +40,18 @@
   let laeuft = $state(false);
   let spieler = $state<Spieler>();
   let rollfeld = $state<HTMLElement>();
-  let mitlaufen = $state(true);
+  const mitrollen = new Mitrollen();
+  // Fassungen: welche gezeigt wird (HAUPT, Kennung einer Fassung oder "vergleich"), die zwei im Vergleich, Neu hören
+  const VERGLEICH = "vergleich";
+  let ansicht = $state<string>(HAUPT);
+  let vergleichLinks = $state<string>(HAUPT);
+  let vergleichRechts = $state<string>("");
+  let neuOffen = $state(false);
+  let neuDienst = $state<string>("");
+  let neuSprache = $state<string>("de");
+  let neuSprecher = $state<SprecherWeg>("ohne");
+  let neuAuftrag = $state<string | null>(null);
+  let neuStand = $state("");
   let suche = $state("");
   let trefferNr = $state(-1);       // der zuletzt angesprungene Treffer (Stelle in `passend`)
   let bearbeiten = $state(false);
@@ -51,23 +70,15 @@
   let wortVorschlag = $state<string[]>([]);
   let wortMeldung = $state("");
   let welle = $state<number[] | null>(null);
-  let ruhePause: ReturnType<typeof setTimeout>;
 
   const t = $derived(entwurf ?? antwort?.transkript ?? null);
-  const segmente = $derived(t?.segmente ?? []);
-  const aktiv = $derived.by(() => {
-    let lo = 0;
-    let hi = segmente.length - 1;
-    let gefunden = -1;
-    while (lo <= hi) {
-      const mitte = (lo + hi) >> 1;
-      if (segmente[mitte].start <= zeit) {
-        gefunden = mitte;
-        lo = mitte + 1;
-      } else hi = mitte - 1;
-    }
-    return gefunden >= 0 && zeit < segmente[gefunden].ende + 1.5 ? gefunden : -1;
-  });
+  const fassungen = $derived(t ? alleFassungen(t) : []);
+  const vergleich = $derived(!bearbeiten && ansicht === VERGLEICH && fassungen.length > 1);
+  // eine weitere Fassung zum Lesen; im Bearbeiten immer die Hauptfassung
+  const gezeigt = $derived(bearbeiten || ansicht === HAUPT ? null : fassungen.find((f) => f.id === ansicht && f.id !== HAUPT) ?? null);
+  const segmente = $derived(gezeigt?.segmente ?? t?.segmente ?? []);
+  const gezeigteSprecher = $derived(gezeigt?.sprecher ?? t?.sprecher ?? []);
+  const aktiv = $derived(aktiverBeitrag(segmente, zeit));
   const spur = $derived.by(() => {
     const aus: { von: number; bis: number; farbe: string }[] = [];
     for (const s of segmente) {
@@ -135,6 +146,11 @@
     try {
       antwort = await api.transkript(id, anfrage);
       navigation.titel = antwort.transkript.name;
+      // eine gewählte Fassung, die es nicht mehr gibt (etwa nach dem Tausch), fällt auf die Hauptfassung zurück
+      const da = new Set(alleFassungen(antwort.transkript).map((f) => f.id));
+      if (ansicht !== VERGLEICH && !da.has(ansicht)) ansicht = HAUPT;
+      if (!da.has(vergleichLinks)) vergleichLinks = HAUPT;
+      if (!da.has(vergleichRechts)) vergleichRechts = [...da].find((x) => x !== vergleichLinks) ?? HAUPT;
       // die Wellenform kommt aus dem Ton selbst (gleich für alte und neue Transkripte); bis dahin die gespeicherte
       const quelle = antwort.transkript.quelle?.knoten_id;
       if (quelle) void api.wellenform(quelle, anfrage).then((w) => (welle = w)).catch(() => {});
@@ -145,6 +161,16 @@
   }
 
   onMount(() => {
+    void hoerdiensteLaden();
+    const abmelden = beiAuftrag((a) => {
+      if (a.id !== neuAuftrag) return;
+      neuStand = a.zustand === "fertig" ? "Fertig gehört." : a.zustand === "fehler" ? (a.fehler ?? "Hören gescheitert")
+        : a.schritt || "Wartet";
+      if (a.zustand === "fertig") {
+        neuAuftrag = null;
+        void laden();
+      } else if (!["wartet", "laeuft"].includes(a.zustand)) neuAuftrag = null;
+    });
     void laden().then(async () => {
       if (beginn != null) {
         await tick();
@@ -152,24 +178,65 @@
         gehe(`transkripte/${id}`, true);
       }
     });
+    return abmelden;
   });
 
-  // Dem laufenden Beitrag folgen, außer man rollt selbst (dann eine Weile nicht).
+  // Dem laufenden Beitrag folgen, außer man rollt selbst (dann eine Weile nicht); den Vergleich führt er selbst.
   $effect(() => {
     const i = aktiv;
-    if (i < 0 || !mitlaufen || !rollfeld || bearbeiten) return;
-    rollfeld.querySelector(`[data-i="${i}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (i < 0 || bearbeiten || vergleich) return;
+    mitrollen.zeigen(rollfeld, `[data-i="${i}"]`);
   });
 
-  function selbstGerollt() {
-    mitlaufen = false;
-    clearTimeout(ruhePause);
-    ruhePause = setTimeout(() => (mitlaufen = true), 8000);
-  }
+  const selbstGerollt = mitrollen.selbstGerollt;
 
   function springen(s: number) {
-    mitlaufen = true;
+    mitrollen.folgen();
     spieler?.springe(s, true);
+  }
+
+  // --- Fassungen je Hördienst -------------------------------------------------------------------------------------
+
+  function waehlen(ansichtNeu: string) {
+    ansicht = ansichtNeu;
+    if (ansichtNeu === VERGLEICH && vergleichLinks === vergleichRechts) {
+      vergleichRechts = fassungen.find((f) => f.id !== vergleichLinks)?.id ?? HAUPT;
+    }
+  }
+
+  function neuOeffnen() {
+    neuOffen = !neuOffen;
+    if (!neuOffen || !t) return;
+    const vorhanden = new Set(fassungen.map((f) => f.erzeugt_mit?.dienst));
+    // Vorschlag: der erste Hördienst, von dem es noch keine Fassung gibt
+    neuDienst = hoerdienstOptionen().find((o) => !vorhanden.has(o.wert))?.wert ?? vorgabeHoerdienst() ?? "";
+    neuSprache = t.sprache || "de";
+    neuStand = "";
+  }
+
+  async function neuHoeren() {
+    const quelle = antwort?.transkript.quelle?.knoten_id;
+    if (!quelle || !neuDienst) return;
+    neuStand = "Wird eingereiht";
+    try {
+      const a = await api.transkribieren({ quelle_id: quelle, hoerdienst: neuDienst, sprache: neuSprache, sprecher: neuSprecher });
+      neuAuftrag = a.id;
+      neuStand = "Wird gehört; die Fassung kommt als eigener Reiter dazu, die bisherigen bleiben.";
+    } catch (f) {
+      neuStand = (f as Error).message;
+    }
+  }
+
+  async function zurHauptfassung() {
+    if (!antwort || !gezeigt) return;
+    fehler = "";
+    try {
+      antwort = await api.hauptfassung(id, gezeigt.id, antwort.stand, anfrage);
+      ansicht = HAUPT;
+      vorschlaege = await api.vorschlaege(id);
+    } catch (f) {
+      fehler = (f as Error).message;
+    }
   }
 
   // Suche im Text: die Zahl der Treffer steht schon beim Tippen da, Eingabe springt zum nächsten (mit Umschalt zum
@@ -205,6 +272,7 @@
 
   function bearbeitenBeginnen() {
     if (!antwort || bearbeiten) return;
+    ansicht = HAUPT;                       // bearbeitet wird die Hauptfassung
     entwurf = structuredClone($state.snapshot(antwort.transkript)) as Transkript;
     bearbeiten = true;
     entscheidungen = {};
@@ -468,7 +536,7 @@
       <div class="marker-zeile"><i class="fa-solid fa-flag"></i>{marke(m.zeit)} {m.titel}</div>
     {/each}
     <div data-i={i}>
-      <Beitrag seg={s} sprecher={t?.sprecher ?? []} jetzt={i === aktiv ? zeit : null} {suche} mobil={geraet.mobil} {bearbeiten}
+      <Beitrag seg={s} sprecher={gezeigteSprecher} jetzt={i === aktiv ? zeit : null} {suche} mobil={geraet.mobil} {bearbeiten}
                offen={bearbeiten && offen === i} gewaehlt={bearbeiten && gewaehltMenge.has(i)} geaendert={bearbeiten && geaendert.has(i)}
                spielerzeit={bearbeiten && offen === i ? zeit : null}
                onspringen={springen} onklick={(e) => beitragKlick(i, e)} onschliessen={() => (offen = null)}
@@ -488,6 +556,52 @@
   <label class="suche text-suche" class:mobil-suche={mobil}><i class="fa-solid fa-magnifying-glass"></i>
     <input class="eingabe-roh" placeholder="Im Text suchen" enterkeyhint="next" bind:value={suche} onkeydown={suchTaste} />
     {@render trefferStand()}</label>
+{/snippet}
+
+{#snippet reiter()}
+  {#if !bearbeiten && (fassungen.length > 1 || (!anfrage && t?.quelle))}
+    <div class="fassungs-reiter" role="tablist" aria-label="Fassungen je Hördienst">
+      {#each fassungen as f (f.id)}
+        <button role="tab" class="chip wahl" class:an={ansicht === f.id} aria-selected={ansicht === f.id} onclick={() => waehlen(f.id)}
+                title={[f.id === HAUPT ? "Hauptfassung: Bearbeiten, Suche und Export gelten ihr" : "Weitere Fassung zum Lesen und Vergleichen",
+                        tempo(f.erzeugt_mit, t?.dauer_s ?? 0)].filter(Boolean).join("; ")}>
+          <i class="fa-solid {f.id === HAUPT ? 'fa-star' : 'fa-ear-listen'}"></i>{f.name}</button>
+      {/each}
+      {#if fassungen.length > 1}
+        <button role="tab" class="chip wahl" class:an={ansicht === VERGLEICH} aria-selected={ansicht === VERGLEICH} onclick={() => waehlen(VERGLEICH)}
+                title="Zwei Fassungen auf einer Zeitachse, dieselbe Stelle auf gleicher Höhe"><i class="fa-solid fa-table-columns"></i>Vergleich</button>
+      {/if}
+      {#if !anfrage && t?.quelle}
+        <button class="knopf still" class:aktiv={neuOffen} aria-expanded={neuOffen} onclick={neuOeffnen}
+                title="Dieselbe Aufnahme mit einem anderen Hördienst hören; das Ergebnis kommt als weitere Fassung dazu, die bisherigen bleiben">
+          <i class="fa-solid fa-plus"></i> Neu hören</button>
+      {/if}
+    </div>
+    {#if neuOffen}
+      <div class="optionen" style="margin-bottom:12px">
+        <label>Hördienst <Auswahl bind:wert={neuDienst} optionen={hoerdienstOptionen()} /></label>
+        <label>Sprache <Auswahl bind:wert={neuSprache} optionen={sprachOptionen()} /></label>
+        <label>Sprecher <Auswahl bind:wert={neuSprecher} optionen={SPRECHER_WEGE} /></label>
+        <span class="knopfzeile" style="margin-left:auto">
+          <button class="knopf primaer" onclick={neuHoeren} disabled={!neuDienst || !!neuAuftrag}>
+            <i class="fa-solid {neuAuftrag ? 'fa-circle-notch fa-spin' : 'fa-play'}"></i> Hören</button>
+        </span>
+        {#if neuDienst && neuDienst === t?.erzeugt_mit?.dienst}
+          <span class="leer-zeile" style="flex-basis:100%">Derselbe Hördienst wie die Hauptfassung: das Ergebnis wird die neue
+            Hauptfassung, die bisherige bleibt unter Versionen.</span>
+        {/if}
+        {#if neuStand}<span class="leer-zeile" style="flex-basis:100%">{neuStand}</span>{/if}
+      </div>
+    {/if}
+    {#if gezeigt}
+      <div class="fassung-hinweis">
+        <span>Fassung von {gezeigt.name}{gezeigt.erzeugt_mit?.hoeren_s ? `, ${tempo(gezeigt.erzeugt_mit, t?.dauer_s ?? 0)}` : ""}.
+          Bearbeiten, Suche und Export gelten der Hauptfassung.</span>
+        <button class="knopf" onclick={zurHauptfassung} title="Diese Fassung wird Hauptfassung; die bisherige bleibt als Reiter daneben">
+          <i class="fa-solid fa-star"></i> Zur Hauptfassung machen</button>
+      </div>
+    {/if}
+  {/if}
 {/snippet}
 
 {#snippet oberhalbText()}
@@ -543,8 +657,12 @@
   {#if mehr}
     <div class="karte" style="padding:0; margin-bottom:10px">{@render leiste(antwort)}</div>
   {/if}
+  {@render reiter()}
   {@render oberhalbText()}
-  <div bind:this={rollfeld} ontouchmove={selbstGerollt} onwheel={selbstGerollt} role="region" aria-label="Text">{@render text()}</div>
+  <div bind:this={rollfeld} ontouchmove={selbstGerollt} onwheel={selbstGerollt} role="region" aria-label="Text">
+    {#if vergleich}
+      <Vergleich {fassungen} bind:links={vergleichLinks} bind:rechts={vergleichRechts} {zeit} mobil {rollfeld} {mitrollen} onspringen={springen} />
+    {:else}{@render text()}{/if}</div>
   <Spieler bind:this={spieler} src={api.tonAdresse(id, anfrage)} dauer={antwort.transkript.dauer_s} wellenform={welle ?? antwort.transkript.wellenform}
            {spur} marker={(t?.marker ?? []).map((m) => m.zeit)} bind:zeit bind:laeuft {stoppBei} kompakt />
   </div>
@@ -566,10 +684,15 @@
                {spur} marker={(t?.marker ?? []).map((m) => m.zeit)} bind:zeit bind:laeuft {stoppBei} />
       <div class="rollfeld" style="padding-top:14px" bind:this={rollfeld} onwheel={selbstGerollt} ontouchmove={selbstGerollt}
            role="region" aria-label="Text">
-        <div class="text-flaeche">
+        <div class="text-flaeche" class:breit={vergleich}>
+          {@render reiter()}
           {@render oberhalbText()}
-          {@render text()}
-          {#if !segmente.length}<p class="leer">In dieser Aufnahme wurde nichts gesprochen.</p>{/if}
+          {#if vergleich}
+            <Vergleich {fassungen} bind:links={vergleichLinks} bind:rechts={vergleichRechts} {zeit} {rollfeld} {mitrollen} onspringen={springen} />
+          {:else}
+            {@render text()}
+            {#if !segmente.length}<p class="leer">In dieser Aufnahme wurde nichts gesprochen.</p>{/if}
+          {/if}
         </div>
       </div>
     </section>

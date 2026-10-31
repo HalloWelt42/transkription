@@ -22,7 +22,8 @@ from ..ablage import orte
 from ..ablage.transkripte import aufnahme_id, begleiter_ablegen
 from ..arten import AuswertenEingabe, KorrigierenEingabe, SprecherEingabe
 from ..modell.sprecherprofil import Probe, Profil
-from ..modell.transkript import Aenderung, Marker, Quelle, Segment, Sprecher, Transkript, woerter_angleichen
+from ..modell.transkript import (Aenderung, Marker, Quelle, Segment, Sprecher, Transkript, woerter_angleichen,
+                                 zur_hauptfassung)
 from ..suchindex import Notiz, Seite
 from ..teile import Teile
 from ..vorschlaege import Entscheidung, OffenerVorschlag
@@ -73,6 +74,11 @@ class StandEingabe(BaseModel):
     stand: str
 
 
+class HauptfassungEingabe(BaseModel):
+    stand: str
+    fassung_id: UUID = Field(description="Fassung eines anderen Hördienstes, die Hauptfassung wird")
+
+
 class ProfilZuordnung(BaseModel):
     stand: str
     profil_id: UUID | None = Field(None, description="vorhandenes Profil; sonst entsteht eins mit `name`")
@@ -101,7 +107,11 @@ class VorlageEingabe(BaseModel):
 
 
 def _ohne_abdruck(t: Transkript) -> Transkript:
-    return t.model_copy(update={"sprecher": [s.model_copy(update={"abdruck": None}) for s in t.sprecher]})
+    """Ohne Stimmabdrücke (je Sprecher 192 Zahlen) für die Oberfläche, auch in den Fassungen."""
+    def ohne(sprecher: list[Sprecher]) -> list[Sprecher]:
+        return [s.model_copy(update={"abdruck": None}) for s in sprecher]
+    return t.model_copy(update={"sprecher": ohne(t.sprecher),
+                                "fassungen": [f.model_copy(update={"sprecher": ohne(f.sprecher)}) for f in t.fassungen]})
 
 
 def _antwort(t: Transkript, knoten: Knoten) -> TranskriptAntwort:
@@ -241,6 +251,20 @@ def router(teile: Teile) -> APIRouter:
             raise Konflikt("Inzwischen geändert: bitte neu laden") from f
         await teile.geschrieben(neu, knoten, anfrage)
         return _antwort(neu, knoten)
+
+    @r.post("/{transkript_id}/hauptfassung", response_model=TranskriptAntwort)
+    async def hauptfassung(transkript_id: UUID, eingabe: HauptfassungEingabe, anfrage: UUID | None = None,
+                           konto: Konto = g.pflicht) -> TranskriptAntwort:
+        """Eine Fassung wird Hauptfassung (Bearbeiten, Suche, Export); die bisherige bleibt als Fassung daneben."""
+        alt, knoten = await lesen(transkript_id, anfrage)
+        if knoten.etag != eingabe.stand:
+            raise Konflikt("Inzwischen geändert: bitte neu laden")
+        try:
+            neu = zur_hauptfassung(alt, eingabe.fassung_id)
+        except KeyError as f:
+            raise HTTPException(404, "Diese Fassung gibt es nicht (mehr)") from f
+        was = f"Hauptfassung: {neu.erzeugt_mit.modell or neu.erzeugt_mit.dienst}" if neu.erzeugt_mit else "Hauptfassung gewechselt"
+        return await schreiben(transkript_id, neu, eingabe.stand, Aenderung(was=was, wer=konto.name, app=konto.app), anfrage)
 
     # --- Export als Datei, Vorschläge -----------------------------------------------------------------------------
 

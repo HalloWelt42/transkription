@@ -53,7 +53,33 @@ export interface Transkript {
   marker: Marker[];
   wellenform?: number[] | null;
   aenderung?: Notiz | null;
-  erzeugt_mit?: { dienst: string; modell: string | null; app: string } | null;
+  erzeugt_mit?: ErzeugtMit | null;
+  fassungen?: Hoerfassung[];
+}
+
+export interface ErzeugtMit {
+  dienst: string;
+  modell: string | null;
+  app: string;
+  hoeren_s?: number | null;       // Rechenzeit des Hördienstes für die ganze Aufnahme
+}
+
+// Dieselbe Aufnahme von einem anderen Hördienst gehört (zum Vergleich neben der Hauptfassung)
+export interface Hoerfassung {
+  id: string;
+  erzeugt_mit: ErzeugtMit;
+  erstellt_am: string;
+  sprache: string;
+  sprecher: Sprecher[];
+  segmente: Segment[];
+}
+
+// Ein Hördienst der Leitstelle zur Wahl beim Transkribieren
+export interface Hoerdienst {
+  kennung: string;
+  name: string;
+  hinweis: string;
+  vorgabe: boolean;
 }
 
 export interface TranskriptAntwort {

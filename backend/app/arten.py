@@ -62,6 +62,11 @@ class TranskribierenAnfrage(BaseModel):
     sprecher: SprecherWeg | None = Field(None, description="ohne, Stimmen gruppieren oder mit Sprechertrennung; leer: Vorgabe "
                                                             "aus den Einstellungen (ab Werk ohne)")
     anzahl: int | None = Field(None, ge=1, le=20, description="bekannte Zahl der Sprecher")
+    hoerdienst: str | None = Field(None, max_length=120, description="Hördienst der Leitstelle für diesen Auftrag (GET "
+                                   "/hoerdienste); leer: der eingestellte. Gibt es schon ein Transkript, wird es die "
+                                   "Fassung dieses Hördienstes daneben (vom Hördienst der Hauptfassung: neue Hauptfassung)")
+    hauptfassung: bool = Field(False, description="das Ergebnis wird Hauptfassung, auch von einem anderen Hördienst; die "
+                                                  "bisherige rückt dann unter die Fassungen")
     anfrage_id: UUID | None = Field(None, description="Anfrage der Kellerwolke: die Aufnahme liegt außerhalb der App, die "
                                                       "App darf sie nur für diesen Auftrag lesen")
 
@@ -77,6 +82,7 @@ class AnfrageOptionen(BaseModel):
     sprache: Sprache | None = None
     sprecher: SprecherWeg | None = None
     anzahl: int | None = Field(None, ge=1, le=20)
+    hoerdienst: str | None = Field(None, max_length=120)
 
 
 def eingabe_aus_anfrage(e: AnfrageEingabe) -> TranskribierenEingabe:
@@ -205,13 +211,17 @@ def arten(teile: Teile) -> list[Art]:
 
     async def sprecher_bestimmen(k: Kontext, wav: Path, ordner: Path, segmente: list[Segment],
                                  abdruecke: list[list[float] | None], anzahl: int | None, titel: str, trennung: bool,
-                                 plan: list[Abschnitt]):
+                                 plan: list[Abschnitt], vom_hoerdienst: list[Wechsel] | None = None):
         """Nur auf ausdrücklichen Wunsch: mit `trennung` fragt sie erst die Sprechertrennung (scheitert die, wird
         gruppiert), sonst gruppiert sie die Stimmabdrücke. Mit Trennung werden die Segmente an den Sprecherwechseln
-        geteilt und ihre Abdrücke neu bestimmt (sonst mischen lange Segmente zwei Stimmen)."""
+        geteilt und ihre Abdrücke neu bestimmt (sonst mischen lange Segmente zwei Stimmen). Nennt der Hördienst die
+        Sprecher selbst (`vom_hoerdienst`), gelten sie als Trennung; gleiche Stimmen über Abschnitte hinweg legen die
+        Abdrücke zusammen."""
         e = teile.einstellungen
-        wechsel: list[Wechsel] | None = None
-        if trennung:
+        wechsel: list[Wechsel] | None = vom_hoerdienst or None
+        if wechsel:
+            await k.fortschritt(None, "Sprecher aus dem Hördienst", phase="sprecher")
+        elif trennung:
             await k.fortschritt(None, "Sprechertrennung", phase="sprecher")
             try:
                 wechsel = await geduldig(k, lambda: teile.klangwerk.trennen(
@@ -237,7 +247,8 @@ def arten(teile: Teile) -> list[Art]:
         e: TranskribierenEingabe = k.eingabe
         einst = teile.einstellungen
         sprache = e.sprache or einst.sprache
-        await teile.sprachen.pruefen(sprache)          # vor aller Arbeit: kann der Hördienst sie?
+        hoerdienst = e.hoerdienst or einst.dienst_hoeren
+        await teile.sprachen.pruefen(sprache, hoerdienst)          # vor aller Arbeit: kann der Hördienst sie?
         weg = e.sprecher or einst.sprecher_weg
         mit_sprechern = weg != "ohne"
         if "transkript_id" in k.zwischenstand:          # schon gespeichert, nur der Abschluss fehlte
@@ -272,8 +283,12 @@ def arten(teile: Teile) -> list[Art]:
                 beginn = time.monotonic()
                 stueck = await ausschneiden(wav, a.start, a.ende, ordner / f"abschnitt-{a.nummer}.wav")
                 titel = f"{name}, Abschnitt {a.nummer} von {len(plan)}"
+                hoer_beginn = time.monotonic()
                 erg = await geduldig(k, lambda: teile.klangwerk.hoeren(stueck, sprache, versatz=a.start, titel=titel,
-                                                                        hinweis=hinweis, prioritaet="hintergrund"), "Hören")
+                                                                        hinweis=hinweis, prioritaet="hintergrund",
+                                                                        dienst=hoerdienst, vorsilbe=f"A{a.nummer}:"),
+                                     "Hören")
+                hoeren_s = round(time.monotonic() - hoer_beginn, 1)
                 abdruecke: list = []
                 if mit_sprechern and erg.segmente:
                     zeiten = [(round(s.start - a.start, 3), round(s.ende - a.start, 3)) for s in erg.segmente]
@@ -283,7 +298,8 @@ def arten(teile: Teile) -> list[Art]:
                 stueck.unlink(missing_ok=True)
                 fertig[str(a.nummer)] = {"segmente": [s.model_dump(mode="json") for s in erg.segmente],
                                          "abdruecke": abdruecke, "sprache": erg.sprache, "modell": erg.modell,
-                                         "gerechnet_s": round(time.monotonic() - beginn, 1)}
+                                         "wechsel": [[w.start, w.ende, w.sprecher] for w in erg.wechsel],
+                                         "hoeren_s": hoeren_s, "gerechnet_s": round(time.monotonic() - beginn, 1)}
                 await k.merken(hoeren=fertig)
                 await k.fortschritt(len(fertig) / len(plan), f"Abschnitt {a.nummer} von {len(plan)} fertig")
 
@@ -296,11 +312,17 @@ def arten(teile: Teile) -> list[Art]:
                 abdruecke_alle += teil["abdruecke"] or [None] * len(segs)
             erkannt = next((t["sprache"] for t in fertig.values() if t.get("sprache")), None)
             modell = next((t["modell"] for t in fertig.values() if t.get("modell")), None)
+            hoeren_s = round(sum(t.get("hoeren_s") or 0.0 for t in fertig.values()), 1)
+            # Sprecher des Hördienstes zählen nur, wenn er sie in jedem Abschnitt mit Text nennt
+            mit_text = [t for t in fertig.values() if t["segmente"]]
+            vom_hoerdienst = ([Wechsel(*w) for t in mit_text for w in t.get("wechsel") or []]
+                              if mit_text and all(t.get("wechsel") for t in mit_text) else None)
 
             sprecher = []
             if mit_sprechern and segmente:
                 segmente, sprecher = await sprecher_bestimmen(k, wav, ordner, segmente, abdruecke_alle, e.anzahl, name,
-                                                              trennung=weg == "trennung", plan=plan)
+                                                              trennung=weg == "trennung", plan=plan,
+                                                              vom_hoerdienst=vom_hoerdienst)
 
             segmente = an_satzenden(segmente)       # Beiträge enden an Satzenden, nicht an jeder Sprechpause
             await k.pruefen()
@@ -310,10 +332,11 @@ def arten(teile: Teile) -> list[Art]:
             t = Transkript(name=name, quelle=Quelle(knoten_id=quelle.id, pfad=quelle.pfad, etag=quelle.etag), marker=marker,
                            sprache=(erkannt if sprache == "auto" and erkannt else sprache), dauer_s=round(dauer, 3),
                            sprecher=sprecher, segmente=segmente, wellenform=wellenform,
-                           erzeugt_mit=ErzeugtMit(dienst=einst.dienst_hoeren, modell=modell, app=FASSUNG),
+                           erzeugt_mit=ErzeugtMit(dienst=hoerdienst, modell=modell, app=FASSUNG, hoeren_s=hoeren_s),
                            aenderung=Aenderung(was="erzeugt", wer=e.von))
             t, knoten = await transkripte.speichern(t, quelle, Aenderung(was="erzeugt", wer=e.von),
-                                                    erneut=Aenderung(was="neu transkribiert", wer=e.von))
+                                                    erneut=Aenderung(was="neu transkribiert", wer=e.von),
+                                                    hauptfassung=e.hauptfassung)
             await k.merken(transkript_id=str(knoten.id))
             await teile.geschrieben(t, knoten, e.anfrage_id)
             return {"transkript_id": str(knoten.id), "ergebnis_id": str(knoten.id), "name": t.name, "pfad": knoten.pfad,
@@ -406,9 +429,9 @@ def arten(teile: Teile) -> list[Art]:
                                         bezug_art="aufnahme", bezug_name=e.von)
             folge = None
             if e.neu_transkribieren and tid:
-                folge = await g.auftraege.einreihen("transkribieren", TranskribierenEingabe(
+                folge = await g.auftraege.einreihen("transkribieren", TranskribierenEingabe(   # wird die jüngste Version
                     quelle_id=quelle.id, name=e.name, sprache=e.sprache, sprecher=e.sprecher, anzahl=e.anzahl,
-                    von=e.von), titel=f"{e.name}: neu transkribieren")
+                    hauptfassung=True, von=e.von), titel=f"{e.name}: neu transkribieren")
             return {"aufnahme_id": str(quelle.id), "transkript_id": tid, "pfad": quelle.pfad, "staende": len(eintrag.staende),
                     "folgeauftrag": folge.id if folge else None}
         finally:

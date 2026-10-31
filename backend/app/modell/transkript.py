@@ -78,6 +78,25 @@ class ErzeugtMit(_Teil):
     dienst: str
     modell: str | None = None
     app: str
+    hoeren_s: float | None = Field(None, ge=0, description="Rechenzeit des Hördienstes für die ganze Aufnahme (Tempo)")
+
+
+class Hoerfassung(_Teil):
+    """Dieselbe Aufnahme von einem anderen Hördienst gehört, zum Vergleich neben der Hauptfassung (den Feldern des
+    Transkripts selbst). Je Hördienst höchstens eine; Bearbeiten, Suche und Export gelten der Hauptfassung."""
+
+    id: UUID = Field(default_factory=uuid4)
+    erzeugt_mit: ErzeugtMit
+    erstellt_am: datetime = Field(default_factory=jetzt)
+    sprache: str = Field("de", max_length=12)
+    sprecher: list[Sprecher] = Field(default_factory=list)
+    segmente: list[Segment] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _stimmig(self) -> Hoerfassung:
+        _sprecher_pruefen(self.sprecher, self.segmente)
+        self.segmente.sort(key=lambda s: (s.start, s.ende))
+        return self
 
 
 class Aenderung(_Teil):
@@ -103,16 +122,14 @@ class Transkript(_Teil):
     erzeugt_mit: ErzeugtMit | None = None
     aenderung: Aenderung | None = None
     wellenform: list[int] | None = Field(None, description="Lautstärke 0 bis 100 in gleichen Abschnitten (Spieler)")
+    fassungen: list[Hoerfassung] = Field(default_factory=list, description="weitere Hördienste zum Vergleich, je einer")
 
     @model_validator(mode="after")
     def _stimmig(self) -> Transkript:
-        kennungen = [s.kennung for s in self.sprecher]
-        if len(set(kennungen)) != len(kennungen):
-            raise ValueError("Sprecherkennungen doppelt")
-        bekannt = set(kennungen)
-        for seg in self.segmente:
-            if seg.sprecher is not None and seg.sprecher not in bekannt:
-                raise ValueError(f"Segment bei {seg.start:.2f} s nennt unbekannten Sprecher {seg.sprecher}")
+        _sprecher_pruefen(self.sprecher, self.segmente)
+        dienste = [f.erzeugt_mit.dienst for f in self.fassungen]
+        if len(set(dienste)) != len(dienste):
+            raise ValueError("Je Hördienst höchstens eine Fassung")
         self.segmente.sort(key=lambda s: (s.start, s.ende))
         self.marker.sort(key=lambda m: m.zeit)
         return self
@@ -140,6 +157,57 @@ class Transkript(_Teil):
         while f"s{n}" in belegt:
             n += 1
         return f"s{n}"
+
+
+def _sprecher_pruefen(sprecher: list[Sprecher], segmente: list[Segment]) -> None:
+    kennungen = [s.kennung for s in sprecher]
+    if len(set(kennungen)) != len(kennungen):
+        raise ValueError("Sprecherkennungen doppelt")
+    bekannt = set(kennungen)
+    for seg in segmente:
+        if seg.sprecher is not None and seg.sprecher not in bekannt:
+            raise ValueError(f"Segment bei {seg.start:.2f} s nennt unbekannten Sprecher {seg.sprecher}")
+
+
+# --- Fassungen je Hördienst -------------------------------------------------------------------------------------
+# Die Hauptfassung sind die Felder des Transkripts (so lesen es auch andere Apps); weitere Hördienste stehen unter
+# `fassungen`. Neu gehört ersetzt nur, was vom selben Hördienst stammt; jeder frühere Stand bleibt als Version der
+# Kellerwolke erhalten.
+
+_HAUPT = ("erzeugt_mit", "sprache", "sprecher", "segmente")
+
+
+def als_fassung(t: Transkript) -> Hoerfassung:
+    """Die Hauptfassung als Fassung (ohne Hördienst gilt sie als unbekannter Herkunft)."""
+    return Hoerfassung(erzeugt_mit=t.erzeugt_mit or ErzeugtMit(dienst="unbekannt", app="unbekannt"),
+                       erstellt_am=t.geaendert_am, sprache=t.sprache, sprecher=t.sprecher, segmente=t.segmente)
+
+
+def gehoert_einfuegen(bisher: Transkript, neu: Transkript, hauptfassung: bool = False) -> tuple[Transkript, bool]:
+    """Ein frisch gehörtes Transkript in das bisherige derselben Aufnahme. Vom Hördienst der Hauptfassung oder mit
+    `hauptfassung`: es wird die Hauptfassung; eine bisherige eines anderen Hördienstes rückt unter die Fassungen.
+    Sonst wird es die Fassung seines Hördienstes (ersetzt eine frühere desselben Dienstes) und die Hauptfassung
+    bleibt. Liefert das Ergebnis und ob es die Hauptfassung ist."""
+    dienst = neu.erzeugt_mit.dienst if neu.erzeugt_mit else None
+    haupt_dienst = bisher.erzeugt_mit.dienst if bisher.erzeugt_mit else None
+    if dienst is None or dienst == haupt_dienst:
+        return neu.model_copy(update={"fassungen": bisher.fassungen}), True
+    andere = [f for f in bisher.fassungen if f.erzeugt_mit.dienst not in (dienst, haupt_dienst)]
+    if hauptfassung:
+        return neu.model_copy(update={"fassungen": [*andere, als_fassung(bisher)]}), True
+    return bisher.model_copy(update={"fassungen": [*andere, als_fassung(neu)]}), False
+
+
+def zur_hauptfassung(t: Transkript, fassung_id: UUID) -> Transkript:
+    """Eine Fassung wird Hauptfassung (Bearbeiten, Suche, Export), die bisherige rückt an ihre Stelle unter die
+    Fassungen. Marker, Name und Wellenform gehören zur Aufnahme und bleiben."""
+    gewaehlt = next((f for f in t.fassungen if f.id == fassung_id), None)
+    if gewaehlt is None:
+        raise KeyError(f"Keine Fassung {fassung_id}")
+    bisherige = als_fassung(t)
+    fassungen = [bisherige if f.id == fassung_id else f for f in t.fassungen]
+    return Transkript.model_validate({**t.model_dump(), **{k: getattr(gewaehlt, k) for k in _HAUPT},
+                                      "erzeugt_mit": gewaehlt.erzeugt_mit, "fassungen": fassungen})
 
 
 # --- Wortangleichung -------------------------------------------------------------------------------------------

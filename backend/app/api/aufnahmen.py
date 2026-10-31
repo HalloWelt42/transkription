@@ -88,6 +88,16 @@ class AusKellerwolke(BaseModel):
     sprache: Sprache | None = None
     sprecher: SprecherWeg | None = None
     anzahl: int | None = Field(None, ge=1, le=20)
+    hoerdienst: str | None = Field(None, max_length=120, description="Hördienst der Leitstelle; leer: der eingestellte")
+
+
+class Hoerdienst(BaseModel):
+    """Ein Hördienst zur Wahl beim Transkribieren (was die Leitstelle dieser App mit der Fähigkeit hoeren anbietet)."""
+
+    kennung: str
+    name: str
+    hinweis: str = ""
+    vorgabe: bool = False
 
 
 def _quelle_von(auftrag) -> str:
@@ -257,7 +267,7 @@ def router(teile: Teile) -> APIRouter:
     async def transkribieren(anfrage: TranskribierenAnfrage, konto: Konto = g.pflicht) -> Auftrag:
         if anfrage.anfrage_id is not None:
             raise HTTPException(422, "Dateien aus der Kellerwolke über /kellerwolke/transkribieren")
-        await teile.sprachen.pruefen(anfrage.sprache)
+        await teile.sprachen.pruefen(anfrage.sprache, anfrage.hoerdienst)
         kw = teile.zugang()
         quelle = await kw.knoten(anfrage.quelle_id)
         if orte.art_der_aufnahme(quelle) is None:
@@ -266,9 +276,23 @@ def router(teile: Teile) -> APIRouter:
         return await g.auftraege.einreihen("transkribieren", eingabe, titel=anfrage.name or orte.anzeigename(quelle.name))
 
     @r.get("/sprachen", response_model=list[SpracheEintrag])
-    async def sprachen() -> list[SpracheEintrag]:
-        """Zur Wahl beim Transkribieren: Erkennen und was der Hördienst laut Steckbrief kann, mit deutschem Namen."""
-        return await teile.sprachen.liste()
+    async def sprachen(dienst: str | None = None) -> list[SpracheEintrag]:
+        """Zur Wahl beim Transkribieren: Erkennen und was der Hördienst (ohne Angabe der eingestellte) laut Steckbrief
+        kann, mit deutschem Namen."""
+        return await teile.sprachen.liste(dienst)
+
+    @r.get("/hoerdienste", response_model=list[Hoerdienst])
+    async def hoerdienste() -> list[Hoerdienst]:
+        """Zur Wahl beim Transkribieren: die Hördienste, die die Leitstelle dieser App anbietet (eine Wahrheit mit der
+        Einstellung "Dienst zum Hören"); der eingestellte ist die Vorgabe. Die Leitstelle entscheidet nur, ob und wann
+        einer rechnet, nie welcher."""
+        vorgabe = teile.einstellungen.dienst_hoeren
+        angebot = await g.leitstelle_angebot("hoeren")()
+        aus = [Hoerdienst(kennung=o.wert, name=o.titel, hinweis=o.hinweis or "", vorgabe=o.wert == vorgabe)
+               for o in angebot.optionen]
+        if not any(d.vorgabe for d in aus):          # die Leitstelle antwortet nicht: wenigstens der eingestellte
+            aus.insert(0, Hoerdienst(kennung=vorgabe, name=vorgabe, hinweis=angebot.stand, vorgabe=True))
+        return aus
 
     @r.get("/transkribieren/{auftrag_id}/bisher", response_model=Bisher)
     async def bisher(auftrag_id: str) -> Bisher:
@@ -283,7 +307,7 @@ def router(teile: Teile) -> APIRouter:
     async def aus_kellerwolke(e: AusKellerwolke, request: Request, konto: Konto = g.mensch) -> list[str]:
         """In der App gewählte Dateien aus der ganzen Kellerwolke: je Datei eine Anfrage an diese App (Recht nur für
         diesen Auftrag), ausgeführt mit den gewählten Optionen; liefert die Aufträge."""
-        await teile.sprachen.pruefen(e.sprache)
+        await teile.sprachen.pruefen(e.sprache, e.hoerdienst)
         kw = teile.zugang()
         sitzung = request.headers.get(KOPF, "")
         auftraege: list[str] = []
@@ -291,7 +315,7 @@ def router(teile: Teile) -> APIRouter:
             for knoten_id in e.knoten_ids:
                 neu = await kw.waehlen(sitzung, knoten_id, "transkribieren")
                 eingabe = TranskribierenEingabe(quelle_id=knoten_id, anfrage_id=neu.anfrage.id, sprache=e.sprache,
-                                                sprecher=e.sprecher, anzahl=e.anzahl, von=von(konto))
+                                                sprecher=e.sprecher, anzahl=e.anzahl, hoerdienst=e.hoerdienst, von=von(konto))
                 auftrag_id = await g.abholer.uebernehmen(neu.anfrage, kw, auftrag="transkribieren",
                                                          eingabe=eingabe.model_dump(mode="json"),
                                                          titel=orte.anzeigename(neu.anfrage.knoten_name))

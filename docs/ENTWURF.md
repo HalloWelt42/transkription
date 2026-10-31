@@ -52,10 +52,18 @@ Auftrag fertig ist (beim Öffnen 12 Stunden). Das Transkript liegt auch dort neb
   ],
   "marker": [{"zeit": 301.2, "titel": "Kosten", "farbe": "gelb"}],
   "wellenform": [0, 12, 80, 95],
-  "erzeugt_mit": {"dienst": "klangwerk-hoeren", "modell": "...", "app": "0.2.0"},
-  "aenderung": {"was": "Text in 1 Segment", "wer": "chef", "zeit": "..."}
+  "erzeugt_mit": {"dienst": "klangwerk-hoeren", "modell": "...", "app": "0.2.0", "hoeren_s": 348.0},
+  "aenderung": {"was": "Text in 1 Segment", "wer": "chef", "zeit": "..."},
+  "fassungen": [{"id": "uuid", "erzeugt_mit": {"dienst": "klangwerk-hoeren-moss", "modell": "MOSS-Transcribe-Diarize 0.9B", "app": "0.20.0", "hoeren_s": 512.4},
+                 "erstellt_am": "...", "sprache": "de", "sprecher": [], "segmente": []}]
 }
 ```
+
+Fassungen (HELF-79): Die Felder des Transkripts sind die Hauptfassung. Hört ein anderer Hördienst dieselbe Aufnahme,
+kommt sein Ergebnis als Fassung unter `fassungen` dazu (je Hördienst eine; neu gehört ersetzt nur die eigene), die
+Hauptfassung bleibt. Vom Hördienst der Hauptfassung, oder mit der Wahl `hauptfassung` im Auftrag, wird das Ergebnis die
+Hauptfassung; eine bisherige eines anderen Hördienstes rückt dann unter die Fassungen. Jeder frühere Stand bleibt
+außerdem als Version der Kellerwolke. `hoeren_s` ist die Rechenzeit des Hördienstes für die ganze Aufnahme.
 
 **In der App** (SQLite, nur Verzeichnis und Index, jederzeit aus der Kellerwolke neu aufbaubar):
 Verzeichnis der Transkripte (Kennung, Name, Knoten der Datei und der Quelle, Sprache, Dauer, Sprecher, Stand),

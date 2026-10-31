@@ -59,10 +59,15 @@ def antworten(request: httpx.Request, *, gespraech: bool = False) -> httpx.Respo
         return httpx.Response(200, json={"data": [
             {"id": "klein", "x-leitstelle": {"name": "Kleines Sprachmodell (Schein)", "faehigkeiten": ["text"], "geladen": True}},
             {"id": "klangwerk-hoeren", "x-leitstelle": {"name": "Klangwerk Hören (Schein)", "faehigkeiten": ["hoeren"]}},
+            {"id": "klangwerk-hoeren-moss", "x-leitstelle": {"name": "MOSS-Transcribe-Diarize 0.9B (Schein)", "faehigkeiten": ["hoeren"]}},
             {"id": "klangwerk-sprecher", "x-leitstelle": {"name": "Klangwerk Sprechermerkmal (Schein)", "faehigkeiten": ["sprecher_erkennen"]}},
             {"id": "klangwerk-trennen", "x-leitstelle": {"name": "Klangwerk Sprechertrennung (Schein)", "faehigkeiten": ["sprecher_trennen"]}},
             {"id": "klangwerk-ton", "x-leitstelle": {"name": "Klangwerk Ton", "faehigkeiten": ["ton"]}},
         ]})
+    if pfad.endswith("-hoeren-moss/stt"):        # nennt die Sprecher selbst, ohne Wortzeiten
+        segmente = [{**x, "words": [], "speaker": f"S0{i % 2 + 1}"} for i, x in enumerate(_segmente(SAETZE))]
+        return httpx.Response(200, json={"language": "de", "model": "MOSS (Schein)", "segments": segmente,
+                                         "speakers": ["S01", "S02"]})
     if pfad.endswith("/stt"):
         if gespraech:
             saetze = [(GESPRAECH[i % len(GESPRAECH)], i * 9.0, i * 9.0 + 7.5) for i in range(6)]

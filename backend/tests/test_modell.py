@@ -106,3 +106,52 @@ def test_anfrage_einer_anderen_app_gibt_sprache_mit():
     assert eingabe_aus_anfrage(e.model_copy(update={"optionen": {"sprache": "ru"}})).sprache == "ru"
     with pytest.raises(ValidationError):
         eingabe_aus_anfrage(e.model_copy(update={"optionen": {"sprache": "russisch"}}))
+
+
+# --- Fassungen je Hördienst (HELF-79) ---------------------------------------------------------------------------
+
+def _gehoert(dienst: str, text: str, mit_sprecher: bool = False) -> Transkript:
+    from app.modell.transkript import ErzeugtMit
+    sprecher = [Sprecher(kennung="s1", name="Sprecher 1")] if mit_sprecher else []
+    return Transkript(name="Folge", sprecher=sprecher, segmente=[seg(0, 2, text, "s1" if mit_sprecher else None)],
+                      erzeugt_mit=ErzeugtMit(dienst=dienst, modell=dienst.upper(), app="t", hoeren_s=1.5))
+
+
+def test_anderer_hoerdienst_wird_fassung_und_die_alte_bleibt():
+    from app.modell.transkript import gehoert_einfuegen
+    alt = _gehoert("klangwerk-hoeren", "alt")
+    t, haupt = gehoert_einfuegen(alt, _gehoert("klangwerk-hoeren-moss", "moss", True))
+    assert not haupt and t.segmente[0].text == "alt" and [f.erzeugt_mit.dienst for f in t.fassungen] == ["klangwerk-hoeren-moss"]
+    assert t.fassungen[0].sprecher[0].kennung == "s1" and t.fassungen[0].erzeugt_mit.hoeren_s == 1.5
+    t, _ = gehoert_einfuegen(t, _gehoert("klangwerk-hoeren-moss", "moss neu"))       # derselbe Dienst ersetzt seine Fassung
+    t, _ = gehoert_einfuegen(t, _gehoert("klangwerk-hoeren-turbo", "turbo"))
+    assert [f.segmente[0].text for f in t.fassungen] == ["moss neu", "turbo"] and t.segmente[0].text == "alt"
+    t, haupt = gehoert_einfuegen(t, _gehoert("klangwerk-hoeren", "alt neu"))        # Dienst der Hauptfassung: neue Hauptfassung
+    assert haupt and t.segmente[0].text == "alt neu" and len(t.fassungen) == 2
+
+
+def test_mit_hauptfassung_rueckt_die_bisherige_unter_die_fassungen():
+    from app.modell.transkript import gehoert_einfuegen
+    t, haupt = gehoert_einfuegen(_gehoert("altbestand", "alt"), _gehoert("klangwerk-hoeren", "neu"), hauptfassung=True)
+    assert haupt and t.segmente[0].text == "neu" and [f.segmente[0].text for f in t.fassungen] == ["alt"]
+
+
+def test_zur_hauptfassung_tauscht_und_behaelt_marker():
+    from app.modell.transkript import Marker, gehoert_einfuegen, zur_hauptfassung
+    alt = _gehoert("klangwerk-hoeren", "alt").model_copy(update={"marker": [Marker(zeit=1, titel="Stelle")]})
+    t, _ = gehoert_einfuegen(alt, _gehoert("klangwerk-hoeren-moss", "moss", True))
+    neu = zur_hauptfassung(t, t.fassungen[0].id)
+    assert neu.segmente[0].text == "moss" and neu.erzeugt_mit.dienst == "klangwerk-hoeren-moss" and neu.sprecher[0].kennung == "s1"
+    assert [f.segmente[0].text for f in neu.fassungen] == ["alt"] and neu.marker[0].titel == "Stelle"
+    with pytest.raises(KeyError):
+        zur_hauptfassung(neu, t.fassungen[0].id)
+    with pytest.raises(ValidationError):                                             # je Hördienst höchstens eine Fassung
+        Transkript.model_validate({**neu.model_dump(), "fassungen": [neu.fassungen[0].model_dump()] * 2})
+
+
+def test_sprecher_des_hoerdienstes_als_wechsel():
+    from app.dienste import wechsel_aus
+    roh = [{"start": 0.5, "end": 2, "text": "Hallo", "speaker": "S01"}, {"start": 2.5, "end": 4, "text": "Ja", "speaker": "S02"}]
+    assert [(w.start, w.ende, w.sprecher) for w in wechsel_aus(roh, 600, "A2:")] == [(600.5, 602.0, "A2:S01"), (602.5, 604.0, "A2:S02")]
+    assert wechsel_aus([{**roh[0], "speaker": None}, roh[1]]) == []                  # nicht für jedes Segment: keine
+    assert wechsel_aus([{"start": 0, "end": 1, "text": "x", "words": []}]) == []

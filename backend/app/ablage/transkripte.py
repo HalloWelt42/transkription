@@ -18,7 +18,7 @@ from pydantic import ValidationError
 
 from appkern.kellerwolke import Kellerwolke, Knoten, Version
 
-from ..modell.transkript import Aenderung, Transkript, jetzt
+from ..modell.transkript import Aenderung, Transkript, gehoert_einfuegen, jetzt
 from . import orte
 
 
@@ -92,15 +92,22 @@ class Transkripte:
         return next((b for b in await self.kw.begleiter(quelle_id) if b.rolle == orte.ROLLE), None)
 
     async def speichern(self, t: Transkript, quelle: Knoten, aenderung: Aenderung,
-                        erneut: Aenderung | None = None) -> tuple[Transkript, Knoten]:
+                        erneut: Aenderung | None = None, hauptfassung: bool = False) -> tuple[Transkript, Knoten]:
         """Das Transkript einer Aufnahme: neu als Begleiter neben ihr (`aenderung`), oder eine neue Version des
-        vorhandenen (`erneut`, sonst `aenderung`; Name und Anlagezeit bleiben, die bisherigen Stände bleiben Versionen)."""
+        vorhandenen (`erneut`, sonst `aenderung`; Name und Anlagezeit bleiben, die bisherigen Stände bleiben Versionen).
+        Stammt es von einem anderen Hördienst als die Hauptfassung, wird es dessen Fassung neben ihr, außer mit
+        `hauptfassung` (siehe `gehoert_einfuegen`)."""
         kw = self.kw
         vorhanden = await self.zur_quelle(quelle.id)
         if vorhanden is not None:
             bisher = _transkript(await kw.lesen_ganz(vorhanden.id), vorhanden.name)
+            t, haupt = gehoert_einfuegen(bisher, t, hauptfassung)
             t = t.model_copy(update={"name": bisher.name, "erstellt_am": bisher.erstellt_am})
             aenderung = erneut or aenderung
+            if not haupt:
+                neu = t.fassungen[-1].erzeugt_mit
+                aenderung = Aenderung(was=f"Fassung von {neu.modell or neu.dienst} ergänzt", wer=aenderung.wer,
+                                      app=aenderung.app)
         t = t.model_copy(update={"geaendert_am": jetzt(), "aenderung": aenderung})
         knoten = await kw.begleiter_schreiben(quelle.id, orte.ROLLE, orte.ENDUNG, _inhalt(t),
                                               stand=vorhanden.etag if vorhanden else None, nur_neu=vorhanden is None,
