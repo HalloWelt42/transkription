@@ -105,22 +105,22 @@
         {
           "klick": "[aria-label='Nächste Abweichung']",
           "marke": ".abw-gewaehlt",
-          "warten_ms": 1500
+          "warten_ms": 50
         },
         {
           "klick": "[aria-label='Nächste Abweichung']",
           "marke": ".abw-gewaehlt",
-          "warten_ms": 1500
+          "warten_ms": 50
         },
         {
           "klick": "[aria-label='Nächste Abweichung']",
           "marke": ".abw-gewaehlt",
-          "warten_ms": 1500
+          "warten_ms": 50
         },
         {
           "klick": "[aria-label='Nächste Abweichung']",
           "marke": ".abw-gewaehlt",
-          "warten_ms": 1500
+          "warten_ms": 50
         },
         {
           "zeit": 300,

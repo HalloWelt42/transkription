@@ -7,7 +7,7 @@ frontend/ansicht.json prüft, dass die Marke danach ganz sichtbar ist.
 
 Angemeldet wird mit dem Testzugang aus backend/.env.test; die zweite Fassung schreibt das Werkzeug mit dem Zugang der
 Entwicklungsinstanz (TRANSKRIPTION_DATEN, sonst daten-entwicklung/) direkt in die Kellerwolke. Gibt es das Prüfstück
-schon, bleibt es, wie es ist.
+schon, bekommt es nur die zweite Fassung neu.
 """
 
 from __future__ import annotations
@@ -71,13 +71,18 @@ def beitraege() -> list[dict]:
 
 
 def zweite_fassung(segmente: list[dict]) -> list[dict]:
-    """Dieselben Beiträge mit jedem siebten Wort anders (mal andere Schreibweise, mal ein anderes Wort)."""
-    neu = json.loads(json.dumps(segmente))
-    for s in neu:
-        for k, w in enumerate(s["woerter"]):
-            if k % 7 == 3:
-                w["wort"] = w["wort"].upper() if k % 2 else "anders"
-        s["text"] = " ".join(w["wort"] for w in s["woerter"])
+    """Dieselben Wörter, je zwei Beiträge zu einem zusammengefasst (wie ein Hördienst mit langen Abschnitten; am Telefon
+    stehen die beiden Fassungen einer Zeile dann weit auseinander), jedes siebte Wort anders (mal andere Schreibweise,
+    mal ein anderes Wort) und hin und wieder ein Wort mehr (eine Abweichung, die es nur auf dieser Seite gibt)."""
+    neu = []
+    for paar in (segmente[i:i + 2] for i in range(0, len(segmente), 2)):
+        woerter = []
+        for k, w in enumerate(w for s in paar for w in s["woerter"]):
+            woerter.append({**w, "wort": (w["wort"].upper() if k % 2 else "anders") if k % 7 == 3 else w["wort"]})
+            if k % 23 == 11:
+                woerter.append({**w, "wort": "zusätzlich"})
+        neu.append({"start": paar[0]["start"], "ende": paar[-1]["ende"], "text": " ".join(w["wort"] for w in woerter),
+                    "woerter": woerter})
     return neu
 
 
@@ -89,15 +94,15 @@ async def main(basis: str) -> None:
         h = {"X-Kellerwolke-Sitzung": r.json()["token"]}
         vorhanden = (await c.get("/api/v1/transkripte", params={"suche": NAME, "anzahl": 1}, headers=h)).json()["eintraege"]
         if vorhanden and vorhanden[0]["name"] == NAME:
-            print(f"{NAME} gibt es schon: {vorhanden[0]['id']}")
-            return
-        r = await c.post("/api/v1/aufnahmen", params={"name": f"{NAME}.wav"}, content=ton(),
-                         headers={**h, "content-type": "audio/wav"})
-        r.raise_for_status()
-        r = await c.post("/api/v1/transkripte", headers=h,
-                         json={"quelle_id": r.json()["id"], "name": NAME, "stuecke": beitraege()})
-        r.raise_for_status()
-        tid = r.json()["id"]
+            tid = vorhanden[0]["id"]
+        else:
+            r = await c.post("/api/v1/aufnahmen", params={"name": f"{NAME}.wav"}, content=ton(),
+                             headers={**h, "content-type": "audio/wav"})
+            r.raise_for_status()
+            r = await c.post("/api/v1/transkripte", headers=h,
+                             json={"quelle_id": r.json()["id"], "name": NAME, "stuecke": beitraege()})
+            r.raise_for_status()
+            tid = r.json()["id"]
     kw = instanz_zugang()
     knoten = await kw.knoten(tid)
     daten = json.loads(await kw.lesen_ganz(tid))
@@ -105,7 +110,7 @@ async def main(basis: str) -> None:
                            "sprache": "de", "segmente": zweite_fassung(daten["segmente"])}]
     await kw.neue_version(tid, json.dumps(daten, ensure_ascii=False).encode("utf-8"), stand=knoten.etag,
                           inhaltstyp="application/json")
-    print(f"{NAME} angelegt: {tid}")
+    print(f"{NAME} bereit: {tid}")
 
 
 if __name__ == "__main__":

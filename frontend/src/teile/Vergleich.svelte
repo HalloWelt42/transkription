@@ -61,17 +61,22 @@
   const aktivLinks = $derived(mitlesen.links ? aktiverBeitrag(a.segmente, zeit) : -1);
   const aktivRechts = $derived(mitlesen.rechts ? aktiverBeitrag(b.segmente, zeit) : -1);
 
-  // Mitrollen: zum gesprochenen Wort (links zuerst, sonst rechts), ohne Wortzeiten zur Zeile des laufenden Beitrags
+  // Mitrollen: zum gesprochenen Wort der Seite, mit der man zuletzt gearbeitet hat (ein Wort angetippt, eine Abweichung
+  // angesprungen; anfangs links), läuft dort nichts, der anderen; ohne Wortzeiten zur Zeile des laufenden Beitrags.
+  // Am Telefon stehen beide Fassungen einer Zeile untereinander, oft weit auseinander: folgte das Mitlesen der anderen
+  // Seite, holte es die Ansicht gleich wieder von der angesprungenen Stelle weg.
+  let seiteFolgen = $state<"links" | "rechts">("links");
   $effect(() => {
     void zeit;
-    const seite = aktivLinks >= 0 ? "links" : "rechts";
-    const zeile = aktivLinks >= 0 ? plan.zeileVon.links[aktivLinks] : aktivRechts >= 0 ? plan.zeileVon.rechts[aktivRechts] : -1;
-    if (zeile < 0) return;
-    const z = rollfeld?.querySelector(`[data-z="${zeile}"]`);
+    const aktivJe = { links: aktivLinks, rechts: aktivRechts };
+    const seite = aktivJe[seiteFolgen] >= 0 ? seiteFolgen : seiteFolgen === "links" ? "rechts" : "links";
+    if (aktivJe[seite] < 0) return;
+    const z = rollfeld?.querySelector(`[data-z="${plan.zeileVon[seite][aktivJe[seite]]}"]`);
     mitrollen.folge(z?.querySelector(`.v-zelle.${seite} .wort.jetzt`) ?? z);
   });
 
-  function springen(t: number) {
+  function springen(t: number, seite?: "links" | "rechts") {
+    if (seite) seiteFolgen = seite;
     mitrollen.folgen();
     onspringen(t);
   }
@@ -146,7 +151,13 @@
       : st.map((s) => s.zeit < zeit + VORLAUF_S - 0.05).lastIndexOf(true);
     if (nr < 0) nr = schritt > 0 ? 0 : st.length - 1;
     springen(Math.max(0, st[nr].zeit - VORLAUF_S));
-    void tick().then(() => zuStelle(rollfeld?.querySelector(".abw-gewaehlt")));
+    // zur Abweichung auf der Seite, der das Mitlesen folgt; gibt es sie nur auf der anderen, folgt es ab jetzt dieser
+    void tick().then(() => {
+      const abw = rollfeld?.querySelector(`.v-zelle.${seiteFolgen} .abw-gewaehlt`) ?? rollfeld?.querySelector(".abw-gewaehlt");
+      if (abw?.closest(".v-zelle.links, .v-zelle.rechts")?.classList.contains("rechts")) seiteFolgen = "rechts";
+      else if (abw) seiteFolgen = "links";
+      zuStelle(abw);
+    });
   }
 </script>
 
@@ -166,7 +177,7 @@
   <div class="v-zelle {seite}" class:leer={!indizes.length}>
     {#if mobil && indizes.length}<div class="v-name"><span class="v-marke" aria-hidden="true"></span>{f.name}</div>{/if}
     {#each indizes as i (i)}
-      <Beitrag seg={f.segmente[i]} sprecher={f.sprecher} jetzt={i === aktiv ? zeit : null} mobil onspringen={springen}
+      <Beitrag seg={f.segmente[i]} sprecher={f.sprecher} jetzt={i === aktiv ? zeit : null} mobil onspringen={(t) => springen(t, seite)}
                wortklassen={klassen(seite, i)} />
     {/each}
   </div>
