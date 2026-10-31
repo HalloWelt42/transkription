@@ -72,7 +72,9 @@
 
   // ── Abweichungen ────────────────────────────────────────────────────────────────────────────────────────────
   let markieren = $state(true);
-  let stelleNr = $state(-1);
+  // Die gezeigte Stelle folgt der Spielerzeit (ohne eigenen Zustand): die letzte, die bis kurz nach jetzt beginnt.
+  // Springen setzt den Spieler kurz vor eine Stelle; vor und zurück zählen von dort.
+  const VORLAUF_S = 0.3;
 
   interface Stelle { zeile: number; zeit: number; }
   interface Markierung { links: Map<number, Abw[]>; rechts: Map<number, Abw[]>; stellen: Stelle[]; schwach: number;
@@ -106,7 +108,7 @@
         const nr = m.stellen.length;
         const zeit = st.links >= 0 ? wortZeit(a.segmente[l[st.links].i], l[st.links].k) : wortZeit(b.segmente[r[st.rechts].i], r[st.rechts].k);
         m.stellen.push({ zeile: n, zeit });
-        // jedes starke Wort kennt seine Stelle (für die Hervorhebung der gewählten)
+        // jedes starke Wort kennt seine Stelle (für die Hervorhebung der gezeigten)
         const merken = (karte: Map<number, number[]>, liste: typeof l, arten: Abw[], ab: number) => {
           for (let j = ab; j >= 0 && j < liste.length && arten[j] === "stark"; j++) {
             if (!karte.has(liste[j].i)) karte.set(liste[j].i, []);
@@ -117,33 +119,27 @@
         if (st.rechts >= 0) merken(m.stelleVon.rechts, r, erg.rechts, st.rechts);
       }
     });
-    return m;
+    return m;                                      // Stellen in Zeilenfolge, also nach der Zeit
   }
 
   const markierung = $derived(markieren ? markierungBilden() : null);
-  $effect(() => {
-    void links;
-    void rechts;
-    stelleNr = -1;                                 // andere Fassungen: von vorn
-  });
+  const stelleNr = $derived(markierung ? markierung.stellen.map((s) => s.zeit <= zeit + VORLAUF_S + 0.05).lastIndexOf(true) : -1);
 
   function klassen(seite: "links" | "rechts", i: number): string[] | null {
     if (!markierung) return null;
     const arten = markierung[seite].get(i);
     if (!arten) return null;
     const nr = markierung.stelleVon[seite].get(i);
-    return arten.map((x, k) => x === "gleich" ? "" : `abw-${x}${nr?.[k] === stelleNr && stelleNr >= 0 ? " abw-gewaehlt" : ""}`);
+    return arten.map((x, k) => x === "gleich" ? "" : `abw-${x}${stelleNr >= 0 && nr?.[k] === stelleNr ? " abw-gewaehlt" : ""}`);
   }
 
   function stelleZeigen(schritt: 1 | -1) {
     const st = markierung?.stellen ?? [];
     if (!st.length) return;
-    // von der gewählten Stelle aus, sonst von der Spielerzeit aus
-    let nr = stelleNr >= 0 ? stelleNr + schritt
-      : schritt > 0 ? st.findIndex((s) => s.zeit > zeit + 0.05) : st.map((s) => s.zeit < zeit - 0.05).lastIndexOf(true);
+    let nr = schritt > 0 ? st.findIndex((s) => s.zeit > zeit + VORLAUF_S + 0.05)
+      : st.map((s) => s.zeit < zeit + VORLAUF_S - 0.05).lastIndexOf(true);
     if (nr < 0) nr = schritt > 0 ? 0 : st.length - 1;
-    stelleNr = (nr + st.length) % st.length;
-    springen(Math.max(0, st[stelleNr].zeit - 0.3));
+    springen(Math.max(0, st[nr].zeit - VORLAUF_S));
   }
 </script>
 
