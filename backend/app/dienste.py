@@ -50,14 +50,12 @@ def _typ(datei: Path) -> str:
 
 
 def wechsel_aus(roh: list[dict], versatz: float = 0.0, vorsilbe: str = "") -> list[Wechsel]:
-    """Sprecher, die der Hördienst je Segment nennt (`speaker`), als Wechsel wie aus der Sprechertrennung. Nur wenn er
-    sie für jedes Segment mit Text nennt; `vorsilbe` hält Kennungen verschiedener Aufrufe auseinander (jeder Aufruf
-    zählt von S01)."""
-    mit_text = [s for s in roh if (s.get("text") or "").strip()]
-    if not mit_text or any(not s.get("speaker") for s in mit_text):
-        return []
+    """Sprecher, die der Hördienst je Segment nennt (`speaker`), als Wechsel wie aus der Sprechertrennung; `vorsilbe` hält
+    Kennungen verschiedener Aufrufe auseinander (jeder Aufruf zählt von S01). Ein Segment ohne Sprecher (etwa ein
+    Formatfehler des Modells in einem kurzen Stück) ist eine Lücke wie bei der Trennung, kein Grund, alle zu verwerfen
+    (HELF-90: ein Stück von 0,4 s ohne Marken kostete sonst die Sprecher der ganzen Aufnahme)."""
     return [Wechsel(round(float(s["start"]) + versatz, 3), round(float(s["end"]) + versatz, 3), f"{vorsilbe}{s['speaker']}")
-            for s in mit_text]
+            for s in roh if (s.get("text") or "").strip() and s.get("speaker")]
 
 
 def segmente_aus(roh: list[dict], versatz: float = 0.0) -> list[Segment]:

@@ -177,7 +177,8 @@ def test_sprecher_des_hoerdienstes_als_wechsel():
     from app.dienste import wechsel_aus
     roh = [{"start": 0.5, "end": 2, "text": "Hallo", "speaker": "S01"}, {"start": 2.5, "end": 4, "text": "Ja", "speaker": "S02"}]
     assert [(w.start, w.ende, w.sprecher) for w in wechsel_aus(roh, 600, "A2:")] == [(600.5, 602.0, "A2:S01"), (602.5, 604.0, "A2:S02")]
-    assert wechsel_aus([{**roh[0], "speaker": None}, roh[1]]) == []                  # nicht für jedes Segment: keine
+    # ein Segment ohne Sprecher ist eine Lücke, die übrigen gelten (HELF-90)
+    assert [w.sprecher for w in wechsel_aus([{**roh[0], "speaker": None}, roh[1]])] == ["S02"]
     assert wechsel_aus([{"start": 0, "end": 1, "text": "x", "words": []}]) == []
 
 

@@ -212,6 +212,8 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 # bleibt; seine Sprecher gelten wie eine Trennung, gleiche Stimmen über Abschnitte hinweg werden einer
                 dienste = (await c.get("/api/v1/hoerdienste", headers=h)).json()
                 assert {d["kennung"]: d["vorgabe"] for d in dienste} == {"klangwerk-hoeren": True, "klangwerk-hoeren-moss": False}
+                # HELF-84: echter Modellname, Aufgabe klein dahinter; gewählt und gespeichert wird die Kennung
+                assert {d["kennung"]: (d["name"], d["aufgabe"]) for d in dienste}["klangwerk-hoeren"] == ("Whisper Large V3 (Schein)", "Spracherkennung")
                 vorher = (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()["transkript"]
                 a = (await c.post("/api/v1/transkribieren", headers=h, json={
                     "quelle_id": aufnahme["id"], "hoerdienst": "klangwerk-hoeren-moss", "sprecher": "trennung",

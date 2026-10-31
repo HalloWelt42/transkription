@@ -630,7 +630,7 @@
           <button class:aktiv={neuWeg === "einer"} onclick={() => (neuWeg = "einer")}>Ein Hördienst</button>
         </span>
         {#if neuWeg === "einer"}
-          <label>Hördienst <Auswahl bind:wert={neuDienst} optionen={neuListe.map((d) => ({ wert: d.kennung, titel: d.name }))} /></label>
+          <label>Hördienst <Auswahl bind:wert={neuDienst} optionen={neuListe.map((d) => ({ wert: d.kennung, titel: d.name, aufgabe: d.aufgabe }))} /></label>
         {/if}
         <label>Sprache <Auswahl bind:wert={neuSprache} optionen={sprachOptionen()} /></label>
         <label>Sprecher <Auswahl bind:wert={neuSprecher} optionen={SPRECHER_WEGE} /></label>

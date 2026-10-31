@@ -98,7 +98,8 @@ class Hoerdienst(BaseModel):
     (Fähigkeit sprecher_trennen), so wie die Leitstelle ihn dieser App anbietet."""
 
     kennung: str
-    name: str
+    name: str                       # der echte Modellname (Whisper Large V3)
+    aufgabe: str = ""               # klein dahinter (Spracherkennung), wie die Leitstelle sie nennt
     hinweis: str = ""
     vorgabe: bool = False
 
@@ -302,7 +303,7 @@ def router(teile: Teile) -> APIRouter:
         einer rechnet, nie welcher."""
         vorgabe = teile.einstellungen.dienst_hoeren
         angebot = await g.leitstelle_angebot("hoeren")()
-        aus = [Hoerdienst(kennung=o.wert, name=o.titel, hinweis=o.hinweis or "", vorgabe=o.wert == vorgabe)
+        aus = [Hoerdienst(kennung=o.wert, name=o.titel, aufgabe=o.aufgabe, hinweis=o.hinweis or "", vorgabe=o.wert == vorgabe)
                for o in angebot.optionen]
         if not any(d.vorgabe for d in aus):          # die Leitstelle antwortet nicht: wenigstens der eingestellte
             aus.insert(0, Hoerdienst(kennung=vorgabe, name=vorgabe, hinweis=angebot.stand, vorgabe=True))
@@ -314,7 +315,7 @@ def router(teile: Teile) -> APIRouter:
         sprecher_trennen anbietet (etwa pyannote und MOSS); der eingestellte ist die Vorgabe."""
         vorgabe = teile.einstellungen.dienst_trennen
         angebot = await g.leitstelle_angebot("sprecher_trennen")()
-        aus = [Hoerdienst(kennung=o.wert, name=o.titel, hinweis=o.hinweis or "", vorgabe=o.wert == vorgabe)
+        aus = [Hoerdienst(kennung=o.wert, name=o.titel, aufgabe=o.aufgabe, hinweis=o.hinweis or "", vorgabe=o.wert == vorgabe)
                for o in angebot.optionen]
         if not any(d.vorgabe for d in aus):
             aus.insert(0, Hoerdienst(kennung=vorgabe, name=vorgabe, hinweis=angebot.stand, vorgabe=True))

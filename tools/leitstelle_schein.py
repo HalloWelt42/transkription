@@ -58,11 +58,11 @@ def antworten(request: httpx.Request, *, gespraech: bool = False) -> httpx.Respo
     if pfad == "/v1/models":
         return httpx.Response(200, json={"data": [
             {"id": "klein", "x-leitstelle": {"name": "Kleines Sprachmodell (Schein)", "faehigkeiten": ["text"], "geladen": True}},
-            {"id": "klangwerk-hoeren", "x-leitstelle": {"name": "Klangwerk Hören (Schein)", "faehigkeiten": ["hoeren"]}},
-            {"id": "klangwerk-hoeren-moss", "x-leitstelle": {"name": "MOSS-Transcribe-Diarize 0.9B (Schein)", "faehigkeiten": ["hoeren", "sprecher_trennen"]}},
-            {"id": "klangwerk-sprecher", "x-leitstelle": {"name": "Klangwerk Sprechermerkmal (Schein)", "faehigkeiten": ["sprecher_erkennen"]}},
-            {"id": "klangwerk-trennen", "x-leitstelle": {"name": "Klangwerk Sprechertrennung (Schein)", "faehigkeiten": ["sprecher_trennen"]}},
-            {"id": "klangwerk-ton", "x-leitstelle": {"name": "Klangwerk Ton", "faehigkeiten": ["ton"]}},
+            {"id": "klangwerk-hoeren", "x-leitstelle": {"name": "Whisper Large V3 (Schein)", "aufgabe": "Spracherkennung", "faehigkeiten": ["hoeren"]}},
+            {"id": "klangwerk-hoeren-moss", "x-leitstelle": {"name": "MOSS-Transcribe-Diarize 0.9B (Schein)", "aufgabe": "Spracherkennung", "faehigkeiten": ["hoeren", "sprecher_trennen"]}},
+            {"id": "klangwerk-sprecher", "x-leitstelle": {"name": "ECAPA-TDNN (Schein)", "aufgabe": "Spracherkennung", "faehigkeiten": ["sprecher_erkennen"]}},
+            {"id": "klangwerk-trennen", "x-leitstelle": {"name": "pyannote speaker-diarization 3.1 (Schein)", "aufgabe": "Spracherkennung", "faehigkeiten": ["sprecher_trennen"]}},
+            {"id": "klangwerk-ton", "x-leitstelle": {"name": "Tonbearbeitung", "faehigkeiten": ["ton"]}},
         ]})
     if pfad.endswith("-hoeren-moss/stt"):        # nennt die Sprecher selbst, ohne Wortzeiten
         segmente = [{**x, "words": [], "speaker": f"S0{i % 2 + 1}"} for i, x in enumerate(_segmente(SAETZE))]

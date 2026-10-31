@@ -15,7 +15,7 @@ export function hoerdiensteLaden(): Promise<void> {
 
 export function hoerdienstOptionen(): { wert: string; titel: string }[] {
   void hoerdiensteLaden();
-  return hoerdienste.liste.map((d) => ({ wert: d.kennung, titel: d.name }));
+  return hoerdienste.liste.map((d) => ({ wert: d.kennung, titel: d.name, aufgabe: d.aufgabe }));
 }
 
 export function vorgabeHoerdienst(): string | null {
@@ -34,7 +34,7 @@ export function trenndiensteLaden(): Promise<void> {
 
 export function trenndienstOptionen(): { wert: string; titel: string }[] {
   void trenndiensteLaden();
-  return trenndienste.liste.map((d) => ({ wert: d.kennung, titel: d.name }));
+  return trenndienste.liste.map((d) => ({ wert: d.kennung, titel: d.name, aufgabe: d.aufgabe }));
 }
 
 export function vorgabeTrenndienst(): string | null {

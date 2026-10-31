@@ -82,6 +82,7 @@ export interface Hoerfassung {
 export interface Hoerdienst {
   kennung: string;
   name: string;
+  aufgabe?: string;
   hinweis: string;
   vorgabe: boolean;
 }

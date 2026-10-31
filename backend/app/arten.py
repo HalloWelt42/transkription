@@ -414,10 +414,8 @@ def arten(teile: Teile) -> list[Art]:
             erkannt = next((t["sprache"] for t in fertig.values() if t.get("sprache")), None)
             modell = next((t["modell"] for t in fertig.values() if t.get("modell")), None)
             hoeren_s = round(sum(t.get("hoeren_s") or 0.0 for t in fertig.values()), 1)
-            # Sprecher des Hördienstes zählen nur, wenn er sie in jedem Abschnitt mit Text nennt
-            mit_text = [t for t in fertig.values() if t["segmente"]]
-            vom_hoerdienst = ([Wechsel(*w) for t in mit_text for w in t.get("wechsel") or []]
-                              if mit_text and all(t.get("wechsel") for t in mit_text) else None)
+            # Sprecher, die der Hördienst selbst nennt (Lücken füllt die Zuordnung wie bei der Trennung)
+            vom_hoerdienst = [Wechsel(*w) for t in fertig.values() for w in t.get("wechsel") or []] or None
 
             sprecher, sprecher_aus = [], SPRECHER_OHNE
             if mit_sprechern and segmente:
