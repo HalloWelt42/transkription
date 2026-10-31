@@ -3,8 +3,9 @@
 Der Auftrag hört in Abschnitten (an Sprechpausen geplant) und legt jeden fertigen Abschnitt in seinen Zwischenstand
 (`hoeren`), samt der Rechenzeit, die er gebraucht hat (`gerechnet_s`), und dem Beginn des laufenden (`abschnitt_beginn`).
 Daraus kommt hier der Text bis jetzt und die Schätzung: Rechenzeit je Sekunde Ton aus den fertigen Abschnitten dieses
-Auftrags, vor dem ersten aus den zuletzt fertigen Aufträgen; mal den Ton, der noch fehlt, abzüglich der Zeit, die der
-laufende Abschnitt schon rechnet. Der Zwischenstand ist die einzige Wahrheit, gelesen wird er aus der Tabelle der
+Auftrags, vor dem ersten aus den zuletzt fertigen Aufträgen desselben Hördienstes (jedes Modell hat sein eigenes Tempo);
+mal den Ton, der noch fehlt, abzüglich der Zeit, die der laufende Abschnitt schon rechnet. Derselbe Takt gibt dem
+Auftrag selbst seinen Fortschritt während eines Abschnitts (siehe `arten`), so steht das Hören nie bei 0 Prozent. Der Zwischenstand ist die einzige Wahrheit, gelesen wird er aus der Tabelle der
 Aufträge des Appkerns (der Auftrag selbst gibt ihn nicht heraus).
 """
 
@@ -12,6 +13,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from collections.abc import Callable
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -99,28 +101,42 @@ def bisher_aus(zeile: dict[str, Any], jetzt: datetime, frueher: tuple[float, flo
                   dauer_s=stand.get("dauer"), gehoert_bis_s=gehoert_bis, rest_s=rest, geschaetzt_aus=herkunft)
 
 
+def hoerdienst_von(eingabe: dict[str, Any], vorgabe: str) -> str:
+    """Der Hördienst eines Auftrags; ohne Angabe (auch alle vor der Wahl je Auftrag) der eingestellte."""
+    return eingabe.get("hoerdienst") or (eingabe.get("optionen") or {}).get("hoerdienst") or vorgabe
+
+
 class Mitlesen:
-    def __init__(self, db: Datenbank) -> None:
+    def __init__(self, db: Datenbank, vorgabe: Callable[[], str]) -> None:
+        """`vorgabe`: der eingestellte Hördienst (für Aufträge ohne eigene Wahl)."""
         self.db = db
+        self.vorgabe = vorgabe
 
     async def bisher(self, auftrag_id: str) -> Bisher | None:
         """Stand eines Auftrags zum Transkribieren; None, wenn es keinen solchen gibt."""
         platz = ",".join("?" * len(ARTEN))
-        zeile = await self.db.zeile(f"SELECT zustand, phase, schritt, zwischenstand FROM auftrag WHERE id=? AND art IN ({platz})",
+        zeile = await self.db.zeile(f"SELECT zustand, phase, schritt, zwischenstand, eingabe FROM auftrag WHERE id=? AND art IN ({platz})",
                                     (auftrag_id, *ARTEN))
         if zeile is None:
             return None
         eigen = takt(json.loads(zeile["zwischenstand"] or "{}"))[1] > 0
-        return bisher_aus(zeile, datetime.now(UTC), (0.0, 0.0) if eigen else await self._frueher())
+        frueher = (0.0, 0.0) if eigen else await self.frueher(hoerdienst_von(json.loads(zeile["eingabe"] or "{}"), self.vorgabe()))
+        return bisher_aus(zeile, datetime.now(UTC), frueher)
 
-    async def _frueher(self) -> tuple[float, float]:
-        """Takt der zuletzt fertigen Aufträge (die vor dieser Fassung messen ihn nicht und zählen nicht)."""
+    async def frueher(self, hoerdienst: str) -> tuple[float, float]:
+        """Takt der zuletzt fertigen Aufträge dieses Hördienstes (die vor der Messung zählen nicht)."""
         platz = ",".join("?" * len(ARTEN))
         zeilen = await self.db.zeilen(
-            f"SELECT zwischenstand FROM auftrag WHERE zustand='fertig' AND art IN ({platz}) "
-            "ORDER BY erstellt_am DESC LIMIT ?", (*ARTEN, FRUEHERE))
+            f"SELECT zwischenstand, eingabe FROM auftrag WHERE zustand='fertig' AND art IN ({platz}) "
+            "ORDER BY erstellt_am DESC LIMIT ?", (*ARTEN, FRUEHERE * 5))
         rechnen = ton = 0.0
+        gezaehlt = 0
         for z in zeilen:
+            if hoerdienst_von(json.loads(z["eingabe"] or "{}"), self.vorgabe()) != hoerdienst:
+                continue
             r, t = takt(json.loads(z["zwischenstand"] or "{}"))
-            rechnen, ton = rechnen + r, ton + t
+            if t:
+                rechnen, ton, gezaehlt = rechnen + r, ton + t, gezaehlt + 1
+            if gezaehlt >= FRUEHERE:
+                break
         return rechnen, ton

@@ -34,8 +34,9 @@ export const ordnerListe = () => hole<Ordner[]>("/aufnahmen/ordner");
 export const aufnahmen = (o: { ordner?: string | null; filter?: string; suche?: string; ab?: number; anzahl?: number }) =>
   hole<AufnahmenSeite>(`/aufnahmen${abfrage(o)}`);
 
+// `reihe`: mehrere Hördienste nacheinander (je einer ein Auftrag im selben Stapel; der Auftrag hört mit dem ersten)
 export const transkribieren = (e: { quelle_id: string; name?: string; sprache?: string; sprecher?: SprecherWeg; anzahl?: number | null;
-                                    hoerdienst?: string | null }) =>
+                                    hoerdienst?: string | null; reihe?: string[] }) =>
   hole<Auftrag>("/transkribieren", { method: "POST", ...json(e) });
 
 // Sprachen zur Wahl: was der Hördienst (ohne Angabe der eingestellte) laut Steckbrief kann (mit "auto" zum Erkennen)

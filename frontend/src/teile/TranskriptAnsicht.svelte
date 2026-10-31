@@ -6,19 +6,21 @@
   // mit dem gelesenen Stand; sonst neu laden). Entwurf: mockups/transkription.html (3, 3b, 3c, 4), transkription-mobil.html (3).
   // Fassungen (HELF-79): oben ein Reiter je Hördienst (die Hauptfassung zuerst, weitere nur zum Lesen und Mitlesen, eine
   // davon lässt sich zur Hauptfassung machen), dazu der Vergleich zweier Fassungen und "Neu hören" mit einem anderen
-  // Hördienst. Bearbeiten, Suche und Export gelten der Hauptfassung.
+  // Hördienst. Bearbeiten, Suche und Export gelten der Hauptfassung. Neu hören hört ab Werk mit allen Hördiensten, die die
+  // Leitstelle gerade anbietet (Liste bei jedem Öffnen frisch), nacheinander als Reihe; gibt es schon Fassungen, wählt man
+  // nur die fehlenden oder alle neu; ein einzelner Hördienst bleibt wählbar. Sind alle da, öffnet sich der Vergleich.
   import { onMount, tick } from "svelte";
   import { AnfrageBand, arbeit, Auswahl, beiAuftrag, farbe, gehe, geraet, Leiste, leisteOeffnen, marke, navigation, Spieler,
            zurueckZurKellerwolke } from "appkern-oberflaeche";
   import * as api from "../lib/api";
-  import { alleFassungen, HAUPT, hoerdiensteLaden, hoerdienstOptionen, tempo, vorgabeHoerdienst } from "../lib/hoerdienste.svelte";
+  import { alleFassungen, HAUPT, hoerdiensteLaden, tempo } from "../lib/hoerdienste.svelte";
   import { aktiverBeitrag, Mitrollen } from "../lib/mitlesen.svelte";
   import { sprachOptionen } from "../lib/sprachen.svelte";
   import { SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import Vergleich from "./Vergleich.svelte";
   import { neueKennung } from "../lib/kennung";
   import { abweichung, korrigierteWoerter } from "../lib/wortvergleich";
-  import type { Marker, Segment, Transkript, TranskriptAntwort, Vorschlag } from "../lib/typen";
+  import type { Hoerdienst, Marker, Segment, Transkript, TranskriptAntwort, Vorschlag } from "../lib/typen";
   import Beitrag from "./Beitrag.svelte";
   import Bearbeitungsleiste from "./Bearbeitungsleiste.svelte";
   import TranskriptLeiste from "./TranskriptLeiste.svelte";
@@ -47,10 +49,13 @@
   let vergleichLinks = $state<string>(HAUPT);
   let vergleichRechts = $state<string>("");
   let neuOffen = $state(false);
+  let neuWeg = $state<"alle" | "einer">("alle");
+  let neuListe = $state<Hoerdienst[]>([]);
   let neuDienst = $state<string>("");
   let neuSprache = $state<string>("de");
   let neuSprecher = $state<SprecherWeg>("ohne");
-  let neuAuftrag = $state<string | null>(null);
+  let neuReihe = $state<string[]>([]);           // die Hördienste der laufenden Reihe, in Reihenfolge
+  let neuStapel = $state<string | null>(null);   // ihr Stapel (alle Aufträge der Reihe)
   let neuStand = $state("");
   let suche = $state("");
   let trefferNr = $state(-1);       // der zuletzt angesprungene Treffer (Stelle in `passend`)
@@ -163,13 +168,21 @@
   onMount(() => {
     void hoerdiensteLaden();
     const abmelden = beiAuftrag((a) => {
-      if (a.id !== neuAuftrag) return;
-      neuStand = a.zustand === "fertig" ? "Fertig gehört." : a.zustand === "fehler" ? (a.fehler ?? "Hören gescheitert")
-        : a.schritt || "Wartet";
-      if (a.zustand === "fertig") {
-        neuAuftrag = null;
-        void laden();
-      } else if (!["wartet", "laeuft"].includes(a.zustand)) neuAuftrag = null;
+      if (a.art !== "transkribieren" || !neuStapel || a.stapel !== neuStapel) return;
+      const dienst = String(a.eingabe.hoerdienst ?? "");
+      const nr = neuReihe.indexOf(dienst) + 1;
+      const name = neuListe.find((d) => d.kennung === dienst)?.name ?? dienst;
+      const was = a.zustand === "fehler" ? `gescheitert: ${a.fehler ?? ""}` : a.zustand === "fertig" ? "fertig" : a.schritt || "wartet";
+      neuStand = `${nr} von ${neuReihe.length} Modellen: ${name}, ${was}`;
+      if (a.zustand === "fertig" || a.zustand === "fehler") {
+        const letzter = nr === neuReihe.length;
+        void laden().then(() => {
+          if (!letzter) return;
+          neuStapel = null;
+          neuOffen = false;
+          if (fassungen.length > 1) waehlen(VERGLEICH);            // alle da: zum Vergleich
+        });
+      } else if (a.zustand === "abgebrochen") neuStapel = null;
     });
     void laden().then(async () => {
       if (beginn != null) {
@@ -204,24 +217,32 @@
     }
   }
 
-  function neuOeffnen() {
+  // Hördienste, von denen es schon eine Fassung gibt, und die noch fehlen (aus der frisch geholten Liste)
+  const vorhandeneDienste = $derived(new Set(fassungen.map((f) => f.erzeugt_mit?.dienst).filter(Boolean)));
+  const fehlende = $derived(neuListe.filter((d) => !vorhandeneDienste.has(d.kennung)).map((d) => d.kennung));
+
+  async function neuOeffnen() {
     neuOffen = !neuOffen;
     if (!neuOffen || !t) return;
-    const vorhanden = new Set(fassungen.map((f) => f.erzeugt_mit?.dienst));
-    // Vorschlag: der erste Hördienst, von dem es noch keine Fassung gibt
-    neuDienst = hoerdienstOptionen().find((o) => !vorhanden.has(o.wert))?.wert ?? vorgabeHoerdienst() ?? "";
     neuSprache = t.sprache || "de";
-    neuStand = "";
+    if (!neuStapel) neuStand = "";
+    try {
+      neuListe = await api.hoerdienste();          // jedes Mal frisch: was die Leitstelle gerade anbietet
+    } catch (f) {
+      neuStand = (f as Error).message;
+    }
+    neuDienst = fehlende[0] ?? neuListe.find((d) => d.vorgabe)?.kennung ?? neuListe[0]?.kennung ?? "";
   }
 
-  async function neuHoeren() {
+  async function neuHoeren(reihe: string[]) {
     const quelle = antwort?.transkript.quelle?.knoten_id;
-    if (!quelle || !neuDienst) return;
+    if (!quelle || !reihe.length) return;
     neuStand = "Wird eingereiht";
     try {
-      const a = await api.transkribieren({ quelle_id: quelle, hoerdienst: neuDienst, sprache: neuSprache, sprecher: neuSprecher });
-      neuAuftrag = a.id;
-      neuStand = "Wird gehört; die Fassung kommt als eigener Reiter dazu, die bisherigen bleiben.";
+      const a = await api.transkribieren({ quelle_id: quelle, reihe, sprache: neuSprache, sprecher: neuSprecher });
+      neuReihe = reihe;
+      neuStapel = a.stapel;
+      neuStand = `1 von ${reihe.length} ${reihe.length === 1 ? "Modell" : "Modellen"}: wartet; jede Fassung kommt als eigener Reiter dazu, die bisherigen bleiben.`;
     } catch (f) {
       neuStand = (f as Error).message;
     }
@@ -578,20 +599,45 @@
       {/if}
     </div>
     {#if neuOffen}
+      {@const alle = neuListe.map((d) => d.kennung)}
       <div class="optionen" style="margin-bottom:12px">
-        <label>Hördienst <Auswahl bind:wert={neuDienst} optionen={hoerdienstOptionen()} /></label>
+        <span class="segment">
+          <button class:aktiv={neuWeg === "alle"} onclick={() => (neuWeg = "alle")}>Alle Hördienste ({alle.length})</button>
+          <button class:aktiv={neuWeg === "einer"} onclick={() => (neuWeg = "einer")}>Ein Hördienst</button>
+        </span>
+        {#if neuWeg === "einer"}
+          <label>Hördienst <Auswahl bind:wert={neuDienst} optionen={neuListe.map((d) => ({ wert: d.kennung, titel: d.name }))} /></label>
+        {/if}
         <label>Sprache <Auswahl bind:wert={neuSprache} optionen={sprachOptionen()} /></label>
         <label>Sprecher <Auswahl bind:wert={neuSprecher} optionen={SPRECHER_WEGE} /></label>
         <span class="knopfzeile" style="margin-left:auto">
-          <button class="knopf primaer" onclick={neuHoeren} disabled={!neuDienst || !!neuAuftrag}>
-            <i class="fa-solid {neuAuftrag ? 'fa-circle-notch fa-spin' : 'fa-play'}"></i> Hören</button>
+          {#if neuWeg === "einer"}
+            <button class="knopf primaer" onclick={() => neuHoeren([neuDienst])} disabled={!neuDienst || !!neuStapel}>
+              <i class="fa-solid {neuStapel ? 'fa-circle-notch fa-spin' : 'fa-play'}"></i> Hören</button>
+          {:else if fehlende.length && fehlende.length < alle.length}
+            <button class="knopf primaer" onclick={() => neuHoeren(fehlende)} disabled={!!neuStapel}
+                    title="Nur die Hördienste, von denen es noch keine Fassung gibt">
+              <i class="fa-solid {neuStapel ? 'fa-circle-notch fa-spin' : 'fa-play'}"></i> Nur fehlende ({fehlende.length})</button>
+            <button class="knopf" onclick={() => neuHoeren(alle)} disabled={!!neuStapel}
+                    title="Alle neu; vorhandene Fassungen werden durch die neue ihres Hördienstes ersetzt (frühere bleiben unter Versionen)">
+              Alle neu ({alle.length})</button>
+          {:else}
+            <button class="knopf primaer" onclick={() => neuHoeren(alle)} disabled={!alle.length || !!neuStapel}>
+              <i class="fa-solid {neuStapel ? 'fa-circle-notch fa-spin' : 'fa-play'}"></i>
+              {fehlende.length ? `Alle hören (${alle.length})` : `Alle neu hören (${alle.length})`}</button>
+          {/if}
         </span>
-        {#if neuDienst && neuDienst === t?.erzeugt_mit?.dienst}
+        {#if neuWeg === "alle" && !fehlende.length && alle.length}
+          <span class="leer-zeile" style="flex-basis:100%">Von jedem Hördienst gibt es schon eine Fassung. Neu gehört ersetzt
+            die Fassung desselben Hördienstes, die frühere bleibt unter Versionen.</span>
+        {:else if neuWeg === "einer" && neuDienst && neuDienst === t?.erzeugt_mit?.dienst}
           <span class="leer-zeile" style="flex-basis:100%">Derselbe Hördienst wie die Hauptfassung: das Ergebnis wird die neue
             Hauptfassung, die bisherige bleibt unter Versionen.</span>
         {/if}
         {#if neuStand}<span class="leer-zeile" style="flex-basis:100%">{neuStand}</span>{/if}
       </div>
+    {:else if neuStapel && neuStand}
+      <p class="leer-zeile" style="margin:0 0 12px">{neuStand}</p>
     {/if}
     {#if gezeigt}
       <div class="fassung-hinweis">

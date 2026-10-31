@@ -190,11 +190,14 @@ def gehoert_einfuegen(bisher: Transkript, neu: Transkript, hauptfassung: bool = 
     bleibt. Liefert das Ergebnis und ob es die Hauptfassung ist."""
     dienst = neu.erzeugt_mit.dienst if neu.erzeugt_mit else None
     haupt_dienst = bisher.erzeugt_mit.dienst if bisher.erzeugt_mit else None
+    # Marker gehören zur Aufnahme: die gesetzten bleiben, auch wenn neu Gehörtes die Hauptfassung wird
+    marker = [*neu.marker, *(m for m in bisher.marker if (m.zeit, m.titel) not in {(n.zeit, n.titel) for n in neu.marker})]
     if dienst is None or dienst == haupt_dienst:
-        return neu.model_copy(update={"fassungen": bisher.fassungen}), True
+        return neu.model_copy(update={"fassungen": bisher.fassungen, "marker": sorted(marker, key=lambda m: m.zeit)}), True
     andere = [f for f in bisher.fassungen if f.erzeugt_mit.dienst not in (dienst, haupt_dienst)]
     if hauptfassung:
-        return neu.model_copy(update={"fassungen": [*andere, als_fassung(bisher)]}), True
+        return neu.model_copy(update={"fassungen": [*andere, als_fassung(bisher)],
+                                      "marker": sorted(marker, key=lambda m: m.zeit)}), True
     return bisher.model_copy(update={"fassungen": [*andere, als_fassung(neu)]}), False
 
 

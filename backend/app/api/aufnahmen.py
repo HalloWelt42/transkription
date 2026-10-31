@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -267,13 +267,22 @@ def router(teile: Teile) -> APIRouter:
     async def transkribieren(anfrage: TranskribierenAnfrage, konto: Konto = g.pflicht) -> Auftrag:
         if anfrage.anfrage_id is not None:
             raise HTTPException(422, "Dateien aus der Kellerwolke über /kellerwolke/transkribieren")
-        await teile.sprachen.pruefen(anfrage.sprache, anfrage.hoerdienst)
+        if len(set(anfrage.reihe)) != len(anfrage.reihe):
+            raise HTTPException(422, "Jeder Hördienst höchstens einmal in der Reihe")
+        hoerdienst = anfrage.reihe[0] if anfrage.reihe else anfrage.hoerdienst
+        for dienst in anfrage.reihe or [hoerdienst]:              # vor aller Arbeit: kann jeder Hördienst die Sprache?
+            await teile.sprachen.pruefen(anfrage.sprache, dienst)
         kw = teile.zugang()
         quelle = await kw.knoten(anfrage.quelle_id)
         if orte.art_der_aufnahme(quelle) is None:
             raise HTTPException(422, f"{quelle.name} ist keine Ton- oder Videodatei")
-        eingabe = TranskribierenEingabe(**anfrage.model_dump(), von=von(konto))
-        return await g.auftraege.einreihen("transkribieren", eingabe, titel=anfrage.name or orte.anzeigename(quelle.name))
+        reihe_kennung = uuid4().hex if anfrage.reihe else None
+        eingabe = TranskribierenEingabe(**{**anfrage.model_dump(), "hoerdienst": hoerdienst}, reihe_kennung=reihe_kennung,
+                                        von=von(konto))
+        titel = anfrage.name or orte.anzeigename(quelle.name)
+        if anfrage.reihe:
+            titel = f"{titel}: 1 von {len(anfrage.reihe)} Hördiensten"
+        return await g.auftraege.einreihen("transkribieren", eingabe, titel=titel, stapel=reihe_kennung)
 
     @r.get("/sprachen", response_model=list[SpracheEintrag])
     async def sprachen(dienst: str | None = None) -> list[SpracheEintrag]:

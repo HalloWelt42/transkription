@@ -31,7 +31,7 @@ import httpx
 from pydantic import BaseModel, Field
 
 from appkern.anfragen import AnfrageEingabe, Angebot
-from appkern.auftraege import Art, Kontext, Phase
+from appkern.auftraege import Art, AuftragAbgebrochen, Kontext, Phase
 from appkern.kellerwolke import Aktion, Kellerwolke, KellerwolkeFehler, StandVeraltet
 from appkern.leitstelle import WARTEN_BEI, DienstFehler, DienstWeg, Halt, NichtErreichbar, NichtGefunden
 from appkern.leitstelle import geduldig as leitstelle_geduldig
@@ -43,6 +43,7 @@ from .dienste import KeineLeitstelle, Wechsel
 from .einstellungen import SprecherWeg
 from .sprachen import Sprache
 from .zusammenfuegen import an_satzenden
+from .mitlesen import takt as mitlesen_takt
 from .fassung import FASSUNG
 from .modell.transkript import Aenderung, ErzeugtMit, Marker, Quelle, Segment, Transkript
 from .sprechererkennung import an_wechseln_teilen, erkennen
@@ -53,6 +54,42 @@ from appkern.ton.wav import ausschnitt, dauer as wav_dauer
 from .ton import Abschnitt, abschnitte_planen
 
 T = TypeVar("T")
+TAKT_S = 5                       # so oft meldet ein Abschnitt beim Hören seinen geschätzten Fortschritt
+
+
+def ungefaehr(sekunden: float) -> str:
+    return "unter 1 min" if sekunden < 60 else f"{round(sekunden / 60)} min"
+
+
+async def mit_schaetzung(k: Kontext, a: Abschnitt, plan: list[Abschnitt], fertig: dict, sekunde_je_ton: float | None,
+                         aufruf: Callable[[], Awaitable[T]]) -> T:
+    """Während ein Abschnitt gehört wird, meldet der Auftrag alle `TAKT_S` Sekunden einen geschätzten Fortschritt und die
+    Restzeit, aus der Länge des Tons und dem gemessenen Tempo des Hördienstes (Rechenzeit je Sekunde Ton). Der Hördienst
+    selbst meldet nichts zwischendurch; ohne Tempo bleibt es bei "Abschnitt n von m". Höchstens 95 Prozent je Abschnitt,
+    bis er wirklich fertig ist."""
+    if not sekunde_je_ton:
+        return await aufruf()
+    beginn = time.monotonic()
+    erwartet = (a.ende - a.start) * sekunde_je_ton
+    spaeter = sum(x.ende - x.start for x in plan if str(x.nummer) not in fertig and x.nummer != a.nummer) * sekunde_je_ton
+
+    async def ticken() -> None:
+        while True:
+            await asyncio.sleep(TAKT_S)
+            vergangen = time.monotonic() - beginn
+            anteil = min(0.95, vergangen / erwartet) if erwartet > 0 else 0.95
+            rest = max(erwartet - vergangen, erwartet * 0.05) + spaeter
+            try:
+                await k.fortschritt((len(fertig) + anteil) / len(plan),
+                                    f"Abschnitt {a.nummer} von {len(plan)}, noch etwa {ungefaehr(rest)}")
+            except Exception:  # noqa: BLE001 - die Schätzung darf das Hören nie stören
+                return
+
+    aufgabe = asyncio.create_task(ticken())
+    try:
+        return await aufruf()
+    finally:
+        aufgabe.cancel()
 
 
 class TranskribierenAnfrage(BaseModel):
@@ -67,12 +104,21 @@ class TranskribierenAnfrage(BaseModel):
                                    "Fassung dieses Hördienstes daneben (vom Hördienst der Hauptfassung: neue Hauptfassung)")
     hauptfassung: bool = Field(False, description="das Ergebnis wird Hauptfassung, auch von einem anderen Hördienst; die "
                                                   "bisherige rückt dann unter die Fassungen")
+    reihe: list[str] = Field(default_factory=list, max_length=20,
+                             description="mehrere Hördienste nacheinander, je einer ein Auftrag desselben Stapels: dieser hört "
+                                         "mit dem ersten, nach seinem Ende kommt der nächste dran (auch wenn einer scheitert, "
+                                         "nicht nach Abbruch)")
     anfrage_id: UUID | None = Field(None, description="Anfrage der Kellerwolke: die Aufnahme liegt außerhalb der App, die "
                                                       "App darf sie nur für diesen Auftrag lesen")
 
 
 class TranskribierenEingabe(TranskribierenAnfrage):
     von: str | None = Field(None, description="wer den Auftrag gab (Konto, bei anderen Apps auch die App)")
+    reihe_kennung: str | None = Field(None, description="Stapel der Aufträge einer Reihe (vergibt die App)")
+
+    def stelle(self) -> int | None:
+        """Platz dieses Auftrags in seiner Reihe (ab 1), ohne Reihe None."""
+        return self.reihe.index(self.hoerdienst) + 1 if self.reihe and self.hoerdienst in self.reihe else None
 
 
 class AnfrageOptionen(BaseModel):
@@ -272,6 +318,14 @@ def arten(teile: Teile) -> list[Art]:
 
             hinweis = await teile.hoer_hinweis()
             fertig: dict[str, dict] = dict(k.zwischenstand.get("hoeren", {}))
+
+            async def tempo() -> float | None:
+                """Rechenzeit je Sekunde Ton: aus den fertigen Abschnitten, vorher aus früheren Aufträgen des Hördienstes."""
+                rechnen, ton = mitlesen_takt({"abschnitte": [[x.nummer, x.start, x.ende] for x in plan], "hoeren": fertig})
+                if not ton:
+                    rechnen, ton = await teile.mitlesen.frueher(hoerdienst)
+                return rechnen / ton if ton else None
+
             await k.fortschritt(len(fertig) / max(len(plan), 1), "Hören", phase="hoeren")
             for a in plan:
                 if str(a.nummer) in fertig:
@@ -284,10 +338,10 @@ def arten(teile: Teile) -> list[Art]:
                 stueck = await ausschneiden(wav, a.start, a.ende, ordner / f"abschnitt-{a.nummer}.wav")
                 titel = f"{name}, Abschnitt {a.nummer} von {len(plan)}"
                 hoer_beginn = time.monotonic()
-                erg = await geduldig(k, lambda: teile.klangwerk.hoeren(stueck, sprache, versatz=a.start, titel=titel,
-                                                                        hinweis=hinweis, prioritaet="hintergrund",
-                                                                        dienst=hoerdienst, vorsilbe=f"A{a.nummer}:"),
-                                     "Hören")
+                erg = await mit_schaetzung(k, a, plan, fertig, await tempo(), lambda: geduldig(
+                    k, lambda: teile.klangwerk.hoeren(stueck, sprache, versatz=a.start, titel=titel, hinweis=hinweis,
+                                                      prioritaet="hintergrund", dienst=hoerdienst, vorsilbe=f"A{a.nummer}:"),
+                    "Hören"))
                 hoeren_s = round(time.monotonic() - hoer_beginn, 1)
                 abdruecke: list = []
                 if mit_sprechern and erg.segmente:
@@ -343,6 +397,31 @@ def arten(teile: Teile) -> list[Art]:
                     "segmente": len(segmente), "sprecher": len(sprecher), "dauer_s": t.dauer_s}
         finally:
             shutil.rmtree(ordner, ignore_errors=True)
+
+    async def naechster_in_reihe(k: Kontext) -> None:
+        """Nach dem Ende eines Auftrags einer Reihe: den nächsten Hördienst einreihen, genau einmal (auch bei Wiederholung
+        oder Fortsetzen nicht doppelt)."""
+        e: TranskribierenEingabe = k.eingabe
+        stelle = e.stelle()
+        if stelle is None or stelle >= len(e.reihe) or k.zwischenstand.get("naechster"):
+            return
+        await k.merken(naechster=True)
+        weiter = e.model_copy(update={"hoerdienst": e.reihe[stelle]})
+        titel = f"{e.name or 'Neu hören'}: {stelle + 1} von {len(e.reihe)} Hördiensten"
+        await g.auftraege.einreihen("transkribieren", weiter, titel=titel, stapel=e.reihe_kennung, von=e.von or "")
+
+    async def transkribieren_in_reihe(k: Kontext) -> dict:
+        """Transkribieren; gehört der Auftrag zu einer Reihe, kommt danach der nächste Hördienst dran, auch wenn dieser
+        scheitert (ein Modell soll die übrigen nicht aufhalten), aber nicht nach einem Abbruch."""
+        try:
+            ergebnis = await transkribieren(k)
+        except AuftragAbgebrochen:
+            raise
+        except Exception:
+            await naechster_in_reihe(k)
+            raise
+        await naechster_in_reihe(k)
+        return ergebnis
 
     async def aus_anfrage(k: Kontext) -> dict:
         """Transkribieren auf Anfrage aus dem Dateimenü der Kellerwolke oder einer anderen App; was die Anfrage nicht
@@ -566,7 +645,7 @@ def arten(teile: Teile) -> list[Art]:
     sprecher_phase = Phase(schluessel="sprecher", titel="Sprecher", symbol="user-group")
     hoeren_phasen = [vorbereiten, Phase(schluessel="hoeren", titel="Hören", symbol="ear-listen"), sprecher_phase, speichern]
     return [
-        Art("transkribieren", "Transkribieren", transkribieren, eingabe=TranskribierenEingabe, fortsetzbar=True,
+        Art("transkribieren", "Transkribieren", transkribieren_in_reihe, eingabe=TranskribierenEingabe, fortsetzbar=True,
             nach_neustart="fortsetzen", phasen=hoeren_phasen),
         Art("aus_anfrage", "Transkribieren (Kellerwolke)", aus_anfrage, eingabe=AnfrageEingabe, fortsetzbar=True,
             nach_neustart="fortsetzen", phasen=hoeren_phasen),

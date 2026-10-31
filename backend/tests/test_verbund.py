@@ -232,6 +232,27 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 assert getauscht["fassungen"][0]["segmente"] == vorher["segmente"] and getauscht["marker"] == vorher["marker"]
                 assert (await c.post(f"/api/v1/transkripte/{tid}/hauptfassung", headers=h,
                                      json={"stand": t["stand"], "fassung_id": moss["id"]})).status_code == 409
+                # Alle Hördienste nacheinander (Reihe): je einer ein Auftrag im selben Stapel, der nächste erst nach dem
+                # Ende des vorigen; doppelte Dienste werden abgewiesen
+                assert (await c.post("/api/v1/transkribieren", headers=h, json={
+                    "quelle_id": aufnahme["id"], "reihe": ["klangwerk-hoeren", "klangwerk-hoeren"]})).status_code == 422
+                erster = (await c.post("/api/v1/transkribieren", headers=h, json={
+                    "quelle_id": aufnahme["id"], "reihe": ["klangwerk-hoeren-moss", "klangwerk-hoeren"], "sprecher": "stimmen"})).json()
+                assert erster["eingabe"]["hoerdienst"] == "klangwerk-hoeren-moss" and erster["titel"].endswith("1 von 2 Hördiensten")
+                assert (await warten(c, h, erster["id"]))["zustand"] == "fertig"
+                reihe = []
+                for _ in range(200):
+                    reihe = (await c.get("/api/v1/auftraege", headers=h, params={"stapel": erster["stapel"]})).json()
+                    reihe = reihe["eintraege"] if isinstance(reihe, dict) else reihe
+                    if len(reihe) == 2 and all(x["zustand"] == "fertig" for x in reihe):
+                        break
+                    await asyncio.sleep(0.05)
+                assert sorted(x["eingabe"]["hoerdienst"] for x in reihe) == ["klangwerk-hoeren", "klangwerk-hoeren-moss"], reihe
+                assert all(x["zustand"] == "fertig" for x in reihe)
+                nach = (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()["transkript"]
+                assert nach["erzeugt_mit"]["dienst"] == "klangwerk-hoeren-moss"
+                assert [f["erzeugt_mit"]["dienst"] for f in nach["fassungen"]] == ["klangwerk-hoeren"]
+
 
                 # Eine andere App mit ihrem App-Schlüssel: Arbeit ja, Einstellungen nein
                 app_kopf = {"Authorization": f"Bearer {W['KELLERWOLKE_SCHLUESSEL']}"}

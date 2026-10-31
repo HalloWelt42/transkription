@@ -38,9 +38,9 @@ class Teile(Begleiter):
         self.woerterbuch = Fachwoerter(lambda: geruest.kellerwolke)
         self.index = Suchindex(geruest.db)
         self.vorschlaege = Vorschlaege(geruest.db)
-        self.mitlesen = Mitlesen(geruest.db)
         self.abgleich = Abgleich(geruest, self.transkripte, self.index)
         e = lambda: geruest.einstellungen.stand  # noqa: E731
+        self.mitlesen = Mitlesen(geruest.db, lambda: e().dienst_hoeren)
         self.ton = TonDienst(lambda: geruest.leitstelle, lambda: e().dienst_ton)     # Tonarbeit nur auf dem Mac
         self.sprachen = Sprachen(lambda: geruest.leitstelle, lambda: e().dienst_hoeren, lambda: e().sprache)
         self.abspielen = Abspielfassungen(geruest.daten / "abspielen", lambda: self.ton,

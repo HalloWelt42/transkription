@@ -155,3 +155,35 @@ def test_sprecher_des_hoerdienstes_als_wechsel():
     assert [(w.start, w.ende, w.sprecher) for w in wechsel_aus(roh, 600, "A2:")] == [(600.5, 602.0, "A2:S01"), (602.5, 604.0, "A2:S02")]
     assert wechsel_aus([{**roh[0], "speaker": None}, roh[1]]) == []                  # nicht für jedes Segment: keine
     assert wechsel_aus([{"start": 0, "end": 1, "text": "x", "words": []}]) == []
+
+
+def test_neue_hauptfassung_behaelt_gesetzte_marker():
+    from app.modell.transkript import Marker, gehoert_einfuegen
+    alt = _gehoert("klangwerk-hoeren", "alt").model_copy(update={"marker": [Marker(zeit=3, titel="Gesetzt")]})
+    neu = _gehoert("klangwerk-hoeren", "neu").model_copy(update={"marker": [Marker(zeit=1, titel="Aufnahme")]})
+    t, _ = gehoert_einfuegen(alt, neu)
+    assert [(m.zeit, m.titel) for m in t.marker] == [(1, "Aufnahme"), (3, "Gesetzt")]
+
+
+async def test_schaetzung_meldet_fortschritt_waehrend_eines_abschnitts(monkeypatch):
+    import asyncio
+    from app import arten
+    from app.ton import Abschnitt
+    monkeypatch.setattr(arten, "TAKT_S", 0.01)
+    meldungen = []
+
+    class K:
+        async def fortschritt(self, anteil, schritt, phase=None):
+            meldungen.append((anteil, schritt))
+
+    plan = [Abschnitt(1, 0, 60), Abschnitt(2, 60, 180)]
+
+    async def hoeren():
+        await asyncio.sleep(0.08)
+        return "gehört"
+
+    assert await arten.mit_schaetzung(K(), plan[0], plan, {}, 0.5, hoeren) == "gehört"
+    assert meldungen and all(0 < a <= 0.95 / 2 for a, _ in meldungen)
+    assert meldungen[0][1].startswith("Abschnitt 1 von 2, noch etwa 1 min")     # 30 s für diesen, 60 s für den zweiten
+    meldungen.clear()
+    assert await arten.mit_schaetzung(K(), plan[0], plan, {}, None, hoeren) == "gehört" and meldungen == []
