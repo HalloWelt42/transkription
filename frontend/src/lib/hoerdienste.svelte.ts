@@ -1,6 +1,7 @@
 // Hördienste zur Wahl je Auftrag: was die Leitstelle dieser App mit der Fähigkeit hoeren anbietet (GET /hoerdienste,
 // eine Wahrheit im Backend), der eingestellte als Vorgabe. Einmal je Sitzung geladen. Welcher rechnet, wählt die App
 // bzw. der Mensch; die Leitstelle entscheidet nur, ob und wann.
+import { marke } from "appkern-oberflaeche";
 import * as api from "./api";
 import type { ErzeugtMit, Hoerdienst, Hoerfassung, Segment, Sprecher, Transkript } from "./typen";
 
@@ -21,10 +22,14 @@ export function vorgabeHoerdienst(): string | null {
   return hoerdienste.liste.find((d) => d.vorgabe)?.kennung ?? null;
 }
 
-// Name eines Modells für Reiter und Vergleich: wie der Hördienst sein Modell nennt, sonst wie die Leitstelle den Dienst
+// Name eines Modells für Reiter und Vergleich: wie der Hördienst sein Modell nennt, sonst wie die Leitstelle den Dienst;
+// ein Ausschnitt nennt seinen Bereich und eine gewählte Abschnittslänge
 export function modellName(e: ErzeugtMit | null | undefined): string {
   if (!e) return "Ohne Angabe";
-  return e.modell || hoerdienste.liste.find((d) => d.kennung === e.dienst)?.name || e.dienst;
+  const name = e.modell || hoerdienste.liste.find((d) => d.kennung === e.dienst)?.name || e.dienst;
+  const zusatz = [e.bereich ? `${marke(e.bereich[0])} bis ${marke(e.bereich[1])}` : "",
+                  e.abschnitt_s ? `Abschnitte ${e.abschnitt_s} s` : ""].filter(Boolean).join(", ");
+  return zusatz ? `${name} (${zusatz})` : name;
 }
 
 // Eine Fassung zum Zeigen: die Hauptfassung (Felder des Transkripts, Kennung "haupt") oder eine weitere

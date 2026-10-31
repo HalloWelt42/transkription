@@ -29,6 +29,7 @@
     onzusammen,
     onmarker,
     onneuerSprecher,
+    wortklassen = null,
   }: {
     seg: Segment;
     sprecher: Sprecher[];
@@ -48,6 +49,7 @@
     onzusammen?: () => void;
     onmarker?: () => void;
     onneuerSprecher?: () => string | null;
+    wortklassen?: string[] | null;     // je Wort des Texts eine Klasse dazu (Vergleich: Abweichungen markieren)
   } = $props();
 
   let feld = $state<HTMLTextAreaElement>();
@@ -119,8 +121,10 @@
 
 {#snippet text()}
   {#if mitWoertern && !suche.trim()}
-    {#each seg.woerter as w, i (i)}<span class={wortKlasse(i)} role="button" tabindex="-1"
+    {#each seg.woerter as w, i (i)}<span class="{wortKlasse(i)} {wortklassen?.[i] ?? ''}" role="button" tabindex="-1"
         onclick={(e) => { if (bearbeiten) return; e.stopPropagation(); onspringen(w.start); }} onkeydown={() => {}}>{w.wort}</span>{" "}{/each}
+  {:else if wortklassen && !suche.trim()}
+    {#each seg.text.trim().split(/\s+/) as w, i (i)}<span class={wortklassen[i] ?? ""}>{w}</span>{" "}{/each}
   {:else}
     {#each teileMitTreffer(seg.text) as stueck, i (i)}{#if stueck.treffer}<mark>{stueck.t}</mark>{:else}{stueck.t}{/if}{/each}
   {/if}

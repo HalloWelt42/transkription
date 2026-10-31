@@ -252,6 +252,21 @@ async def test_ganzer_ablauf(tmp_path: Path):
                 nach = (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()["transkript"]
                 assert nach["erzeugt_mit"]["dienst"] == "klangwerk-hoeren-moss"
                 assert [f["erzeugt_mit"]["dienst"] for f in nach["fassungen"]] == ["klangwerk-hoeren"]
+                # Ein Ausschnitt mit eigener Abschnittslänge (Messung): kommt als eigene Fassung daneben, nie als Hauptfassung
+                assert (await c.post("/api/v1/transkribieren", headers=h, json={
+                    "quelle_id": aufnahme["id"], "bereich": [0, 2], "hauptfassung": True})).status_code == 422
+                aus = (await c.post("/api/v1/transkribieren", headers=h, json={
+                    "quelle_id": aufnahme["id"], "hoerdienst": "klangwerk-hoeren", "bereich": [0, 2],
+                    "abschnitt_s": 15})).json()
+                fertig = await warten(c, h, aus["id"])
+                assert fertig["zustand"] == "fertig", fertig
+                antwort = (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()
+                assert "transkript" in antwort, antwort
+                nach = antwort["transkript"]
+                assert nach["erzeugt_mit"]["dienst"] == "klangwerk-hoeren-moss"
+                ausschnitt = [f for f in nach["fassungen"] if f["erzeugt_mit"]["bereich"]]
+                assert len(ausschnitt) == 1 and ausschnitt[0]["erzeugt_mit"]["abschnitt_s"] == 15
+                assert ausschnitt[0]["erzeugt_mit"]["bereich"][0] == 0
 
 
                 # Eine andere App mit ihrem App-Schlüssel: Arbeit ja, Einstellungen nein

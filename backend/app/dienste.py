@@ -89,11 +89,14 @@ class Klangwerk:
         return ls
 
     async def hoeren(self, datei: Path, sprache: str, *, versatz: float = 0.0, titel: str = "", hinweis: str = "",
-                     prioritaet=None, dienst: str | None = None, vorsilbe: str = "") -> HoerErgebnis:
+                     prioritaet=None, dienst: str | None = None, vorsilbe: str = "",
+                     abschnitt_s: int | None = None) -> HoerErgebnis:
         """`hinweis`: Stilsatz und Fachwörter, die der Hördienst jedem Fenster mitgibt (siehe Klangwerk); `dienst`: der
-        Hördienst dieses Auftrags (sonst der eingestellte); `vorsilbe` für die Sprecher, die der Hördienst nennt."""
+        Hördienst dieses Auftrags (sonst der eingestellte); `vorsilbe` für die Sprecher, die der Hördienst nennt;
+        `abschnitt_s`: Abschnittslänge, mit der der Hördienst am Stück hört (leer: seine Vorgabe)."""
         name = dienst or self._namen()[0]
-        daten = {"language": sprache, "diarize": "false", **({"prompt": hinweis} if hinweis else {})}
+        daten = {"language": sprache, "diarize": "false", **({"prompt": hinweis} if hinweis else {}),
+                 **({"abschnitt_s": str(abschnitt_s)} if abschnitt_s else {})}
         with open(datei, "rb") as inhalt:          # gestreamt, nie am Stück im Speicher
             antwort = await self._leitstelle().dienst(name).json(
                 "POST", "/stt", titel=titel, prioritaet=prioritaet, data=daten,

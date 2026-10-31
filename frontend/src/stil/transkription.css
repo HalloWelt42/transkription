@@ -256,9 +256,17 @@ kbd.taste { font-family: var(--schrift-code); font-size: var(--marke); color: va
                       white-space: nowrap; }
 .v-marke { flex: none; width: 10px; height: 10px; border-radius: 5px; background: var(--v-links); }
 .rechts .v-marke { background: var(--v-rechts); }
+/* Abweichungen zwischen zwei Fassungen: andere Wörter kräftig, nur Schreibweise schwach, die gewählte Stelle umrandet */
+.v-abw { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--klein); color: var(--text-2); }
+.v-abw .v-mitlesen { margin-left: 0; }
+.v-abw .v-zahl b { color: var(--text); font-weight: 600; }
+.abw-stark { background: var(--warn-weich); color: var(--text); border-radius: 3px; box-shadow: 0 0 0 1px var(--warn-weich); }
+.abw-schwach { text-decoration: underline dotted var(--text-3); text-underline-offset: 3px; }
+.abw-gewaehlt { box-shadow: 0 0 0 2px var(--warn); }
 .v-zeile { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
 .v-zeile + .v-zeile { border-top: 1px solid var(--rand); }
 .v-zelle { min-width: 0; padding: 4px 0; }
 .vergleich.mobil .v-zeile { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 6px 0; }
 .vergleich.mobil .v-zelle.leer { display: none; }
 .v-name { display: flex; align-items: center; gap: 6px; font-size: var(--klein); color: var(--text-3); padding: 2px 12px 0; }
+.ausschnitt-zeit { width: 84px; }

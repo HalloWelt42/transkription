@@ -28,7 +28,7 @@ from typing import Literal, TypeVar
 from uuid import UUID
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from appkern.anfragen import AnfrageEingabe, Angebot
 from appkern.auftraege import Art, AuftragAbgebrochen, Kontext, Phase
@@ -51,7 +51,7 @@ from .teile import Teile
 from appkern.ton import ABSPIELEN, HOEREN, Aufbereiten, Ausgabe, Messen, Pause, PausenWahl
 from appkern.ton.wav import ausschnitt, dauer as wav_dauer
 
-from .ton import Abschnitt, abschnitte_planen
+from .ton import Abschnitt, abschnitte_planen, bereich_einpassen
 
 T = TypeVar("T")
 TAKT_S = 5                       # so oft meldet ein Abschnitt beim Hören seinen geschätzten Fortschritt
@@ -110,6 +110,23 @@ class TranskribierenAnfrage(BaseModel):
                                          "nicht nach Abbruch)")
     anfrage_id: UUID | None = Field(None, description="Anfrage der Kellerwolke: die Aufnahme liegt außerhalb der App, die "
                                                       "App darf sie nur für diesen Auftrag lesen")
+    abschnitt_s: int | None = Field(None, ge=5, le=600, description="Abschnittslänge höchstens, mit der der Hördienst am "
+                                    "Stück hört (er schneidet in Sprechpausen); leer: seine Vorgabe. Für Messungen und "
+                                    "Vergleiche")
+    bereich: tuple[float, float] | None = Field(None, description="nur dieser Ausschnitt der Aufnahme (von, bis in "
+                                                "Sekunden; die Grenzen rücken in die nächste Sprechpause). Das Ergebnis "
+                                                "kommt als Ausschnitt-Fassung neben ein vorhandenes Transkript, nie als "
+                                                "Hauptfassung")
+
+    @model_validator(mode="after")
+    def _bereich_pruefen(self):
+        if self.bereich is not None:
+            von, bis = self.bereich
+            if von < 0 or bis - von < 1:
+                raise ValueError("bereich: von ab 0, bis mindestens 1 s danach")
+            if self.hauptfassung:
+                raise ValueError("Ein Ausschnitt wird nie Hauptfassung")
+        return self
 
 
 class TranskribierenEingabe(TranskribierenAnfrage):
@@ -236,7 +253,9 @@ def arten(teile: Teile) -> list[Art]:
         """Plan aus dem Zwischenstand (beim Fortsetzen derselbe), sonst neu an den Sprechpausen."""
         if "abschnitte" in k.zwischenstand:
             return [Abschnitt(*a) for a in k.zwischenstand["abschnitte"]]
-        plan = abschnitte_planen(v.dauer, v.pausen, hoechstens_s=teile.einstellungen.abschnitt_min * 60)
+        e: TranskribierenEingabe = k.eingabe
+        von, bis = (bereich_einpassen(*e.bereich, v.pausen, v.dauer) if getattr(e, "bereich", None) else (0.0, None))
+        plan = abschnitte_planen(v.dauer, v.pausen, hoechstens_s=teile.einstellungen.abschnitt_min * 60, von=von, bis=bis)
         await k.merken(abschnitte=[[a.nummer, a.start, a.ende] for a in plan], dauer=v.dauer)
         return plan
 
@@ -302,6 +321,8 @@ def arten(teile: Teile) -> list[Art]:
         kw = teile.zugang(e.anfrage_id)
         transkripte = teile.transkripte_fuer(e.anfrage_id)
         quelle = await kw.knoten(e.quelle_id)
+        if e.bereich and await transkripte.zur_quelle(quelle.id) is None:
+            raise ValueError("Ein Ausschnitt kommt nur neben ein vorhandenes Transkript der Aufnahme")
         name = e.name or orte.anzeigename(quelle.name)
         ordner = teile.arbeit / k.auftrag_id
         ordner.mkdir(parents=True, exist_ok=True)
@@ -340,7 +361,8 @@ def arten(teile: Teile) -> list[Art]:
                 hoer_beginn = time.monotonic()
                 erg = await mit_schaetzung(k, a, plan, fertig, await tempo(), lambda: geduldig(
                     k, lambda: teile.klangwerk.hoeren(stueck, sprache, versatz=a.start, titel=titel, hinweis=hinweis,
-                                                      prioritaet="hintergrund", dienst=hoerdienst, vorsilbe=f"A{a.nummer}:"),
+                                                      prioritaet="hintergrund", dienst=hoerdienst, vorsilbe=f"A{a.nummer}:",
+                                                      abschnitt_s=e.abschnitt_s),
                     "Hören"))
                 hoeren_s = round(time.monotonic() - hoer_beginn, 1)
                 abdruecke: list = []
@@ -386,7 +408,9 @@ def arten(teile: Teile) -> list[Art]:
             t = Transkript(name=name, quelle=Quelle(knoten_id=quelle.id, pfad=quelle.pfad, etag=quelle.etag), marker=marker,
                            sprache=(erkannt if sprache == "auto" and erkannt else sprache), dauer_s=round(dauer, 3),
                            sprecher=sprecher, segmente=segmente, wellenform=wellenform,
-                           erzeugt_mit=ErzeugtMit(dienst=hoerdienst, modell=modell, app=FASSUNG, hoeren_s=hoeren_s),
+                           erzeugt_mit=ErzeugtMit(dienst=hoerdienst, modell=modell, app=FASSUNG, hoeren_s=hoeren_s,
+                                                  bereich=(plan[0].start, plan[-1].ende) if e.bereich and plan else None,
+                                                  abschnitt_s=e.abschnitt_s),
                            aenderung=Aenderung(was="erzeugt", wer=e.von))
             t, knoten = await transkripte.speichern(t, quelle, Aenderung(was="erzeugt", wer=e.von),
                                                     erneut=Aenderung(was="neu transkribiert", wer=e.von),

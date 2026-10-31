@@ -4,10 +4,14 @@
   // gleicher Höhe (am Telefon folgen die beiden Fassungen einer Stelle direkt aufeinander). Ein Spieler für beide: je
   // Fassung hebt das Mitlesen den laufenden Beitrag hervor und rollt mit; ausgeschaltet bleibt die Fassung reiner Text.
   // Laufender Beitrag und Mitrollen kommen aus lib/mitlesen (dieselbe Wahrheit wie die Transkript-Ansicht).
+  // Abweichungen (HELF-79): je Zeile werden die Wörter beider Fassungen abgeglichen (lib/wortvergleich); andere Wörter
+  // sind stark markiert, nur Groß und Klein oder Satzzeichen schwach. Vor und zurück springt von Stelle zu Stelle (nur
+  // die starken) und spielt sie ab; am Telefon dieselbe Markierung untereinander.
   import { Auswahl } from "appkern-oberflaeche";
   import { aktiverBeitrag, type Mitrollen } from "../lib/mitlesen.svelte";
   import type { Gezeigt } from "../lib/hoerdienste.svelte";
   import type { Segment } from "../lib/typen";
+  import { abgleichen, type Abw } from "../lib/wortvergleich";
   import Beitrag from "./Beitrag.svelte";
 
   let { fassungen, links = $bindable(), rechts = $bindable(), zeit, mobil = false, rollfeld, mitrollen, onspringen }: {
@@ -65,6 +69,82 @@
     mitrollen.folgen();
     onspringen(t);
   }
+
+  // ── Abweichungen ────────────────────────────────────────────────────────────────────────────────────────────
+  let markieren = $state(true);
+  let stelleNr = $state(-1);
+
+  interface Stelle { zeile: number; zeit: number; }
+  interface Markierung { links: Map<number, Abw[]>; rechts: Map<number, Abw[]>; stellen: Stelle[]; schwach: number;
+                         stelleVon: { links: Map<number, number[]>; rechts: Map<number, number[]> }; }
+
+  const woerter = (s: Segment) => s.text.trim().split(/\s+/).filter(Boolean);
+
+  // Beginn eines Worts: mit Wortzeiten genau, sonst der Beginn des Beitrags
+  function wortZeit(s: Segment, i: number): number {
+    const passt = s.woerter.length > 0 && s.woerter.map((w) => w.wort).join(" ") === woerter(s).join(" ");
+    return passt ? s.woerter[i].start : s.start;
+  }
+
+  function markierungBilden(): Markierung {
+    const m: Markierung = { links: new Map(), rechts: new Map(), stellen: [], schwach: 0,
+                            stelleVon: { links: new Map(), rechts: new Map() } };
+    plan.zeilen.forEach((z, n) => {
+      // die Wörter einer Zeile je Seite, mit Herkunft (Beitrag, Wort)
+      const seite = (segs: Segment[], idx: number[]) => idx.flatMap((i) => woerter(segs[i]).map((w, k) => ({ w, i, k })));
+      const l = seite(a.segmente, z.links);
+      const r = seite(b.segmente, z.rechts);
+      const erg = abgleichen(l.map((x) => x.w), r.map((x) => x.w));
+      const eintragen = (karte: Map<number, Abw[]>, liste: typeof l, arten: Abw[]) => liste.forEach((x, j) => {
+        if (!karte.has(x.i)) karte.set(x.i, []);
+        karte.get(x.i)![x.k] = arten[j];
+      });
+      eintragen(m.links, l, erg.links);
+      eintragen(m.rechts, r, erg.rechts);
+      m.schwach += erg.links.filter((x) => x === "schwach").length;
+      for (const st of erg.stellen) {
+        const nr = m.stellen.length;
+        const zeit = st.links >= 0 ? wortZeit(a.segmente[l[st.links].i], l[st.links].k) : wortZeit(b.segmente[r[st.rechts].i], r[st.rechts].k);
+        m.stellen.push({ zeile: n, zeit });
+        // jedes starke Wort kennt seine Stelle (für die Hervorhebung der gewählten)
+        const merken = (karte: Map<number, number[]>, liste: typeof l, arten: Abw[], ab: number) => {
+          for (let j = ab; j >= 0 && j < liste.length && arten[j] === "stark"; j++) {
+            if (!karte.has(liste[j].i)) karte.set(liste[j].i, []);
+            karte.get(liste[j].i)![liste[j].k] = nr;
+          }
+        };
+        if (st.links >= 0) merken(m.stelleVon.links, l, erg.links, st.links);
+        if (st.rechts >= 0) merken(m.stelleVon.rechts, r, erg.rechts, st.rechts);
+      }
+    });
+    return m;
+  }
+
+  const markierung = $derived(markieren ? markierungBilden() : null);
+  $effect(() => {
+    void links;
+    void rechts;
+    stelleNr = -1;                                 // andere Fassungen: von vorn
+  });
+
+  function klassen(seite: "links" | "rechts", i: number): string[] | null {
+    if (!markierung) return null;
+    const arten = markierung[seite].get(i);
+    if (!arten) return null;
+    const nr = markierung.stelleVon[seite].get(i);
+    return arten.map((x, k) => x === "gleich" ? "" : `abw-${x}${nr?.[k] === stelleNr && stelleNr >= 0 ? " abw-gewaehlt" : ""}`);
+  }
+
+  function stelleZeigen(schritt: 1 | -1) {
+    const st = markierung?.stellen ?? [];
+    if (!st.length) return;
+    // von der gewählten Stelle aus, sonst von der Spielerzeit aus
+    let nr = stelleNr >= 0 ? stelleNr + schritt
+      : schritt > 0 ? st.findIndex((s) => s.zeit > zeit + 0.05) : st.map((s) => s.zeit < zeit - 0.05).lastIndexOf(true);
+    if (nr < 0) nr = schritt > 0 ? 0 : st.length - 1;
+    stelleNr = (nr + st.length) % st.length;
+    springen(Math.max(0, st[stelleNr].zeit - 0.3));
+  }
 </script>
 
 {#snippet wahl(seite: "links" | "rechts", f: Gezeigt)}
@@ -83,7 +163,8 @@
   <div class="v-zelle {seite}" class:leer={!indizes.length}>
     {#if mobil && indizes.length}<div class="v-name"><span class="v-marke" aria-hidden="true"></span>{f.name}</div>{/if}
     {#each indizes as i (i)}
-      <Beitrag seg={f.segmente[i]} sprecher={f.sprecher} jetzt={i === aktiv ? zeit : null} mobil onspringen={springen} />
+      <Beitrag seg={f.segmente[i]} sprecher={f.sprecher} jetzt={i === aktiv ? zeit : null} mobil onspringen={springen}
+               wortklassen={klassen(seite, i)} />
     {/each}
   </div>
 {/snippet}
@@ -92,6 +173,22 @@
   <div class="v-kopf">
     {@render wahl("links", a)}
     {@render wahl("rechts", b)}
+    <div class="v-abw">
+      <label class="v-mitlesen" title="Stellen markieren, an denen die Fassungen sich unterscheiden: andere Wörter kräftig, nur Groß und Klein oder Satzzeichen schwach">
+        Abweichungen
+        <button class="schalter" class:an={markieren} aria-pressed={markieren} aria-label="Abweichungen markieren"
+                onclick={() => (markieren = !markieren)}></button>
+      </label>
+      {#if markierung}
+        <span class="v-zahl" title="Stellen mit anderen Wörtern; dahinter die Wörter, die nur in Schreibweise oder Satzzeichen abweichen">
+          {#if stelleNr >= 0}<b>{stelleNr + 1}</b> von {/if}<b>{markierung.stellen.length}</b>
+          {markierung.stellen.length === 1 ? "Stelle" : "Stellen"}, {markierung.schwach} nur Schreibweise</span>
+        <button class="knopf klein ohne" onclick={() => stelleZeigen(-1)} disabled={!markierung.stellen.length}
+                title="Vorige Abweichung zeigen und abspielen" aria-label="Vorige Abweichung"><i class="fa-solid fa-chevron-up"></i></button>
+        <button class="knopf klein ohne" onclick={() => stelleZeigen(1)} disabled={!markierung.stellen.length}
+                title="Nächste Abweichung zeigen und abspielen" aria-label="Nächste Abweichung"><i class="fa-solid fa-chevron-down"></i></button>
+      {/if}
+    </div>
   </div>
   {#each plan.zeilen as z, n (n)}
     <div class="v-zeile" data-z={n}>

@@ -99,6 +99,8 @@ class Transkripte:
         `hauptfassung` (siehe `gehoert_einfuegen`)."""
         kw = self.kw
         vorhanden = await self.zur_quelle(quelle.id)
+        if vorhanden is None and t.erzeugt_mit and t.erzeugt_mit.bereich is not None:
+            raise ValueError("Ein Ausschnitt kommt nur neben ein vorhandenes Transkript der Aufnahme")
         if vorhanden is not None:
             bisher = _transkript(await kw.lesen_ganz(vorhanden.id), vorhanden.name)
             t, haupt = gehoert_einfuegen(bisher, t, hauptfassung)
@@ -106,7 +108,8 @@ class Transkripte:
             aenderung = erneut or aenderung
             if not haupt:
                 neu = t.fassungen[-1].erzeugt_mit
-                aenderung = Aenderung(was=f"Fassung von {neu.modell or neu.dienst} ergänzt", wer=aenderung.wer,
+                was = f"Ausschnitt {neu.bereich[0]:.0f} bis {neu.bereich[1]:.0f} s" if neu.bereich else "Fassung"
+                aenderung = Aenderung(was=f"{was} von {neu.modell or neu.dienst} ergänzt", wer=aenderung.wer,
                                       app=aenderung.app)
         t = t.model_copy(update={"geaendert_am": jetzt(), "aenderung": aenderung})
         knoten = await kw.begleiter_schreiben(quelle.id, orte.ROLLE, orte.ENDUNG, _inhalt(t),

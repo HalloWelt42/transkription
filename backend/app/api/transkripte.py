@@ -263,6 +263,8 @@ def router(teile: Teile) -> APIRouter:
             neu = zur_hauptfassung(alt, eingabe.fassung_id)
         except KeyError as f:
             raise HTTPException(404, "Diese Fassung gibt es nicht (mehr)") from f
+        except ValueError as f:
+            raise HTTPException(422, str(f)) from f
         was = f"Hauptfassung: {neu.erzeugt_mit.modell or neu.erzeugt_mit.dienst}" if neu.erzeugt_mit else "Hauptfassung gewechselt"
         return await schreiben(transkript_id, neu, eingabe.stand, Aenderung(was=was, wer=konto.name, app=konto.app), anfrage)
 

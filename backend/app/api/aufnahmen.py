@@ -276,6 +276,8 @@ def router(teile: Teile) -> APIRouter:
         quelle = await kw.knoten(anfrage.quelle_id)
         if orte.art_der_aufnahme(quelle) is None:
             raise HTTPException(422, f"{quelle.name} ist keine Ton- oder Videodatei")
+        if anfrage.bereich and await teile.transkripte_fuer(None).zur_quelle(quelle.id) is None:
+            raise HTTPException(422, "Ein Ausschnitt kommt nur neben ein vorhandenes Transkript der Aufnahme")
         reihe_kennung = uuid4().hex if anfrage.reihe else None
         eingabe = TranskribierenEingabe(**{**anfrage.model_dump(), "hoerdienst": hoerdienst}, reihe_kennung=reihe_kennung,
                                         von=von(konto))

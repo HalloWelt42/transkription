@@ -187,3 +187,38 @@ async def test_schaetzung_meldet_fortschritt_waehrend_eines_abschnitts(monkeypat
     assert meldungen[0][1].startswith("Abschnitt 1 von 2, noch etwa 1 min")     # 30 s für diesen, 60 s für den zweiten
     meldungen.clear()
     assert await arten.mit_schaetzung(K(), plan[0], plan, {}, None, hoeren) == "gehört" and meldungen == []
+
+
+def test_ausschnitt_wird_eigene_fassung_nie_hauptfassung():
+    import pytest
+    from app.modell.transkript import ErzeugtMit, gehoert_einfuegen, zur_hauptfassung
+    haupt = _gehoert("klangwerk-hoeren", "ganz")
+    ganz_moss, _ = gehoert_einfuegen(haupt, _gehoert("klangwerk-hoeren-moss", "moss ganz"))
+    aus = _gehoert("klangwerk-hoeren", "ausschnitt").model_copy(update={"erzeugt_mit": ErzeugtMit(
+        dienst="klangwerk-hoeren", modell="W", app="t", bereich=(60.0, 120.0), abschnitt_s=30)})
+    t, ist_haupt = gehoert_einfuegen(ganz_moss, aus)            # derselbe Dienst wie die Hauptfassung: trotzdem daneben
+    assert not ist_haupt and t.segmente[0].text == "ganz"
+    assert [(f.erzeugt_mit.dienst, f.erzeugt_mit.bereich) for f in t.fassungen] == [
+        ("klangwerk-hoeren-moss", None), ("klangwerk-hoeren", (60.0, 120.0))]
+    neuer = aus.model_copy(update={"erzeugt_mit": aus.erzeugt_mit.model_copy(update={"bereich": (0.0, 15.0)})})
+    t2, _ = gehoert_einfuegen(t, neuer)                         # ersetzt nur den Ausschnitt desselben Dienstes
+    assert [f.erzeugt_mit.bereich for f in t2.fassungen] == [None, (0.0, 15.0)]
+    t3, _ = gehoert_einfuegen(t2, _gehoert("klangwerk-hoeren-moss", "moss neu"))   # ganze Fassung lässt Ausschnitte stehen
+    assert sorted(str(f.erzeugt_mit.bereich) for f in t3.fassungen) == ["(0.0, 15.0)", "None"]
+    with pytest.raises(ValueError):
+        gehoert_einfuegen(t, neuer, hauptfassung=True)
+    with pytest.raises(ValueError):
+        zur_hauptfassung(t2, t2.fassungen[-1].id)
+
+
+def test_ausschnitt_rueckt_in_sprechpausen_und_plant_nur_darin():
+    import pytest
+    from appkern.ton import Pause
+    from app.ton import abschnitte_planen, bereich_einpassen
+    pausen = [Pause(start=59.0, ende=60.0), Pause(start=121.5, ende=122.5), Pause(start=300.0, ende=301.0)]
+    assert bereich_einpassen(60.0, 120.0, pausen, 1000.0) == (59.5, 122.0)
+    assert bereich_einpassen(0.0, 200.0, pausen, 1000.0) == (0.0, 200.0)       # keine Pause nah: Grenze bleibt
+    with pytest.raises(ValueError):
+        bereich_einpassen(59.4, 59.6, pausen, 1000.0)
+    plan = abschnitte_planen(1000.0, pausen, hoechstens_s=600, von=59.5, bis=122.0)
+    assert [(a.start, a.ende) for a in plan] == [(59.5, 122.0)]

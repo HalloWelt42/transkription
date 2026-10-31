@@ -36,7 +36,8 @@ export const aufnahmen = (o: { ordner?: string | null; filter?: string; suche?: 
 
 // `reihe`: mehrere Hördienste nacheinander (je einer ein Auftrag im selben Stapel; der Auftrag hört mit dem ersten)
 export const transkribieren = (e: { quelle_id: string; name?: string; sprache?: string; sprecher?: SprecherWeg; anzahl?: number | null;
-                                    hoerdienst?: string | null; reihe?: string[] }) =>
+                                    hoerdienst?: string | null; reihe?: string[];
+                                    abschnitt_s?: number | null; bereich?: [number, number] | null }) =>
   hole<Auftrag>("/transkribieren", { method: "POST", ...json(e) });
 
 // Sprachen zur Wahl: was der Hördienst (ohne Angabe der eingestellte) laut Steckbrief kann (mit "auto" zum Erkennen)

@@ -10,7 +10,7 @@
   // Leitstelle gerade anbietet (Liste bei jedem Öffnen frisch), nacheinander als Reihe; gibt es schon Fassungen, wählt man
   // nur die fehlenden oder alle neu; ein einzelner Hördienst bleibt wählbar. Sind alle da, öffnet sich der Vergleich.
   import { onMount, tick } from "svelte";
-  import { AnfrageBand, arbeit, Auswahl, beiAuftrag, farbe, gehe, geraet, Leiste, leisteOeffnen, marke, navigation, Spieler,
+  import { AnfrageBand, arbeit, Auswahl, beiAuftrag, farbe, gehe, geraet, Leiste, leisteOeffnen, lesen, marke, navigation, Spieler,
            zurueckZurKellerwolke } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import { alleFassungen, HAUPT, hoerdiensteLaden, tempo } from "../lib/hoerdienste.svelte";
@@ -54,6 +54,17 @@
   let neuDienst = $state<string>("");
   let neuSprache = $state<string>("de");
   let neuSprecher = $state<SprecherWeg>("ohne");
+  // Für Messungen und Vergleiche einer Stelle: Abschnittslänge des Hördienstes und ein Ausschnitt (von, bis)
+  let neuAbschnitt = $state<string>("");
+  let neuVon = $state("");
+  let neuBis = $state("");
+  const ABSCHNITTE = [{ wert: "", titel: "Vorgabe des Hördienstes" },
+                      ...[15, 30, 60, 120, 240].map((s) => ({ wert: String(s), titel: `höchstens ${s} s` }))];
+  const neuBereich = $derived.by((): [number, number] | null | "falsch" => {
+    if (!neuVon.trim() && !neuBis.trim()) return null;
+    const von = lesen(neuVon || "0"), bis = lesen(neuBis);
+    return von != null && bis != null && bis - von >= 1 ? [von, bis] : "falsch";
+  });
   let neuReihe = $state<string[]>([]);           // die Hördienste der laufenden Reihe, in Reihenfolge
   let neuStapel = $state<string | null>(null);   // ihr Stapel (alle Aufträge der Reihe)
   let neuStand = $state("");
@@ -218,7 +229,8 @@
   }
 
   // Hördienste, von denen es schon eine Fassung gibt, und die noch fehlen (aus der frisch geholten Liste)
-  const vorhandeneDienste = $derived(new Set(fassungen.map((f) => f.erzeugt_mit?.dienst).filter(Boolean)));
+  const vorhandeneDienste = $derived(new Set(fassungen.filter((f) => !f.erzeugt_mit?.bereich)
+    .map((f) => f.erzeugt_mit?.dienst).filter(Boolean)));
   const fehlende = $derived(neuListe.filter((d) => !vorhandeneDienste.has(d.kennung)).map((d) => d.kennung));
 
   async function neuOeffnen() {
@@ -239,7 +251,9 @@
     if (!quelle || !reihe.length) return;
     neuStand = "Wird eingereiht";
     try {
-      const a = await api.transkribieren({ quelle_id: quelle, reihe, sprache: neuSprache, sprecher: neuSprecher });
+      const bereich = neuBereich === "falsch" ? null : neuBereich;
+      const a = await api.transkribieren({ quelle_id: quelle, reihe, sprache: neuSprache, sprecher: neuSprecher,
+                                           abschnitt_s: neuAbschnitt ? Number(neuAbschnitt) : null, bereich });
       neuReihe = reihe;
       neuStapel = a.stapel;
       neuStand = `1 von ${reihe.length} ${reihe.length === 1 ? "Modell" : "Modellen"}: wartet; jede Fassung kommt als eigener Reiter dazu, die bisherigen bleiben.`;
@@ -610,19 +624,24 @@
         {/if}
         <label>Sprache <Auswahl bind:wert={neuSprache} optionen={sprachOptionen()} /></label>
         <label>Sprecher <Auswahl bind:wert={neuSprecher} optionen={SPRECHER_WEGE} /></label>
+        <label title="Wie lang der Hördienst höchstens am Stück hört; geschnitten wird immer in Sprechpausen">Abschnitt
+          <Auswahl bind:wert={neuAbschnitt} optionen={ABSCHNITTE} /></label>
+        <label class="ausschnitt" title="Nur diese Stelle hören (etwa 1:00 bis 3:00); die Grenzen rücken in die nächste Sprechpause. Das Ergebnis kommt als eigener Reiter neben die Fassungen, nie als Hauptfassung">
+          Ausschnitt <input class="eingabe ausschnitt-zeit" bind:value={neuVon} placeholder="von" aria-label="Ausschnitt von" />
+          <input class="eingabe ausschnitt-zeit" bind:value={neuBis} placeholder="bis" aria-label="Ausschnitt bis" /></label>
         <span class="knopfzeile" style="margin-left:auto">
           {#if neuWeg === "einer"}
-            <button class="knopf primaer" onclick={() => neuHoeren([neuDienst])} disabled={!neuDienst || !!neuStapel}>
+            <button class="knopf primaer" onclick={() => neuHoeren([neuDienst])} disabled={!neuDienst || !!neuStapel || neuBereich === "falsch"}>
               <i class="fa-solid {neuStapel ? 'fa-circle-notch fa-spin' : 'fa-play'}"></i> Hören</button>
           {:else if fehlende.length && fehlende.length < alle.length}
-            <button class="knopf primaer" onclick={() => neuHoeren(fehlende)} disabled={!!neuStapel}
+            <button class="knopf primaer" onclick={() => neuHoeren(fehlende)} disabled={!!neuStapel || neuBereich === "falsch"}
                     title="Nur die Hördienste, von denen es noch keine Fassung gibt">
               <i class="fa-solid {neuStapel ? 'fa-circle-notch fa-spin' : 'fa-play'}"></i> Nur fehlende ({fehlende.length})</button>
-            <button class="knopf" onclick={() => neuHoeren(alle)} disabled={!!neuStapel}
+            <button class="knopf" onclick={() => neuHoeren(alle)} disabled={!!neuStapel || neuBereich === "falsch"}
                     title="Alle neu; vorhandene Fassungen werden durch die neue ihres Hördienstes ersetzt (frühere bleiben unter Versionen)">
               Alle neu ({alle.length})</button>
           {:else}
-            <button class="knopf primaer" onclick={() => neuHoeren(alle)} disabled={!alle.length || !!neuStapel}>
+            <button class="knopf primaer" onclick={() => neuHoeren(alle)} disabled={!alle.length || !!neuStapel || neuBereich === "falsch"}>
               <i class="fa-solid {neuStapel ? 'fa-circle-notch fa-spin' : 'fa-play'}"></i>
               {fehlende.length ? `Alle hören (${alle.length})` : `Alle neu hören (${alle.length})`}</button>
           {/if}
@@ -634,6 +653,8 @@
           <span class="leer-zeile" style="flex-basis:100%">Derselbe Hördienst wie die Hauptfassung: das Ergebnis wird die neue
             Hauptfassung, die bisherige bleibt unter Versionen.</span>
         {/if}
+        {#if neuBereich === "falsch"}<span class="leer-zeile" style="flex-basis:100%">Ausschnitt: von und bis als Zeit (etwa
+          1:00 und 3:00), mindestens 1 s auseinander.</span>{/if}
         {#if neuStand}<span class="leer-zeile" style="flex-basis:100%">{neuStand}</span>{/if}
       </div>
     {:else if neuStapel && neuStand}
@@ -643,8 +664,10 @@
       <div class="fassung-hinweis">
         <span>Fassung von {gezeigt.name}{gezeigt.erzeugt_mit?.hoeren_s ? `, ${tempo(gezeigt.erzeugt_mit, t?.dauer_s ?? 0)}` : ""}.
           Bearbeiten, Suche und Export gelten der Hauptfassung.</span>
-        <button class="knopf" onclick={zurHauptfassung} title="Diese Fassung wird Hauptfassung; die bisherige bleibt als Reiter daneben">
-          <i class="fa-solid fa-star"></i> Zur Hauptfassung machen</button>
+        {#if !gezeigt.erzeugt_mit?.bereich}
+          <button class="knopf" onclick={zurHauptfassung} title="Diese Fassung wird Hauptfassung; die bisherige bleibt als Reiter daneben">
+            <i class="fa-solid fa-star"></i> Zur Hauptfassung machen</button>
+        {/if}
       </div>
     {/if}
   {/if}

@@ -79,6 +79,13 @@ class ErzeugtMit(_Teil):
     modell: str | None = None
     app: str
     hoeren_s: float | None = Field(None, ge=0, description="Rechenzeit des Hördienstes für die ganze Aufnahme (Tempo)")
+    bereich: tuple[float, float] | None = Field(None, description="nur dieser Ausschnitt der Aufnahme (Sekunden, in "
+                                                "Sprechpausen); ohne: die ganze Aufnahme")
+    abschnitt_s: float | None = Field(None, gt=0, description="gewünschte Abschnittslänge des Hördienstes; ohne: seine Vorgabe")
+
+    def art(self) -> tuple[str, bool]:
+        """Wofür eine Fassung steht: je Hördienst höchstens eine ganze und eine Ausschnitt-Fassung."""
+        return self.dienst, self.bereich is not None
 
 
 class Hoerfassung(_Teil):
@@ -127,9 +134,9 @@ class Transkript(_Teil):
     @model_validator(mode="after")
     def _stimmig(self) -> Transkript:
         _sprecher_pruefen(self.sprecher, self.segmente)
-        dienste = [f.erzeugt_mit.dienst for f in self.fassungen]
-        if len(set(dienste)) != len(dienste):
-            raise ValueError("Je Hördienst höchstens eine Fassung")
+        arten = [f.erzeugt_mit.art() for f in self.fassungen]
+        if len(set(arten)) != len(arten):
+            raise ValueError("Je Hördienst höchstens eine ganze Fassung und ein Ausschnitt")
         self.segmente.sort(key=lambda s: (s.start, s.ende))
         self.marker.sort(key=lambda m: m.zeit)
         return self
@@ -190,11 +197,18 @@ def gehoert_einfuegen(bisher: Transkript, neu: Transkript, hauptfassung: bool = 
     bleibt. Liefert das Ergebnis und ob es die Hauptfassung ist."""
     dienst = neu.erzeugt_mit.dienst if neu.erzeugt_mit else None
     haupt_dienst = bisher.erzeugt_mit.dienst if bisher.erzeugt_mit else None
+    if neu.erzeugt_mit and neu.erzeugt_mit.bereich is not None:
+        # Ein Ausschnitt (Messung, Vergleich einer Stelle) wird nie Hauptfassung; er ersetzt nur den vorigen Ausschnitt
+        # desselben Hördienstes
+        if hauptfassung:
+            raise ValueError("Ein Ausschnitt wird nie Hauptfassung")
+        andere = [f for f in bisher.fassungen if f.erzeugt_mit.art() != neu.erzeugt_mit.art()]
+        return bisher.model_copy(update={"fassungen": [*andere, als_fassung(neu)]}), False
     # Marker gehören zur Aufnahme: die gesetzten bleiben, auch wenn neu Gehörtes die Hauptfassung wird
     marker = [*neu.marker, *(m for m in bisher.marker if (m.zeit, m.titel) not in {(n.zeit, n.titel) for n in neu.marker})]
     if dienst is None or dienst == haupt_dienst:
         return neu.model_copy(update={"fassungen": bisher.fassungen, "marker": sorted(marker, key=lambda m: m.zeit)}), True
-    andere = [f for f in bisher.fassungen if f.erzeugt_mit.dienst not in (dienst, haupt_dienst)]
+    andere = [f for f in bisher.fassungen if f.erzeugt_mit.bereich is not None or f.erzeugt_mit.dienst not in (dienst, haupt_dienst)]
     if hauptfassung:
         return neu.model_copy(update={"fassungen": [*andere, als_fassung(bisher)],
                                       "marker": sorted(marker, key=lambda m: m.zeit)}), True
@@ -207,6 +221,8 @@ def zur_hauptfassung(t: Transkript, fassung_id: UUID) -> Transkript:
     gewaehlt = next((f for f in t.fassungen if f.id == fassung_id), None)
     if gewaehlt is None:
         raise KeyError(f"Keine Fassung {fassung_id}")
+    if gewaehlt.erzeugt_mit.bereich is not None:
+        raise ValueError("Ein Ausschnitt kann nicht Hauptfassung werden")
     bisherige = als_fassung(t)
     fassungen = [bisherige if f.id == fassung_id else f for f in t.fassungen]
     return Transkript.model_validate({**t.model_dump(), **{k: getattr(gewaehlt, k) for k in _HAUPT},
