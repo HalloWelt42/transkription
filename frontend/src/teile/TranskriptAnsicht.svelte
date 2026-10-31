@@ -649,6 +649,9 @@
         {#if neuWeg === "alle" && !fehlende.length && alle.length}
           <span class="leer-zeile" style="flex-basis:100%">Von jedem Hördienst gibt es schon eine Fassung. Neu gehört ersetzt
             die Fassung desselben Hördienstes, die frühere bleibt unter Versionen.</span>
+        {:else if neuBereich && neuBereich !== "falsch"}
+          <span class="leer-zeile" style="flex-basis:100%">Ausschnitt: das Ergebnis kommt als eigener Reiter neben die
+            Fassungen (je Hördienst einer), nie als Hauptfassung.</span>
         {:else if neuWeg === "einer" && neuDienst && neuDienst === t?.erzeugt_mit?.dienst}
           <span class="leer-zeile" style="flex-basis:100%">Derselbe Hördienst wie die Hauptfassung: das Ergebnis wird die neue
             Hauptfassung, die bisherige bleibt unter Versionen.</span>
