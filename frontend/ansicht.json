@@ -1,26 +1,198 @@
 {
   "seiten": [
-    { "name": "aufnahmen", "pfad": "/aufnahmen" },
-    { "name": "kellerwolke", "pfad": "/aufnahmen/kellerwolke" },
-    { "name": "transkripte", "pfad": "/transkripte" },
-    { "name": "transkript", "abfrage": "/api/v1/transkripte?anzahl=1", "pfad": "/transkripte/{eintraege.0.id}" },
-    { "name": "bearbeiten", "abfrage": "/api/v1/transkripte?anzahl=1", "pfad": "/transkripte/{eintraege.0.id}",
+    {
+      "name": "aufnahmen",
+      "pfad": "/aufnahmen"
+    },
+    {
+      "name": "kellerwolke",
+      "pfad": "/aufnahmen/kellerwolke"
+    },
+    {
+      "name": "transkripte",
+      "pfad": "/transkripte"
+    },
+    {
+      "name": "transkript",
+      "abfrage": "/api/v1/transkripte?anzahl=1",
+      "pfad": "/transkripte/{eintraege.0.id}"
+    },
+    {
+      "name": "bearbeiten",
+      "abfrage": "/api/v1/transkripte?anzahl=1",
+      "pfad": "/transkripte/{eintraege.0.id}",
       "wechsel": [
-        { "klick": ".seiten-kopf .knopf:has(.fa-pen), .knopfzeile .rund[aria-label=Bearbeiten]", "warten_ms": 800 },
-        { "klick": "[data-i='1'] .beitrag, [data-i='1'] .t-beitrag", "warten_ms": 500 }
-      ] },
-    { "name": "sprecher", "pfad": "/sprecher" },
-    { "name": "woerterbuch", "pfad": "/woerterbuch" },
-    { "name": "auftraege", "pfad": "/auftraege" },
-    { "name": "protokoll", "pfad": "/protokoll" },
-    { "name": "einstellungen", "pfad": "/einstellungen" },
-    { "name": "aufnehmen", "pfad": "/aufnahmen", "nur": [1440, 900, 390],
+        {
+          "klick": ".seiten-kopf .knopf:has(.fa-pen), .knopfzeile .rund[aria-label=Bearbeiten]",
+          "warten_ms": 800
+        },
+        {
+          "klick": "[data-i='1'] .beitrag, [data-i='1'] .t-beitrag",
+          "warten_ms": 500
+        }
+      ]
+    },
+    {
+      "name": "mitlesen",
+      "abfrage": "/api/v1/transkripte?suche=Pr%C3%BCfst%C3%BCck%20Mitlesen&anzahl=1",
+      "pfad": "/transkripte/{eintraege.0.id}",
+      "nur": [
+        1440,
+        1100,
+        390
+      ],
+      "warten_ms": 2500,
       "wechsel": [
-        { "klick": ".seiten-kopf .knopf:has(.fa-circle-dot), .t-aufnehmen .rot", "warten_ms": 2500 },
-        { "klick": ".rek-leiste .pause", "fest": [".rek-leiste", ".rek-symbole", ".rek-zeit"] },
-        { "klick": ".rek-symbol[aria-label='Live-Mitschrift']", "fest": [".rek-leiste", ".rek-symbole"] },
-        { "klick": ".rek-symbol[aria-label=Verwerfen]", "fest": [".rek-leiste", ".rek-symbole"] },
-        { "klick": ".rek-blase .knopf.gefahr" }
-      ] }
+        {
+          "zeit": 95,
+          "marke": ".wort.jetzt",
+          "warten_ms": 1500
+        },
+        {
+          "zeit": 150,
+          "marke": ".wort.jetzt",
+          "warten_ms": 1500
+        },
+        {
+          "zeit": 380,
+          "marke": ".wort.jetzt",
+          "warten_ms": 1500
+        },
+        {
+          "zeit": 460,
+          "marke": ".wort.jetzt",
+          "warten_ms": 1500
+        },
+        {
+          "tippen": {
+            "feld": ".text-suche input",
+            "text": "Ergebnisse",
+            "taste": "Enter"
+          },
+          "marke": "[data-treffer] mark",
+          "warten_ms": 900
+        },
+        {
+          "tippen": {
+            "feld": ".text-suche input",
+            "text": "Ergebnisse",
+            "taste": "Enter"
+          },
+          "marke": "[data-treffer] mark",
+          "warten_ms": 900
+        },
+        {
+          "tippen": {
+            "feld": ".text-suche input",
+            "text": "Ergebnisse",
+            "taste": "Enter"
+          },
+          "marke": "[data-treffer] mark",
+          "warten_ms": 900
+        },
+        {
+          "tippen": {
+            "feld": ".text-suche input",
+            "text": "",
+            "taste": ""
+          },
+          "warten_ms": 500
+        },
+        {
+          "klick": ".fassungs-reiter .chip:has(.fa-table-columns)",
+          "warten_ms": 1200
+        },
+        {
+          "klick": "[aria-label='Nächste Abweichung']",
+          "marke": ".abw-gewaehlt",
+          "warten_ms": 1500
+        },
+        {
+          "klick": "[aria-label='Nächste Abweichung']",
+          "marke": ".abw-gewaehlt",
+          "warten_ms": 1500
+        },
+        {
+          "klick": "[aria-label='Nächste Abweichung']",
+          "marke": ".abw-gewaehlt",
+          "warten_ms": 1500
+        },
+        {
+          "klick": "[aria-label='Nächste Abweichung']",
+          "marke": ".abw-gewaehlt",
+          "warten_ms": 1500
+        },
+        {
+          "zeit": 300,
+          "marke": ".wort.jetzt",
+          "warten_ms": 1500
+        },
+        {
+          "zeit": 460,
+          "marke": ".wort.jetzt",
+          "warten_ms": 1500
+        }
+      ]
+    },
+    {
+      "name": "sprecher",
+      "pfad": "/sprecher"
+    },
+    {
+      "name": "woerterbuch",
+      "pfad": "/woerterbuch"
+    },
+    {
+      "name": "auftraege",
+      "pfad": "/auftraege"
+    },
+    {
+      "name": "protokoll",
+      "pfad": "/protokoll"
+    },
+    {
+      "name": "einstellungen",
+      "pfad": "/einstellungen"
+    },
+    {
+      "name": "aufnehmen",
+      "pfad": "/aufnahmen",
+      "nur": [
+        1440,
+        900,
+        390
+      ],
+      "wechsel": [
+        {
+          "klick": ".seiten-kopf .knopf:has(.fa-circle-dot), .t-aufnehmen .rot",
+          "warten_ms": 2500
+        },
+        {
+          "klick": ".rek-leiste .pause",
+          "fest": [
+            ".rek-leiste",
+            ".rek-symbole",
+            ".rek-zeit"
+          ]
+        },
+        {
+          "klick": ".rek-symbol[aria-label='Live-Mitschrift']",
+          "fest": [
+            ".rek-leiste",
+            ".rek-symbole"
+          ]
+        },
+        {
+          "klick": ".rek-symbol[aria-label=Verwerfen]",
+          "fest": [
+            ".rek-leiste",
+            ".rek-symbole"
+          ]
+        },
+        {
+          "klick": ".rek-blase .knopf.gefahr"
+        }
+      ]
+    }
   ]
 }

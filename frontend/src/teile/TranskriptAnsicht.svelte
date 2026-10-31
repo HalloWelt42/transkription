@@ -17,7 +17,8 @@
   import * as api from "../lib/api";
   import { alleFassungen, erwarteteHerkunft, HAUPT, hoerdiensteLaden, tempo, trenndiensteLaden, trenndienstOptionen,
            vorgabeTrenndienst } from "../lib/hoerdienste.svelte";
-  import { aktiverBeitrag, Mitrollen } from "../lib/mitlesen.svelte";
+  import { Mitrollen, zuStelle } from "appkern-oberflaeche";
+  import { aktiverBeitrag } from "../lib/mitlesen";
   import { sprachOptionen } from "../lib/sprachen.svelte";
   import { SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import Vergleich from "./Vergleich.svelte";
@@ -210,11 +211,14 @@
     return abmelden;
   });
 
-  // Dem laufenden Beitrag folgen, außer man rollt selbst (dann eine Weile nicht); den Vergleich führt er selbst.
+  // Der gesprochenen Stelle folgen (dem Wort, ohne Wortzeiten dem Beitrag), außer man rollt selbst (dann eine Weile
+  // nicht); gerollt wird erst, wenn sie aus dem oberen Drittel läuft. Den Vergleich führt er selbst.
   $effect(() => {
     const i = aktiv;
+    void zeit;
     if (i < 0 || bearbeiten || vergleich) return;
-    mitrollen.zeigen(rollfeld, `[data-i="${i}"]`);
+    const beitrag = rollfeld?.querySelector(`[data-i="${i}"]`);
+    mitrollen.folge(beitrag?.querySelector(".wort.jetzt") ?? beitrag);
   });
 
   const selbstGerollt = mitrollen.selbstGerollt;
@@ -301,7 +305,7 @@
     const i = passend[trefferNr];
     selbstGerollt();
     spieler?.springe(segmente[i].start);
-    rollfeld?.querySelector(`[data-i="${i}"]`)?.scrollIntoView({ block: "center" });
+    void tick().then(() => zuStelle(rollfeld?.querySelector(`[data-i="${i}"] mark`) ?? rollfeld?.querySelector(`[data-i="${i}"]`)));
   }
 
   function suchTaste(e: KeyboardEvent) {
@@ -399,7 +403,7 @@
   // --- Auswahl und Sprecher -----------------------------------------------------------------------------------
 
   function zeigen(i: number) {
-    void tick().then(() => rollfeld?.querySelector(`[data-i="${i}"]`)?.scrollIntoView({ block: "nearest" }));
+    void tick().then(() => zuStelle(rollfeld?.querySelector(`[data-i="${i}"]`), { nurWennNoetig: true }));
   }
 
   // Öffnen: der Beitrag wird die Auswahl, der Spieler springt an seinen Anfang (spielt weiter, wenn er lief)
@@ -580,7 +584,7 @@
     {#each markerVor[i] ?? [] as m (m.id)}
       <div class="marker-zeile"><i class="fa-solid fa-flag"></i>{marke(m.zeit)} {m.titel}</div>
     {/each}
-    <div data-i={i}>
+    <div data-i={i} data-treffer={trefferNr >= 0 && passend[trefferNr] === i ? "" : undefined}>
       <Beitrag seg={s} sprecher={gezeigteSprecher} jetzt={i === aktiv ? zeit : null} {suche} mobil={geraet.mobil} {bearbeiten}
                offen={bearbeiten && offen === i} gewaehlt={bearbeiten && gewaehltMenge.has(i)} geaendert={bearbeiten && geaendert.has(i)}
                spielerzeit={bearbeiten && offen === i ? zeit : null}

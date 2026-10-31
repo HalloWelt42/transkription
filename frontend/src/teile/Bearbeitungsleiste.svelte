@@ -4,7 +4,7 @@
   // Ziffer als Taste); der Schalter "am Ende des Beitrags anhalten" mit Erklärung. Die Knöpfe stehen immer an derselben
   // Stelle und sind nur gesperrt, wenn sie nichts tun können. Nach dem Speichern stehen hier die korrigierten Wörter
   // als Vorschlag fürs Fachwörter-Wörterbuch: jedes einzeln an- und abwählbar, aufgenommen wird nur auf Klick.
-  import { farbe } from "appkern-oberflaeche";
+  import { farbe, fest } from "appkern-oberflaeche";
   import type { Sprecher } from "../lib/typen";
 
   let {
@@ -60,7 +60,7 @@
   const ERKLAERUNG = "Hält die Wiedergabe am Ende des geöffneten oder gewählten Beitrags an; nochmal Abspielen läuft weiter.";
 </script>
 
-<div class="bearbeitungsleiste" role="toolbar" aria-label="Bearbeiten">
+<div class="bearbeitungsleiste" role="toolbar" aria-label="Bearbeiten" use:fest={"oben"}>
   <div class="bl-zeile">
     <span class="bl-titel"><i class="fa-solid fa-pen"></i> Bearbeiten</span>
     <span class="bl-stand" class:offen={aenderungen > 0} aria-live="polite">{stand}</span>

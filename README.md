@@ -97,6 +97,7 @@ auf dem Entwicklungsrechner sein.
 | Ausrollen | `tools/ausrollen.sh` (auf den Pi, siehe oben) |
 | Appkern heben | `tools/appkern.sh` (Oberfläche und Backend auf denselben Commit; Ausrollen prüft das) |
 | Ansicht prüfen | `tools/ansicht.sh` (Seiten aus `frontend/ansicht.json` in allen Breiten, hell und dunkel: seitliches Rollen, Überlauf, Kontrast, Verschiebung beim Wechsel) |
+| Prüfstück | `backend/.venv/bin/python tools/pruefstueck.py` (Testdaten für die Seite `mitlesen` der Ansichtsprüfung: lange Beiträge und eine zweite Fassung; Mitlesen, Suche und Sprünge zu Abweichungen müssen die Marke danach ganz sichtbar zeigen) |
 | Pi im Browser ohne Zertifikat | `python3 tools/pi_durchleitung.py`, dann `http://127.0.0.1:8633` (prüft nach außen gegen die Hausstelle) |
 | Entwürfe | `python3 -m http.server` im Repo, dann `/mockups/transkription.html` und `/mockups/transkription-mobil.html` |
 

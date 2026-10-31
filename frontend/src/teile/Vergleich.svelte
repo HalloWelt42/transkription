@@ -3,12 +3,14 @@
   // auf einer Zeitachse. Die Beiträge stehen in Zeilen, die zur selben Zeit beginnen, so steht dieselbe Stelle auf
   // gleicher Höhe (am Telefon folgen die beiden Fassungen einer Stelle direkt aufeinander). Ein Spieler für beide: je
   // Fassung hebt das Mitlesen den laufenden Beitrag hervor und rollt mit; ausgeschaltet bleibt die Fassung reiner Text.
-  // Laufender Beitrag und Mitrollen kommen aus lib/mitlesen (dieselbe Wahrheit wie die Transkript-Ansicht).
+  // Laufender Beitrag kommt aus lib/mitlesen (dieselbe Wahrheit wie die Transkript-Ansicht), das Mitrollen und der
+  // Sprung zur Abweichung aus dem Appkern: die Stelle steht im oberen Drittel, nie unter dem festen Kopf (HELF-91).
   // Abweichungen (HELF-79): je Zeile werden die Wörter beider Fassungen abgeglichen (lib/wortvergleich); andere Wörter
   // sind stark markiert, nur Groß und Klein oder Satzzeichen schwach. Vor und zurück springt von Stelle zu Stelle (nur
   // die starken) und spielt sie ab; am Telefon dieselbe Markierung untereinander.
-  import { Auswahl } from "appkern-oberflaeche";
-  import { aktiverBeitrag, type Mitrollen } from "../lib/mitlesen.svelte";
+  import { tick } from "svelte";
+  import { Auswahl, fest, type Mitrollen, zuStelle } from "appkern-oberflaeche";
+  import { aktiverBeitrag } from "../lib/mitlesen";
   import type { Gezeigt } from "../lib/hoerdienste.svelte";
   import type { Segment } from "../lib/typen";
   import { abgleichen, type Abw } from "../lib/wortvergleich";
@@ -59,10 +61,14 @@
   const aktivLinks = $derived(mitlesen.links ? aktiverBeitrag(a.segmente, zeit) : -1);
   const aktivRechts = $derived(mitlesen.rechts ? aktiverBeitrag(b.segmente, zeit) : -1);
 
-  // Mitrollen: zur Zeile des laufenden Beitrags (links zuerst, sonst rechts)
+  // Mitrollen: zum gesprochenen Wort (links zuerst, sonst rechts), ohne Wortzeiten zur Zeile des laufenden Beitrags
   $effect(() => {
+    void zeit;
+    const seite = aktivLinks >= 0 ? "links" : "rechts";
     const zeile = aktivLinks >= 0 ? plan.zeileVon.links[aktivLinks] : aktivRechts >= 0 ? plan.zeileVon.rechts[aktivRechts] : -1;
-    if (zeile >= 0) mitrollen.zeigen(rollfeld, `[data-z="${zeile}"]`);
+    if (zeile < 0) return;
+    const z = rollfeld?.querySelector(`[data-z="${zeile}"]`);
+    mitrollen.folge(z?.querySelector(`.v-zelle.${seite} .wort.jetzt`) ?? z);
   });
 
   function springen(t: number) {
@@ -140,6 +146,7 @@
       : st.map((s) => s.zeit < zeit + VORLAUF_S - 0.05).lastIndexOf(true);
     if (nr < 0) nr = schritt > 0 ? 0 : st.length - 1;
     springen(Math.max(0, st[nr].zeit - VORLAUF_S));
+    void tick().then(() => zuStelle(rollfeld?.querySelector(".abw-gewaehlt")));
   }
 </script>
 
@@ -166,7 +173,7 @@
 {/snippet}
 
 <div class="vergleich" class:mobil>
-  <div class="v-kopf">
+  <div class="v-kopf" use:fest={"oben"}>
     {@render wahl("links", a)}
     {@render wahl("rechts", b)}
     <div class="v-abw">
