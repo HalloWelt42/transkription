@@ -12,7 +12,7 @@ schluessel_orte:
   - "Pi: Einstellungen im Verzeichnis `transkription.sqlite`: App-Schlüssel der Kellerwolke, Schlüssel der Leitstelle (in der Oberfläche unter Einstellungen, verdeckt)"
   - "Pi: `{{wurzel}}/zertifikate/`, Blattzertifikat mit Schlüssel aus der Hausstelle (vom Ausrollen)"
 einrichten: einrichten.sh
-stand: e8c96cc
+stand: 967902c
 ---
 
 # Transkription
