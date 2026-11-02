@@ -10,3 +10,5 @@ ton = true
 [zugaenge]
 name = "Transkription"
 leitstelle = ["text", "hoeren", "sprecher_erkennen", "sprecher_trennen", "ton"]
+# Konto der Kellerwolke, dem die App gehört: das Ausrollen besorgt auch Adresse und App-Schlüssel dort
+kellerwolke = "admin"

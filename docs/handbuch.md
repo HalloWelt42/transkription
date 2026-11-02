@@ -9,11 +9,11 @@ sicherung:
   - "nach der Regel des Appkerns eine Kopie von `transkription.sqlite` nach `{{wurzel}}/sicherungen`, wöchentlich und vor dem Ausrollen (nur, wenn die jüngste älter als 24 Stunden ist), nie ohne Änderung, höchstens drei Stände (Einstellungen, Sicherung); das Werkzeug Sicherungen holt sie täglich nach `~/Sicherungen/transkription/pi`"
   - "Transkripte und Aufnahmen liegen in der Kellerwolke und hängen an deren Sicherung; `abspielen/` braucht keine Sicherung"
 schluessel_orte:
-  - "Pi: Einstellungen im Verzeichnis `transkription.sqlite`: App-Schlüssel der Kellerwolke (in der Oberfläche unter Einstellungen, verdeckt)"
+  - "Pi: `{{wurzel}}/.env`: Adresse und App-Schlüssel der Kellerwolke als feste Einstellung (TRANSKRIPTION_FEST_KELLERWOLKE_*), vom Ausrollen gesetzt (HELF-77); in der Oberfläche nur angezeigt"
   - "Pi: `{{wurzel}}/.env`: Schlüssel und Adresse der Leitstelle als feste Einstellung (TRANSKRIPTION_FEST_LEITSTELLE_*), vom Ausrollen gesetzt (HELF-77); in der Oberfläche nur angezeigt"
   - "Pi: `{{wurzel}}/zertifikate/`, Blattzertifikat mit Schlüssel aus der Hausstelle (vom Ausrollen)"
 einrichten: einrichten.sh
-stand: a00c1ce
+stand: f2285f7
 ---
 
 # Transkription
@@ -40,7 +40,7 @@ Compose-Projekt aus `compose.pi.yml` hinter ihrem Vorschaltdienst `vorne`. Adres
 
 - Pi nach [[Grundlage Pi]] mit Docker; Mac nach [[Grundlage Mac]] für Entwicklung, Ausrollen und Hausstelle (für die
   Tests der Entwicklung auch ffmpeg am Mac).
-- [[Kellerwolke]]: Konto zum Anmelden und ein App-Schlüssel für die Transkription.
+- [[Kellerwolke]]: Konto zum Anmelden und ein App-Schlüssel für die Transkription, den das Ausrollen besorgt.
 - [[Leitstelle]]: Anwendung "Transkription" mit den Fähigkeiten aus `deploy/ausrollen.toml` (Abschnitt `[zugaenge]`);
   das Ausrollen legt sie an oder übernimmt sie und prüft, dass die Leitstelle den Tondienst meldet (fehlt er, ist das
   eine Warnung, kein Abbruch).
@@ -49,7 +49,7 @@ Compose-Projekt aus `compose.pi.yml` hinter ihrem Vorschaltdienst `vorne`. Adres
 ## Neu einrichten
 
 Zwei Wege. Aus der Sicherung: die jüngste Kopie von `transkription.sqlite` zurückspielen; dann sind Einstellungen,
-Aufträge und Vorschläge wie vorher. Frisch: leere Datenbank, erste Einrichtung mit neuem App-Schlüssel, Leitstelle
+Aufträge und Vorschläge wie vorher. Frisch: leere Datenbank, Adresse und App-Schlüssel der Kellerwolke vom Ausrollen, Leitstelle
 unter Einstellungen. Die Transkripte gehen dabei nicht verloren, weil sie in der Kellerwolke liegen; was nur die
 SQLite-Datei hielt (Aufträge, Vorschläge, Suchindex, Protokoll), beginnt neu.
 
@@ -80,9 +80,9 @@ Probe: `curl -s --cacert "$(mkcert -CAROOT)/rootCA.pem" {{adresse}}/api/v1/app` 
 
 ### 4. Erste Einrichtung
 
-Aus der Sicherung entfällt sie. Frisch: in der [[Kellerwolke]] einen App-Schlüssel für die Transkription anlegen,
-{{adresse}} öffnen und mit dem Einrichtungscode die Adresse der Kellerwolke und den Schlüssel eintragen; danach mit dem
-eigenen Kellerwolke-Konto anmelden. Telefone koppeln sich einmal je Web-App.
+Entfällt: Adresse und App-Schlüssel der [[Kellerwolke]] setzt das Ausrollen als feste Einstellungen (Konto unter
+`[zugaenge]` in `deploy/ausrollen.toml`, neuer Schlüssel nur mit `tools/ausrollen.sh --zugaenge-erneuern`). Nach dem
+ersten Ausrollen {{adresse}} öffnen und mit dem eigenen Kellerwolke-Konto anmelden. Telefone koppeln sich einmal je Web-App.
 
 Probe: `/api/v1/app` meldet `"einrichtung_noetig": false` und den Besitzer.
 
