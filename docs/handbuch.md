@@ -9,10 +9,11 @@ sicherung:
   - "nach der Regel des Appkerns eine Kopie von `transkription.sqlite` nach `{{wurzel}}/sicherungen`, wöchentlich und vor dem Ausrollen (nur, wenn die jüngste älter als 24 Stunden ist), nie ohne Änderung, höchstens drei Stände (Einstellungen, Sicherung); das Werkzeug Sicherungen holt sie täglich nach `~/Sicherungen/transkription/pi`"
   - "Transkripte und Aufnahmen liegen in der Kellerwolke und hängen an deren Sicherung; `abspielen/` braucht keine Sicherung"
 schluessel_orte:
-  - "Pi: Einstellungen im Verzeichnis `transkription.sqlite`: App-Schlüssel der Kellerwolke, Schlüssel der Leitstelle (in der Oberfläche unter Einstellungen, verdeckt)"
+  - "Pi: Einstellungen im Verzeichnis `transkription.sqlite`: App-Schlüssel der Kellerwolke (in der Oberfläche unter Einstellungen, verdeckt)"
+  - "Pi: `{{wurzel}}/.env`: Schlüssel und Adresse der Leitstelle als feste Einstellung (TRANSKRIPTION_FEST_LEITSTELLE_*), vom Ausrollen gesetzt (HELF-77); in der Oberfläche nur angezeigt"
   - "Pi: `{{wurzel}}/zertifikate/`, Blattzertifikat mit Schlüssel aus der Hausstelle (vom Ausrollen)"
 einrichten: einrichten.sh
-stand: 967902c
+stand: a00c1ce
 ---
 
 # Transkription
@@ -40,8 +41,9 @@ Compose-Projekt aus `compose.pi.yml` hinter ihrem Vorschaltdienst `vorne`. Adres
 - Pi nach [[Grundlage Pi]] mit Docker; Mac nach [[Grundlage Mac]] für Entwicklung, Ausrollen und Hausstelle (für die
   Tests der Entwicklung auch ffmpeg am Mac).
 - [[Kellerwolke]]: Konto zum Anmelden und ein App-Schlüssel für die Transkription.
-- [[Leitstelle]]: Anwendung "Transkription" mit den Fähigkeiten hoeren, ton, sprecher_erkennen, sprecher_trennen und
-  text; das Ausrollen prüft, dass die Leitstelle den Tondienst meldet (fehlt er, ist das eine Warnung, kein Abbruch).
+- [[Leitstelle]]: Anwendung "Transkription" mit den Fähigkeiten aus `deploy/ausrollen.toml` (Abschnitt `[zugaenge]`);
+  das Ausrollen legt sie an oder übernimmt sie und prüft, dass die Leitstelle den Tondienst meldet (fehlt er, ist das
+  eine Warnung, kein Abbruch).
 - [[Klangwerk]] am Mac mit den Diensten hoeren, sprecher, trennen und ton (über den [[Maschinenraum]]).
 
 ## Neu einrichten
@@ -86,9 +88,10 @@ Probe: `/api/v1/app` meldet `"einrichtung_noetig": false` und den Besitzer.
 
 ### 5. Leitstelle und Tondienst
 
-Aus der Sicherung stehen sie im Verzeichnis. Frisch: in der [[Leitstelle]] die Anwendung "Transkription" anlegen, ihren
-Schlüssel unter Einstellungen, Verbindungen eintragen, "Tondienst" wählen und "Adresse dieser App" auf {{adresse}}
-setzen (damit die Aktionen im Dateimenü der Kellerwolke hierher führen).
+Den Zugang zur [[Leitstelle]] besorgt das Ausrollen (anlegen oder übernehmen, Schlüssel als feste Einstellung in
+`{{wurzel}}/.env`, erneuern mit `tools/ausrollen.sh --zugaenge-erneuern`); unter Einstellungen, Verbindungen steht er
+mit Schloss. Aus der Sicherung steht der Rest im Verzeichnis; frisch "Tondienst" wählen und "Adresse dieser App" auf
+{{adresse}} setzen (damit die Aktionen im Dateimenü der Kellerwolke hierher führen).
 
 Probe: unter Einstellungen, Verbindungen sind Kellerwolke und Leitstelle grün, und eine kurze Aufnahme wird
 transkribiert.
