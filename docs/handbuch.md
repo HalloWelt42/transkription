@@ -13,7 +13,7 @@ schluessel_orte:
   - "Pi: `{{wurzel}}/.env`: Schlüssel und Adresse der Leitstelle als feste Einstellung (TRANSKRIPTION_FEST_LEITSTELLE_*), vom Ausrollen gesetzt (HELF-77); in der Oberfläche nur angezeigt"
   - "Pi: `{{wurzel}}/zertifikate/`, Blattzertifikat mit Schlüssel aus der Hausstelle (vom Ausrollen)"
 einrichten: einrichten.sh
-stand: f2285f7
+stand: b71ca8a
 ---
 
 # Transkription

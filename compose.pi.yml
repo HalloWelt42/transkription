@@ -10,6 +10,11 @@ services:
     user: "1000:1000"
     expose:
       - "8630"
+    # Einstellungen, die nicht ins Repo gehören (Zugänge zu Leitstelle und Kellerwolke, vom Ausrollen gesetzt), stehen
+    # nur auf dem Pi
+    env_file:
+      - path: .env
+        required: false
     environment:
       TRANSKRIPTION_DATEN: /app/daten
       TRANSKRIPTION_CA_DATEI: /zertifikate/rootCA.pem
