@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="de" data-theme="hell">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Transkription - Gespräch fortsetzen und löschen</title>
+    <link rel="stylesheet" href="kopf.css" />
+    <style>
+      /* Nur im Entwurf: Bausteine, die es in der App noch nicht gibt */
+      .teil-marke { display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; color: var(--text-3); font-size: var(--klein); }
+      .teil-marke::before, .teil-marke::after { content: ""; flex: 1; height: 1px; background: var(--rand); }
+      .teil-marke b { color: var(--text-2); font-weight: 600; }
+      .weiter-band { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin: 18px 0 6px; border-radius: var(--r2);
+                     background: var(--flaeche-2); box-shadow: 0 0 0 1px var(--rand); }
+      .weiter-band .unter { font-size: var(--klein); color: var(--text-3); }
+      .weiter-band .knopf { margin-left: auto; flex: none; }
+      .wahl { display: grid; gap: 6px; width: 100%; }
+      .wahl button { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 8px 12px; border: 0; border-radius: var(--r2);
+                     background: var(--flaeche); color: var(--text); font: inherit; text-align: left; box-shadow: 0 0 0 1px var(--rand); cursor: pointer; }
+      .wahl button .unter { display: block; font-size: var(--klein); color: var(--text-3); }
+      .wahl button.an { box-shadow: 0 0 0 2px var(--akzent); }
+      .wahl button i.fa-circle-dot { color: var(--akzent); }
+      .wahl button i.fa-circle { color: var(--text-3); }
+      .rueckfrage.drei { flex-direction: column; align-items: stretch; }
+      .rueckfrage.drei .aktionen { margin-left: 0; justify-content: flex-end; }
+      .menue { position: absolute; right: 14px; top: 96px; z-index: 4; min-width: 230px; padding: 6px; border-radius: var(--r2);
+               background: var(--flaeche); box-shadow: var(--schatten), 0 0 0 1px var(--rand); }
+      .menue button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 46px; padding: 0 12px; border: 0;
+                      background: transparent; color: var(--text); font: inherit; border-radius: var(--r1, 6px); }
+      .menue button.gefahr { color: var(--gefahr); }
+      .menue hr { border: 0; height: 1px; background: var(--rand); margin: 4px 0; }
+      .teil-grenze { position: absolute; top: 4px; bottom: 4px; width: 2px; background: var(--text-3); opacity: .55; }
+      .fortsetzung { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--r2); background: var(--akzent-weich);
+                     font-size: var(--klein); margin: 14px 0 4px; }
+      .fortsetzung i { color: var(--akzent); }
+      .seite-pc { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; padding: 18px; min-height: 0; overflow: hidden; }
+      .seite-pc .karte { background: var(--flaeche); border-radius: var(--r3, 14px); box-shadow: 0 0 0 1px var(--rand); padding: 16px 18px; overflow: auto; }
+      .seite-pc h2 { font-size: 16px; margin: 0 0 10px; }
+      .teile-liste .zeile { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--rand); font-size: var(--klein); }
+      .teile-liste .zeile .meta { color: var(--text-3); margin-left: auto; font-family: var(--schrift-zahl); }
+      .telefon .mobil { display: flex; flex-direction: column; }
+      .telefon .t-inhalt { flex: 1 1 auto; min-height: 0; overflow: auto; }
+      .seite-pc .t-beitrag { padding: 8px 0; }
+      .seite-pc .wer { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: var(--klein); }
+      .seite-pc .wer .zeit { margin-left: auto; color: var(--text-3); font-family: var(--schrift-zahl); font-weight: 400; }
+      .pc-kopf { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--rand); background: var(--flaeche); }
+      .pc-kopf h1 { font-size: 20px; margin: 0; }
+      .pc-kopf .knopfreihe { margin-left: auto; display: flex; gap: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="buehne">
+
+      <div>
+        <p class="zustand-titel" style="margin-top:0">1. Fertiges Transkript: am Ende "Weiter aufnehmen", dasselbe im Menü oben rechts</p>
+        <div class="telefon"><div class="mobil">
+          <div class="t-kopf"><button class="rund" aria-label="Zurück"><i class="fa-solid fa-chevron-left"></i></button><h1 style="font-size:21px">Folge 12: Hausverwaltung</h1><button class="rund aktiv" aria-label="Mehr"><i class="fa-solid fa-ellipsis-vertical"></i></button></div>
+          <div class="menue">
+            <button><i class="fa-solid fa-microphone"></i> Weiter aufnehmen</button>
+            <button><i class="fa-solid fa-file-export"></i> Herunterladen</button>
+            <button><i class="fa-solid fa-user-group"></i> Sprecher</button>
+            <hr />
+            <button class="gefahr"><i class="fa-solid fa-trash-can"></i> In den Papierkorb</button>
+          </div>
+          <div class="t-inhalt">
+            <div class="t-beitrag"><div class="wer"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:var(--s2)"></span>Herr Krüger<span class="zeit">44:31</span></div>
+              <div class="text">Gut, dann schicke ich Ihnen die Belege bis Freitag zu.</div></div>
+            <div class="t-beitrag"><div class="wer"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:var(--s1)"></span>Anna<span class="zeit">44:52</span></div>
+              <div class="text">Danke. Dann machen wir für nächste Woche einen Termin aus.</div></div>
+            <div class="weiter-band">
+              <div><b>Geht das Gespräch weiter?</b><div class="unter">Wird als Teil 2 angehängt; nur der neue Teil wird transkribiert.</div></div>
+              <button class="knopf"><i class="fa-solid fa-microphone" style="color:var(--gefahr)"></i> Weiter aufnehmen</button>
+            </div>
+          </div>
+          <div class="t-spieler">
+            <button class="gross"><i class="fa-solid fa-play"></i></button>
+            <div class="welle" data-kopf="0.98" data-saeulen="60" data-spur="s1:8 s2:14 s1:5 s3:9 s2:20 s1:12 s3:6 s2:26" data-marker=""></div>
+            <span class="zeitangabe">44:52<br />45:12</span>
+          </div>
+          <nav class="t-reiter">
+            <button><i class="fa-solid fa-microphone-lines"></i>Aufnahmen</button>
+            <button class="aktiv"><i class="fa-solid fa-file-lines"></i>Transkripte</button>
+            <button><i class="fa-solid fa-list-check"></i>Aufträge</button>
+            <button><i class="fa-solid fa-ellipsis"></i>Mehr</button>
+          </nav>
+        </div></div>
+      </div>
+
+      <div>
+        <p class="zustand-titel" style="margin-top:0">2. Fortsetzung läuft: dieselbe Aufnahmeleiste, im Kopf steht, woran sie hängt; die Zeit zählt ab dem Ende von Teil 1 weiter</p>
+        <div class="telefon"><div class="mobil">
+          <div class="t-kopf"><h1 style="font-size:21px">Teil 2 zu Folge 12</h1></div>
+          <div class="t-inhalt" style="display:flex; flex-direction:column">
+            <div class="rek">
+            <div class="rek-live">
+              <div class="kopf-zeile"><i class="fa-solid fa-closed-captioning"></i> Live-Mitschrift<span style="margin-left:auto">hört ...</span></div>
+              <div class="text">
+                <p><span class="zeit">45:12</span>Wir sind wieder da, kurz noch zum Termin.</p>
+                <p><span class="zeit">45:20</span>Dienstag um zehn passt bei uns, Herr Krüger kommt mit den Ordnern.</p>
+              </div>
+            </div>
+            <span class="rek-symbole">
+                <button class="rek-symbol" title="Mikrofon"><i class="fa-solid fa-microphone"></i></button>
+                <button class="rek-symbol gut" title="Live-Mitschrift an"><i class="fa-solid fa-closed-captioning"></i></button>
+                <button class="rek-symbol gut" title="Wird laufend gesichert"><i class="fa-solid fa-floppy-disk"></i></button>
+                <button class="rek-symbol gut" title="Ton vom Mikrofon"><i class="fa-solid fa-wave-square"></i></button>
+                <button class="rek-symbol" title="Verwerfen"><i class="fa-solid fa-trash-can"></i></button>
+              </span>
+            <div class="rek-leiste">
+              <button class="stopp" title="Beenden und anhängen"><i class="fa-solid fa-stop"></i></button>
+              <button class="rund pause" title="Anhalten"><i class="fa-solid fa-pause"></i></button>
+              <span class="rek-pegel" id="pegel"></span>
+              <span class="rek-zeit"><span class="punkt"></span>45:31</span>
+              <button class="rund marken" title="Marker setzen"><i class="fa-solid fa-flag"></i></button>
+            </div>
+            </div>
+          </div>
+          <nav class="t-reiter">
+            <button><i class="fa-solid fa-microphone-lines"></i>Aufnahmen</button>
+            <button class="aktiv"><i class="fa-solid fa-file-lines"></i>Transkripte</button>
+            <button><i class="fa-solid fa-list-check"></i>Aufträge</button>
+            <button><i class="fa-solid fa-ellipsis"></i>Mehr</button>
+          </nav>
+        </div></div>
+      </div>
+
+      <div>
+        <p class="zustand-titel" style="margin-top:0">3. Danach: Teil 2 wird transkribiert (Auftrag mit Fortschritt), Teil 1 bleibt lesbar und abspielbar</p>
+        <div class="telefon"><div class="mobil">
+          <div class="t-kopf"><button class="rund" aria-label="Zurück"><i class="fa-solid fa-chevron-left"></i></button><h1 style="font-size:21px">Folge 12: Hausverwaltung</h1><button class="rund" aria-label="Mehr"><i class="fa-solid fa-ellipsis-vertical"></i></button></div>
+          <div class="t-inhalt">
+            <div class="t-beitrag"><div class="wer"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:var(--s1)"></span>Anna<span class="zeit">44:52</span></div>
+              <div class="text">Danke. Dann machen wir für nächste Woche einen Termin aus.</div></div>
+            <div class="teil-marke"><b>Teil 2</b> aufgenommen am 04.11.2026, 15:20</div>
+            <div class="fortsetzung"><i class="fa-solid fa-circle-notch fa-spin"></i><span><b>Teil 2 wird transkribiert</b>, Abschnitt 1 von 2, noch etwa 1 min</span></div>
+            <div class="rek-live" style="margin-top:8px"><div class="text">
+              <p><span class="zeit">45:12</span>Wir sind wieder da, kurz noch zum Termin.</p></div></div>
+          </div>
+          <div class="t-spieler">
+            <button class="gross"><i class="fa-solid fa-play"></i></button>
+            <div class="welle" data-kopf="0.95" data-saeulen="60" data-spur="s1:8 s2:14 s1:5 s3:9 s2:20 s1:12 s3:6 s2:22" data-marker="" data-grenze="0.96"></div>
+            <span class="zeitangabe">44:52<br />46:03</span>
+          </div>
+          <nav class="t-reiter">
+            <button><i class="fa-solid fa-microphone-lines"></i>Aufnahmen</button>
+            <button class="aktiv"><i class="fa-solid fa-file-lines"></i>Transkripte</button>
+            <button><i class="fa-solid fa-list-check"></i>Aufträge</button>
+            <button><i class="fa-solid fa-ellipsis"></i>Mehr</button>
+          </nav>
+        </div></div>
+      </div>
+
+      <div>
+        <p class="zustand-titel" style="margin-top:0">4. Ein Gespräch aus zwei Teilen: Trennmarke im Text, Strich im Spieler; die Zeit läuft durch, Abspielen geht nahtlos weiter</p>
+        <div class="telefon"><div class="mobil">
+          <div class="t-kopf"><button class="rund" aria-label="Zurück"><i class="fa-solid fa-chevron-left"></i></button><h1 style="font-size:21px">Folge 12: Hausverwaltung</h1><button class="rund" aria-label="Mehr"><i class="fa-solid fa-ellipsis-vertical"></i></button></div>
+          <div class="t-inhalt">
+            <div class="t-beitrag"><div class="wer"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:var(--s1)"></span>Anna<span class="zeit">44:52</span></div>
+              <div class="text">Danke. Dann machen wir für nächste Woche einen Termin aus.</div></div>
+            <div class="teil-marke"><b>Teil 2</b> aufgenommen am 04.11.2026, 15:20</div>
+            <div class="t-beitrag jetzt"><div class="wer"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:var(--s1)"></span>Anna<span class="zeit">45:12</span></div>
+              <div class="text"><span class="wort gehoert">Wir</span> <span class="wort gehoert">sind</span> <span class="wort jetzt">wieder</span> <span class="wort">da, kurz noch zum Termin.</span></div></div>
+            <div class="t-beitrag"><div class="wer"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:var(--s2)"></span>Herr Krüger<span class="zeit">45:20</span></div>
+              <div class="text">Dienstag um zehn passt bei uns, ich komme mit den Ordnern.</div></div>
+            <div class="weiter-band">
+              <div><b>Geht das Gespräch weiter?</b><div class="unter">Wird als Teil 3 angehängt.</div></div>
+              <button class="knopf"><i class="fa-solid fa-microphone" style="color:var(--gefahr)"></i> Weiter aufnehmen</button>
+            </div>
+          </div>
+          <div class="t-spieler">
+            <button class="gross"><i class="fa-solid fa-pause"></i></button>
+            <div class="welle" data-kopf="0.962" data-saeulen="60" data-spur="s1:8 s2:14 s1:5 s3:9 s2:20 s1:12 s3:6 s2:22 s1:2 s2:2" data-marker="" data-grenze="0.96"></div>
+            <span class="zeitangabe">45:13<br />46:03</span>
+          </div>
+          <nav class="t-reiter">
+            <button><i class="fa-solid fa-microphone-lines"></i>Aufnahmen</button>
+            <button class="aktiv"><i class="fa-solid fa-file-lines"></i>Transkripte</button>
+            <button><i class="fa-solid fa-list-check"></i>Aufträge</button>
+            <button><i class="fa-solid fa-ellipsis"></i>Mehr</button>
+          </nav>
+        </div></div>
+      </div>
+
+      <div>
+        <p class="zustand-titel" style="margin-top:0">5. Löschen (Menü oder Papierkorb in der Liste): eine Rückfrage mit drei Wahlen, alles landet im Papierkorb der Kellerwolke</p>
+        <div class="telefon"><div class="mobil">
+          <div class="t-kopf"><button class="rund" aria-label="Zurück"><i class="fa-solid fa-chevron-left"></i></button><h1 style="font-size:21px">Folge 12: Hausverwaltung</h1><button class="rund" aria-label="Mehr"><i class="fa-solid fa-ellipsis-vertical"></i></button></div>
+          <div class="t-inhalt">
+            <div class="rueckfrage drei" role="alertdialog">
+              <span class="frage">Was soll in den Papierkorb?</span>
+              <div class="wahl">
+                <button class="an"><i class="fa-solid fa-circle-dot"></i><span>Gespräch ganz<span class="unter">Transkript und Aufnahme mit beiden Teilen</span></span></button>
+                <button><i class="fa-regular fa-circle"></i><span>Nur das Transkript<span class="unter">Die Aufnahme bleibt und lässt sich neu transkribieren</span></span></button>
+                <button><i class="fa-regular fa-circle"></i><span>Nur die Aufnahme<span class="unter">Beide Teile; der Text bleibt ohne Ton stehen</span></span></button>
+              </div>
+              <span>Im Papierkorb der Kellerwolke lässt sich alles zurückholen.</span>
+              <span class="aktionen">
+                <button class="knopf still">Abbrechen</button>
+                <button class="knopf gefahr"><i class="fa-solid fa-trash-can"></i> In den Papierkorb</button>
+              </span>
+            </div>
+            <div class="t-beitrag"><div class="wer"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:var(--s2)"></span>Herr Krüger<span class="zeit">00:00</span></div>
+              <div class="text">Guten Tag, schön, dass Sie es einrichten konnten.</div></div>
+          </div>
+          <nav class="t-reiter">
+            <button><i class="fa-solid fa-microphone-lines"></i>Aufnahmen</button>
+            <button class="aktiv"><i class="fa-solid fa-file-lines"></i>Transkripte</button>
+            <button><i class="fa-solid fa-list-check"></i>Aufträge</button>
+            <button><i class="fa-solid fa-ellipsis"></i>Mehr</button>
+          </nav>
+        </div></div>
+      </div>
+
+      <div>
+        <p class="zustand-titel" style="margin-top:0">6. Am Rechner: Weiter aufnehmen und Papierkorb im Kopf des Transkripts, rechts die Teile des Gesprächs, Rückfrage im Ablauf</p>
+        <div class="fenster">
+          <div class="pc-kopf"><h1>Folge 12: Hausverwaltung</h1><span class="stand-pille fertig">2 Teile, 46:03</span>
+            <span class="knopfreihe">
+              <button class="knopf"><i class="fa-solid fa-microphone" style="color:var(--gefahr)"></i> Weiter aufnehmen</button>
+              <button class="knopf"><i class="fa-solid fa-file-export"></i> Herunterladen</button>
+              <button class="knopf still"><i class="fa-solid fa-trash-can"></i> In den Papierkorb</button>
+            </span></div>
+          <div style="padding:0 18px">
+            <div class="rueckfrage" role="alertdialog" style="margin-top:12px">
+              <span class="frage">Was soll in den Papierkorb?</span>
+              <span class="wahl" style="display:flex; width:auto; gap:6px">
+                <button class="an"><i class="fa-solid fa-circle-dot"></i>Gespräch ganz</button>
+                <button><i class="fa-regular fa-circle"></i>Nur das Transkript</button>
+                <button><i class="fa-regular fa-circle"></i>Nur die Aufnahme</button>
+              </span>
+              <span class="aktionen"><button class="knopf still">Abbrechen</button><button class="knopf gefahr"><i class="fa-solid fa-trash-can"></i> In den Papierkorb</button></span>
+            </div>
+          </div>
+          <div class="seite-pc">
+            <div class="karte">
+              <div class="t-beitrag"><div class="wer"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:var(--s1)"></span>Anna<span class="zeit">44:52</span></div>
+                <div class="text">Danke. Dann machen wir für nächste Woche einen Termin aus.</div></div>
+              <div class="teil-marke"><b>Teil 2</b> aufgenommen am 04.11.2026, 15:20</div>
+              <div class="t-beitrag"><div class="wer"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:var(--s1)"></span>Anna<span class="zeit">45:12</span></div>
+                <div class="text">Wir sind wieder da, kurz noch zum Termin.</div></div>
+              <div class="t-beitrag"><div class="wer"><span class="punkt" style="width:10px;height:10px;border-radius:5px;background:var(--s2)"></span>Herr Krüger<span class="zeit">45:20</span></div>
+                <div class="text">Dienstag um zehn passt bei uns, ich komme mit den Ordnern.</div></div>
+            </div>
+            <div class="karte teile-liste">
+              <h2>Teile des Gesprächs</h2>
+              <div class="zeile"><i class="fa-solid fa-file-audio"></i>Teil 1, 04.11.2026 14:31<span class="meta">00:00 bis 45:12</span></div>
+              <div class="zeile"><i class="fa-solid fa-microphone"></i>Teil 2, 04.11.2026 15:20<span class="meta">45:12 bis 46:03</span></div>
+              <p style="font-size:var(--klein); color:var(--text-3)">Ein Klick springt an den Anfang des Teils. Die Teile liegen als Begleiter neben der Aufnahme und wandern mit ihr in den Papierkorb.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <script src="gemeinsam.js"></script>
+    <script>
+      document.querySelectorAll(".welle[data-grenze]").forEach((w) => {
+        const g = document.createElement("span");
+        g.className = "teil-grenze";
+        g.style.left = `${Number(w.dataset.grenze) * 100}%`;
+        w.append(g);
+      });
+      const pegel = document.getElementById("pegel");
+      for (let i = 0; i < 40; i++) {
+        const s = document.createElement("span");
+        s.style.height = `${12 + 70 * Math.abs(Math.sin(i * 0.6) * Math.cos(i * 0.23))}%`;
+        pegel.append(s);
+      }
+    </script>
+  </body>
+</html>
