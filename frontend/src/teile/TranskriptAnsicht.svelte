@@ -15,7 +15,7 @@
   // unten angehängt; eine Marke "Weiter aufgenommen am ..." zeigt die Stelle. "In den Papierkorb" fragt, was weg soll:
   // das Gespräch ganz, nur das Transkript oder nur die Aufnahme.
   import { onMount, tick } from "svelte";
-  import { AnfrageBand, arbeit, aufnahme, Auswahl, beiAuftrag, farbe, gehe, geraet, Leiste, leisteOeffnen, lesen, marke,
+  import { AnfrageBand, ApiFehler, arbeit, aufnahme, Auswahl, beiAuftrag, farbe, gehe, geraet, Leiste, leisteOeffnen, lesen, marke,
            navigation, Spieler, zurueckZurKellerwolke } from "appkern-oberflaeche";
   import { fortsetzung, weiterAufnehmen as aufnehmenAn } from "../lib/fortsetzung.svelte";
   import Aufnehmen from "./Aufnehmen.svelte";
@@ -214,7 +214,10 @@
       if (quelle) void api.wellenform(quelle, anfrage).then((w) => (welle = w)).catch(() => {});
       vorschlaege = await api.vorschlaege(id);
     } catch (f) {
-      fehler = (f as Error).message;
+      // gelöscht (etwa an anderer Stelle oder in der Kellerwolke): sagen, was los ist, statt "Nicht gefunden"
+      fehler = f instanceof ApiFehler && f.status === 404
+        ? "Dieses Transkript gibt es nicht mehr. Gelöschtes liegt im Papierkorb der Kellerwolke und lässt sich dort zurückholen."
+        : (f as Error).message;
     }
   }
 

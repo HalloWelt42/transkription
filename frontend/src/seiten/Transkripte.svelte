@@ -33,6 +33,16 @@
     }
   }
 
+  // zurück aus einem Transkript: die Liste neu holen (es kann gelöscht, umbenannt oder weiter aufgenommen sein, HELF-154)
+  let warOffen = false;
+  $effect(() => {
+    if (kennung) warOffen = true;
+    else if (warOffen) {
+      warOffen = false;
+      void laden();
+    }
+  });
+
   onMount(() => {
     void laden();
     api.sprecherNamen().then((n) => (namen = n)).catch(() => {});

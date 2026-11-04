@@ -483,3 +483,62 @@ async def test_gespraech_fortsetzen(tmp_path: Path):
                     pass
         await g.stoppen()
         await aktionen_zurueckziehen()
+
+
+async def test_loeschwege_raeumen_das_verzeichnis(tmp_path: Path):
+    """HELF-154: Jeder Löschweg nimmt gelöschte Transkripte aus Liste und Suche: das Gespräch ganz, nur das Transkript;
+    nur die Aufnahme lässt das Transkript (mit seinem Text) in der Liste, ohne Aufnahme. Ein gelöschtes Transkript
+    antwortet mit 404 (die Oberfläche sagt dann, dass es im Papierkorb liegt)."""
+    ton = await _webm(tmp_path / "ton.webm", 4, 330)
+    app = app_bauen(tmp_path / "daten", transport=Weiche(tmp_path / "tondienst"))
+    g = app.state.geruest
+    await g.starten()
+    angelegt: list[str] = []
+    try:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t", timeout=60) as c:
+            r = await c.post("/api/v1/einrichtung", json={"kellerwolke_adresse": W["KELLERWOLKE_ADRESSE"],
+                                                          "kellerwolke_schluessel": W["KELLERWOLKE_SCHLUESSEL"]})
+            assert r.status_code == 200, r.text
+            r = await c.post("/api/v1/anmeldung", json={"kennung": W["KELLERWOLKE_KENNUNG"], "passwort": W["KELLERWOLKE_PASSWORT"]})
+            h = {"X-Kellerwolke-Sitzung": r.json()["token"]}
+            try:
+                lauf = secrets.token_hex(3)
+
+                async def gespraech(was: str) -> tuple[str, str]:
+                    a = (await c.post("/api/v1/aufnahmen", params={"name": f"Löschweg {was} {lauf}.webm"}, content=ton.read_bytes(),
+                                      headers={**h, "Content-Type": "audio/webm"})).json()
+                    angelegt.append(a["id"])
+                    t = (await c.post("/api/v1/transkripte", headers=h, json={
+                        "quelle_id": a["id"], "name": f"Löschweg {was} {lauf}", "stuecke": [{"start": 0, "ende": 2, "text": f"Wort{lauf}"}]})).json()
+                    angelegt.append(t["id"])
+                    return a["id"], t["id"]
+
+                async def liste() -> set[str]:
+                    return {e["id"] for e in (await c.get("/api/v1/transkripte", headers=h, params={"suche": f"Wort{lauf}"})).json()["eintraege"]}
+
+                ganz, nur_transkript, nur_aufnahme = await gespraech("ganz"), await gespraech("transkript"), await gespraech("aufnahme")
+                assert await liste() == {ganz[1], nur_transkript[1], nur_aufnahme[1]}
+                assert (await c.get(f"/api/v1/transkripte/{nur_aufnahme[1]}", headers=h)).json()["aufnahme_id"] == nur_aufnahme[0]
+
+                assert (await c.delete(f"/api/v1/aufnahmen/{ganz[0]}", headers=h, params={"mit_transkripten": True})).status_code == 204
+                assert (await c.delete(f"/api/v1/transkripte/{nur_transkript[1]}", headers=h)).status_code == 204
+                assert (await c.delete(f"/api/v1/aufnahmen/{nur_aufnahme[0]}", headers=h)).status_code == 204
+                for k in (ganz[0], ganz[1], nur_transkript[1], nur_aufnahme[0]):
+                    angelegt.remove(k)
+
+                assert await liste() == {nur_aufnahme[1]}
+                assert (await c.get(f"/api/v1/transkripte/{ganz[1]}", headers=h)).status_code == 404
+                assert (await c.get(f"/api/v1/transkripte/{nur_aufnahme[1]}", headers=h)).json()["aufnahme_id"] is None
+                assert (await c.get(f"/api/v1/aufnahmen/{nur_transkript[0]}", headers=h)).json()["transkripte"] == []
+                assert (await c.get(f"/api/v1/aufnahmen/{ganz[0]}", headers=h)).status_code == 404
+            finally:
+                await c.post("/api/v1/anmeldung/abmelden", headers=h)
+    finally:
+        if g.kellerwolke is not None:
+            for k in list(angelegt):
+                try:
+                    await g.kellerwolke.loeschen(k)
+                except Exception:  # noqa: BLE001 - schon weg
+                    pass
+        await g.stoppen()
+        await aktionen_zurueckziehen()

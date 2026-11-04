@@ -7,7 +7,7 @@
   import { onMount } from "svelte";
   import { fortsetzung, weiterAufnehmen } from "../lib/fortsetzung.svelte";
   import Aufnehmen from "./Aufnehmen.svelte";
-  import { AnfrageBand, aufnahme, Auswahl, beiAuftrag, gehe, geraet, groesse, Leiste, leisteOeffnen, marke, navigation,
+  import { AnfrageBand, ApiFehler, aufnahme, Auswahl, beiAuftrag, gehe, geraet, groesse, Leiste, leisteOeffnen, marke, navigation,
            Spieler, wann, zurueckZurKellerwolke } from "appkern-oberflaeche";
   import { sprachOptionen as sprachWahl } from "../lib/sprachen.svelte";
   import { hoerdiensteLaden, hoerdienstOptionen, trenndiensteLaden, trenndienstOptionen, vorgabeHoerdienst,
@@ -59,7 +59,9 @@
       a = await api.aufnahme(id, anfrage);
       navigation.titel = a.name;
     } catch (f) {
-      fehler = (f as Error).message;
+      fehler = f instanceof ApiFehler && f.status === 404
+        ? "Diese Aufnahme gibt es nicht mehr. Gelöschtes liegt im Papierkorb der Kellerwolke und lässt sich dort zurückholen."
+        : (f as Error).message;
     }
   }
 

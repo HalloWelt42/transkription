@@ -18,6 +18,37 @@
       "pfad": "/transkripte/{eintraege.0.id}"
     },
     {
+      "name": "aufnahme",
+      "abfrage": "/api/v1/aufnahmen?anzahl=1",
+      "pfad": "/aufnahmen/{eintraege.0.id}"
+    },
+    {
+      "name": "loeschen",
+      "abfrage": "/api/v1/transkripte?anzahl=1",
+      "pfad": "/transkripte/{eintraege.0.id}",
+      "wechsel": [
+        {
+          "klick": ".seiten-kopf .knopf:has(.fa-trash-can), .knopfzeile .rund[aria-label=Mehr]",
+          "warten_ms": 600
+        },
+        {
+          "klick": ".mehr-aktionen .knopf:has(.fa-trash-can), .loeschen-wahl .wahl button:nth-child(2)",
+          "warten_ms": 600
+        }
+      ]
+    },
+    {
+      "name": "aufnahme-loeschen",
+      "abfrage": "/api/v1/aufnahmen?anzahl=1",
+      "pfad": "/aufnahmen/{eintraege.0.id}",
+      "wechsel": [
+        {
+          "klick": ".t-loeschen .knopf, .leiste-inhalt .knopf:has(.fa-trash-can)",
+          "warten_ms": 600
+        }
+      ]
+    },
+    {
       "name": "bearbeiten",
       "abfrage": "/api/v1/transkripte?anzahl=1",
       "pfad": "/transkripte/{eintraege.0.id}",
