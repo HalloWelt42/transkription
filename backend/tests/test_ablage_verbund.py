@@ -79,6 +79,8 @@ async def test_ein_transkript_je_aufnahme_mit_versionen(umgebung):
     _, k4 = await transkripte.zurueckholen(k1.id, versionen[2].id, k3.etag, "chef")
     t4, _ = await transkripte.lesen(k1.id)
     assert t4.segmente[0].text == "Erster Text" and "zurückgeholt" in t4.aenderung.was and k4.etag != k3.etag
+    alt = await transkripte.version(k1.id, versionen[2].id)
+    assert f"{alt.geaendert_am.astimezone():%d.%m.%Y %H:%M}" in t4.aenderung.was      # Ortszeit wie die Liste der Versionen
 
 
 async def test_unlesbares_transkript_meldet_sich(umgebung):

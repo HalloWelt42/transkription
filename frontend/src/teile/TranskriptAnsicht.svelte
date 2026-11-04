@@ -30,7 +30,7 @@
   import Vergleich from "./Vergleich.svelte";
   import { neueKennung } from "../lib/kennung";
   import { abweichung, korrigierteWoerter } from "../lib/wortvergleich";
-  import type { Hoerdienst, LoeschenWas, Marker, Segment, Transkript, TranskriptAntwort, Vorschlag } from "../lib/typen";
+  import type { Hoerdienst, LoeschenWas, Marker, Segment, Transkript, TranskriptAntwort, Version, Vorschlag } from "../lib/typen";
   import Beitrag from "./Beitrag.svelte";
   import Bearbeitungsleiste from "./Bearbeitungsleiste.svelte";
   import TranskriptLeiste from "./TranskriptLeiste.svelte";
@@ -106,8 +106,30 @@
   const vergleich = $derived(!bearbeiten && ansicht === VERGLEICH && fassungen.length > 1);
   // eine weitere Fassung zum Lesen; im Bearbeiten immer die Hauptfassung
   const gezeigt = $derived(bearbeiten || ansicht === HAUPT ? null : fassungen.find((f) => f.id === ansicht && f.id !== HAUPT) ?? null);
-  const segmente = $derived(gezeigt?.segmente ?? t?.segmente ?? []);
-  const gezeigteSprecher = $derived(gezeigt?.sprecher ?? t?.sprecher ?? []);
+  // eine frühere Version nur ansehen (aus den Versionen der Leiste); Bearbeiten, Suche und Export bleiben bei der aktuellen
+  let alteFassung = $state<{ nummer: number; id: string; erstellt_am: string; t: Transkript } | null>(null);
+  const segmente = $derived(alteFassung?.t.segmente ?? gezeigt?.segmente ?? t?.segmente ?? []);
+  const gezeigteSprecher = $derived(alteFassung?.t.sprecher ?? gezeigt?.sprecher ?? t?.sprecher ?? []);
+
+  async function versionAnsehen(v: Version, nummer: number) {
+    fehler = "";
+    try {
+      alteFassung = { nummer, id: v.id, erstellt_am: v.erstellt_am, t: await api.version(id, v.id, anfrage ?? undefined) };
+      mehr = false;
+    } catch (f) {
+      fehler = (f as Error).message;
+    }
+  }
+
+  async function versionZurueckholen() {
+    if (!antwort || !alteFassung) return;
+    try {
+      antwort = await api.zurueckholen(id, alteFassung.id, antwort.stand, anfrage ?? undefined);
+      alteFassung = null;
+    } catch (f) {
+      fehler = (f as Error).message;
+    }
+  }
   const aktiv = $derived(aktiverBeitrag(segmente, zeit));
   const spur = $derived.by(() => {
     const aus: { von: number; bis: number; farbe: string }[] = [];
@@ -149,7 +171,7 @@
   const markerVor = $derived.by(() => {
     // Marker gehören vor den ersten Beitrag, der nach ihnen beginnt
     const zu: Record<number, Marker[]> = {};
-    for (const m of t?.marker ?? []) {
+    for (const m of alteFassung?.t.marker ?? t?.marker ?? []) {
       const i = segmente.findIndex((s) => s.start >= m.zeit);
       (zu[i < 0 ? segmente.length : i] ??= []).push(m);
     }
@@ -375,6 +397,7 @@
 
   function bearbeitenBeginnen() {
     if (!antwort || bearbeiten) return;
+    alteFassung = null;
     ansicht = HAUPT;                       // bearbeitet wird die Hauptfassung
     entwurf = structuredClone($state.snapshot(antwort.transkript)) as Transkript;
     bearbeiten = true;
@@ -770,6 +793,16 @@
 {/snippet}
 
 {#snippet oberhalbText()}
+  {#if alteFassung}
+    <div class="fassung-hinweis">
+      <span>Version {alteFassung.nummer} vom {new Date(alteFassung.erstellt_am).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })},
+        nur zum Ansehen.</span>
+      <span class="knopfzeile">
+        <button class="knopf" onclick={versionZurueckholen} title="Diese Fassung als neue Version zurückholen"><i class="fa-solid fa-clock-rotate-left"></i> Zurückholen</button>
+        <button class="knopf still" onclick={() => (alteFassung = null)}>Zur aktuellen</button>
+      </span>
+    </div>
+  {/if}
   {#if loeschenOffen && antwort}
     <LoeschenWahl transkript aufnahme={!!antwort.aufnahme_id} beschaeftigt={loescht}
                   nebeneinander={!geraet.mobil} onabbrechen={() => (loeschenOffen = false)} onja={loeschenJetzt} />
@@ -804,7 +837,7 @@
                     zuordnung={bearbeiten ? { neu: neuerSprecher, umbenennen: sprecherUmbenennen, zusammenfuehren } : null}
                     onneu={(a) => { antwort = a; if (bearbeiten) entwurf = structuredClone($state.snapshot(a.transkript)) as Transkript; }}
                     onmarker={markerSpeichern} onvorschlaege={() => api.vorschlaege(id).then((v) => (vorschlaege = v))}
-                    onansehen={() => { bearbeitenBeginnen(); mehr = false; }} />
+                    onansehen={() => { bearbeitenBeginnen(); mehr = false; }} onversion={versionAnsehen} />
 {/snippet}
 
 {#if !antwort}

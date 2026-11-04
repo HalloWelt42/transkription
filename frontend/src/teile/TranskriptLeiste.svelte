@@ -23,6 +23,7 @@
     onmarker,
     onvorschlaege,
     onansehen,
+    onversion,
     entwurf = null,
     ungespeichert = 0,
     onzuordnen,
@@ -38,6 +39,7 @@
     onmarker: (liste: Marker[]) => Promise<void>;
     onvorschlaege: () => void;
     onansehen: () => void;
+    onversion?: (v: Version, nummer: number) => void;      // eine frühere Fassung nur ansehen (im Text, HELF-154)
     entwurf?: Transkript | null;
     ungespeichert?: number;
     onzuordnen?: () => void;
@@ -376,8 +378,12 @@
           <span class="zeit">{tag(v.erstellt_am)}</span>
           <span class="version-text"><b>{(versionen?.length ?? 0) - i}</b> · {uhr(v.erstellt_am)} · {v.notiz?.was ?? "geändert"}</span>
           {#if !v.aktuell && !bearbeiten && alleVersionen}
-            <button class="knopf klein still" title="Diese Fassung als neue Version zurückholen" onclick={() => zurueck(v)}>
-              {zurueckFrage === v.id ? "Wirklich?" : "Zurückholen"}</button>
+            <span class="knopfreihe">
+              {#if onversion}<button class="knopf klein still" title="Diese Fassung im Text ansehen, ohne etwas zu ändern"
+                                     onclick={() => onversion(v, (versionen?.length ?? 0) - i)}>Ansehen</button>{/if}
+              <button class="knopf klein still" title="Diese Fassung als neue Version zurückholen" onclick={() => zurueck(v)}>
+                {zurueckFrage === v.id ? "Wirklich?" : "Zurückholen"}</button>
+            </span>
           {/if}
         </div>
       {/each}

@@ -137,7 +137,7 @@ class Transkripte:
     async def zurueckholen(self, transkript_id: UUID | str, version_id: UUID | str, stand: str, wer: str | None,
                            app: str | None = None) -> tuple[Transkript, Knoten]:
         alt = await self.version(transkript_id, version_id)
-        was = f"Fassung vom {alt.geaendert_am:%d.%m.%Y %H:%M} zurückgeholt"
+        was = f"Fassung vom {alt.geaendert_am.astimezone():%d.%m.%Y %H:%M} zurückgeholt"       # Ortszeit wie in der Liste
         return await self.schreiben(transkript_id, alt, stand, Aenderung(was=was, wer=wer, app=app))
 
     async def loeschen(self, transkript_id: UUID | str) -> None:
