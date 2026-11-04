@@ -1,6 +1,6 @@
 <script lang="ts">
   // Leiste eines Transkripts, wie im Entwurf (mockups/transkription.html, 3): Sprecher mit Anteil, Profilvorschlag zum
-  // Übernehmen, Umbenennen (als Profil oder nur hier) und Neu erkennen; Marker; Export (Download, auf Wunsch auch als
+  // Übernehmen, Umbenennen (als Profil oder nur hier) und Neu erkennen; Teile des Gesprächs (HELF-154); Marker; Export (Download, auf Wunsch auch als
   // Datei daneben); KI über die Leitstelle (Korrigieren, Auswerten nach Vorlage); Versionen. Laufende Aufträge zu
   // diesem Transkript stehen in ihrem Abschnitt; fertige laden nach. Im Bearbeiten (3b) zeigt sie den Entwurf:
   // Umbenennen, Zusammenführen, neue Sprecher und Marker wirken dort und werden mit dem Entwurf gespeichert; ein Marker
@@ -304,6 +304,20 @@
         <button class="knopf klein still" onclick={() => (zusammenVon = null)}>Abbrechen</button></div>
       <p class="leer-zeile" style="margin-top:8px">Alle Beiträge von {sprecherName(zusammenVon)} gehen an {sprecherName(zusammenNach)};
         {sprecherName(zusammenVon)} entfällt.</p>
+    </div>
+  {/if}
+
+  {#if t.teile?.length}
+    <div class="gruppe">
+      <h3>Teile des Gesprächs</h3>
+      <div class="liste-klein">
+        {#each [{ nummer: 1, beginn_s: 0, dauer_s: t.teile[0].beginn_s, aufgenommen_am: null }, ...t.teile] as x (x.nummer)}
+          <div class="marker-eintrag"><button class="zeit" onclick={() => onspringen(x.beginn_s)} title="An den Anfang des Teils">{marke(x.beginn_s)}</button>
+            <span class="marker-titel"><i class="fa-solid {x.nummer === 1 ? 'fa-file-audio' : 'fa-microphone'}"></i> Teil {x.nummer}
+              {#if x.aufgenommen_am}<span class="leer-zeile">{wann(x.aufgenommen_am)}</span>{/if}</span>
+            <span class="leer-zeile">{marke(x.dauer_s)}</span></div>
+        {/each}
+      </div>
     </div>
   {/if}
 

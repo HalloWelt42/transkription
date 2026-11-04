@@ -37,6 +37,18 @@ mark.fund { background: var(--warn-weich); color: inherit; border-radius: 3px; }
 .beitrag.jetzt .wort:not(.gehoert):not(.jetzt) { color: var(--text-2); }
 .marker-zeile { display: flex; align-items: center; gap: 10px; margin: 8px 0 8px 84px; font-size: var(--klein); color: var(--warn); }
 .marker-zeile::after { content: ""; flex: 1; height: 1px; background: var(--warn-weich); }
+/* Gespräch in Teilen (HELF-154): Marke, wo ein Teil beginnt; am Ende das Angebot, weiter aufzunehmen */
+.teil-marke { display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; font-size: var(--klein); color: var(--text-3); }
+.teil-marke::before, .teil-marke::after { content: ""; flex: 1; height: 1px; background: var(--rand); }
+.teil-marke b { color: var(--text-2); font-weight: 600; }
+.weiter-band { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 12px 14px; margin: 18px 0 6px;
+  border-radius: var(--r2); background: var(--flaeche-2); box-shadow: 0 0 0 1px var(--rand); }
+.weiter-band .unter { font-size: var(--klein); color: var(--text-3); }
+.weiter-band .knopf { margin-left: auto; flex: none; }
+.mehr-aktionen { padding: 10px 12px 0; flex-wrap: wrap; }
+.fortsetzung-band { margin-bottom: 10px; }
+/* im Kopf des Transkripts: unter 1280 Pixel nur die Symbole (der Titel behält seinen Platz) */
+@media (max-width: 1279px) { .seiten-kopf .kopf-text { display: none; } }
 
 /* Bearbeiten: ein offener Beitrag (Sprecher, Text, Beginn und Ende, Werkzeuge); am Telefon untereinander */
 .beitrag.bearbeiten { background: var(--flaeche); box-shadow: 0 0 0 2px var(--akzent); align-items: start; }

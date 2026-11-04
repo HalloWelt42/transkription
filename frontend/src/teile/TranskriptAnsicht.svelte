@@ -11,9 +11,15 @@
   // nur die fehlenden oder alle neu; ein einzelner Hördienst bleibt wählbar. Sind alle da, öffnet sich der Vergleich.
   // Mit Sprechertrennung wählt man, woher die Sprecher kommen ("Sprecher aus", HELF-90, etwa pyannote oder MOSS); eine
   // Fassung ist Hördienst plus Herkunft der Sprecher, so steht Whisper mit Sprechern aus MOSS neben Whisper ohne.
+  // Gespräch in Teilen (HELF-154, Entwurf mockups/fortsetzen-loeschen.html): "Weiter aufnehmen" hängt eine neue Aufnahme
+  // als nächsten Teil an; ihr Text kommt unten dazu, eine Marke zeigt, wo ein Teil beginnt, der Ton spielt alle Teile
+  // hintereinander. "In den Papierkorb" fragt, was weg soll: das Gespräch ganz, nur das Transkript oder nur die Aufnahme.
   import { onMount, tick } from "svelte";
-  import { AnfrageBand, arbeit, Auswahl, beiAuftrag, farbe, gehe, geraet, Leiste, leisteOeffnen, lesen, marke, navigation, Spieler,
-           zurueckZurKellerwolke } from "appkern-oberflaeche";
+  import { AnfrageBand, arbeit, aufnahme, aufnehmen, Auswahl, beiAuftrag, farbe, gehe, geraet, Leiste, leisteOeffnen, lesen, marke,
+           navigation, Spieler, zurueckZurKellerwolke } from "appkern-oberflaeche";
+  import { fortsetzung, fortsetzungFuer } from "../lib/fortsetzung.svelte";
+  import Aufnehmen from "./Aufnehmen.svelte";
+  import LoeschenWahl from "./LoeschenWahl.svelte";
   import * as api from "../lib/api";
   import { alleFassungen, erwarteteHerkunft, HAUPT, hoerdiensteLaden, tempo, trenndiensteLaden, trenndienstOptionen,
            vorgabeTrenndienst } from "../lib/hoerdienste.svelte";
@@ -24,7 +30,7 @@
   import Vergleich from "./Vergleich.svelte";
   import { neueKennung } from "../lib/kennung";
   import { abweichung, korrigierteWoerter } from "../lib/wortvergleich";
-  import type { Hoerdienst, Marker, Segment, Transkript, TranskriptAntwort, Vorschlag } from "../lib/typen";
+  import type { Hoerdienst, LoeschenWas, Marker, Segment, TeilAufnahme, Transkript, TranskriptAntwort, Vorschlag } from "../lib/typen";
   import Beitrag from "./Beitrag.svelte";
   import Bearbeitungsleiste from "./Bearbeitungsleiste.svelte";
   import TranskriptLeiste from "./TranskriptLeiste.svelte";
@@ -91,6 +97,9 @@
   let wortVorschlag = $state<string[]>([]);
   let wortMeldung = $state("");
   let welle = $state<number[] | null>(null);
+  let loeschenOffen = $state(false);
+  let loescht = $state(false);
+  let teilStand = $state("");              // ein weiterer Teil wird gerade transkribiert (Stand des Auftrags)
 
   const t = $derived(entwurf ?? antwort?.transkript ?? null);
   const fassungen = $derived(t ? alleFassungen(t) : []);
@@ -109,6 +118,48 @@
     }
     return aus;
   });
+  const teile = $derived(t?.teile ?? []);
+  // Marken der Teile vor den ersten Beitrag ihres Teils; ein Teil ohne Text (noch nicht fertig gehört) steht am Ende
+  const teilVor = $derived.by(() => {
+    const zu: Record<number, TeilAufnahme[]> = {};
+    for (const x of gezeigt ? [] : teile) {
+      const i = segmente.findIndex((s) => s.start >= x.beginn_s - 0.01);
+      (zu[i < 0 ? segmente.length : i] ??= []).push(x);
+    }
+    return zu;
+  });
+  const weiterGeht = $derived(!anfrage && !bearbeiten && !vergleich && !gezeigt && !!antwort?.aufnahme_id);
+  // die Aufnahme dieses Gesprächs läuft gerade als weiterer Teil (oder wartet auf "Zum Transkript")
+  const nimmtAuf = $derived(fortsetzung.ziel?.transkriptId === id && (aufnahme.laeuft || !!aufnahme.danach));
+  const aufgenommenAm = (x: TeilAufnahme) => x.aufgenommen_am
+    ? `aufgenommen am ${new Date(x.aufgenommen_am).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}` : "";
+
+  async function weiterAufnehmen() {
+    if (!antwort) return;
+    const z = fortsetzungFuer(id, antwort.transkript);
+    if (!z || aufnahme.laeuft) return;
+    mehr = false;
+    fortsetzung.ziel = { ...z, hauptId: antwort.aufnahme_id ?? z.hauptId };
+    await aufnehmen();
+    if (!aufnahme.laeuft) fortsetzung.ziel = null;            // kein Mikrofon: es bleibt beim Transkript
+  }
+
+  async function loeschenJetzt(was: LoeschenWas) {
+    if (!antwort) return;
+    loescht = true;
+    fehler = "";
+    try {
+      await api.inPapierkorb(was, antwort.aufnahme_id ?? null, [id], anfrage ?? undefined);
+      loeschenOffen = false;
+      if (was === "aufnahme") await laden();
+      else gehe("transkripte");
+    } catch (f) {
+      fehler = (f as Error).message;
+    } finally {
+      loescht = false;
+    }
+  }
+
   const markerVor = $derived.by(() => {
     // Marker gehören vor den ersten Beitrag, der nach ihnen beginnt
     const zu: Record<number, Marker[]> = {};
@@ -174,7 +225,9 @@
       if (!da.has(vergleichRechts)) vergleichRechts = [...da].find((x) => x !== vergleichLinks) ?? HAUPT;
       // die Wellenform kommt aus dem Ton selbst (gleich für alte und neue Transkripte); bis dahin die gespeicherte
       const quelle = antwort.transkript.quelle?.knoten_id;
-      if (quelle) void api.wellenform(quelle, anfrage).then((w) => (welle = w)).catch(() => {});
+      // ein Gespräch in Teilen hat seine Wellenform über alle Teile im Transkript
+      if (quelle && !antwort.transkript.teile?.length) void api.wellenform(quelle, anfrage).then((w) => (welle = w)).catch(() => {});
+      else welle = null;
       vorschlaege = await api.vorschlaege(id);
     } catch (f) {
       fehler = (f as Error).message;
@@ -185,6 +238,14 @@
     void hoerdiensteLaden();
     void trenndiensteLaden();
     const abmelden = beiAuftrag((a) => {
+      const haupt = antwort?.aufnahme_id;
+      if (a.art === "transkribieren" && haupt && a.eingabe.teil_von === haupt) {      // ein weiterer Teil wird angehängt
+        if (a.zustand === "fertig") { teilStand = ""; void laden(); }
+        else if (a.zustand === "fehler") teilStand = `Der neue Teil ging nicht: ${a.fehler ?? ""}. Die Aufnahme liegt neben dem Gespräch.`;
+        else if (a.zustand === "abgebrochen") teilStand = "";
+        else teilStand = `Der neue Teil wird transkribiert${a.schritt ? `, ${a.schritt}` : ""}${a.fortschritt != null ? ` (${Math.round(a.fortschritt * 100)} %)` : ""}`;
+        return;
+      }
       if (a.art !== "transkribieren" || !neuStapel || a.stapel !== neuStapel) return;
       const dienst = String(a.eingabe.hoerdienst ?? "");
       const nr = neuReihe.indexOf(dienst) + 1;
@@ -579,8 +640,13 @@
   {/if}
 {/snippet}
 
+{#snippet teilMarke(x: TeilAufnahme)}
+  <div class="teil-marke"><b>Teil {x.nummer}</b> {aufgenommenAm(x)}</div>
+{/snippet}
+
 {#snippet text()}
   {#each segmente as s, i (i)}
+    {#each teilVor[i] ?? [] as x (x.knoten_id)}{@render teilMarke(x)}{/each}
     {#each markerVor[i] ?? [] as m (m.id)}
       <div class="marker-zeile"><i class="fa-solid fa-flag"></i>{marke(m.zeit)} {m.titel}</div>
     {/each}
@@ -599,6 +665,27 @@
   {#each markerVor[segmente.length] ?? [] as m (m.id)}
     <div class="marker-zeile"><i class="fa-solid fa-flag"></i>{marke(m.zeit)} {m.titel}</div>
   {/each}
+  {#each teilVor[segmente.length] ?? [] as x (x.knoten_id)}{@render teilMarke(x)}{/each}
+  {#if teilStand}
+    <div class="hinweis-band"><i class="fa-solid {teilStand.startsWith('Der neue Teil ging') ? 'fa-triangle-exclamation' : 'fa-circle-notch fa-spin'}"></i><span>{teilStand}</span></div>
+  {:else if weiterGeht}
+    <div class="weiter-band">
+      <div><b>Geht das Gespräch weiter?</b>
+        <div class="unter">Wird als Teil {teile.length + 2} angehängt; nur der neue Teil wird transkribiert.</div></div>
+      <button class="knopf" onclick={weiterAufnehmen}><i class="fa-solid fa-microphone" style="color:var(--gefahr)"></i> Weiter aufnehmen</button>
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet aktionen()}
+  {#if !anfrage && !bearbeiten}
+    <button class="knopf" onclick={weiterAufnehmen} disabled={!antwort?.aufnahme_id || aufnahme.laeuft} aria-label="Weiter aufnehmen"
+            title={antwort?.aufnahme_id ? "Das Gespräch geht weiter: neue Aufnahme als nächster Teil, ihr Text kommt unten dazu" : "Die Aufnahme ist nicht mehr da"}>
+      <i class="fa-solid fa-microphone" style="color:var(--gefahr)"></i><span class="kopf-text"> Weiter aufnehmen</span></button>
+    <button class="knopf still" class:aktiv={loeschenOffen} onclick={() => { loeschenOffen = !loeschenOffen; mehr = false; }}
+            aria-label="In den Papierkorb" title="Transkript, Aufnahme oder beides in den Papierkorb der Kellerwolke">
+      <i class="fa-solid fa-trash-can"></i><span class="kopf-text"> In den Papierkorb</span></button>
+  {/if}
 {/snippet}
 
 {#snippet suchfeld(mobil: boolean)}
@@ -696,6 +783,10 @@
 {/snippet}
 
 {#snippet oberhalbText()}
+  {#if loeschenOffen && antwort}
+    <LoeschenWahl transkript aufnahme={!!antwort.aufnahme_id} teile={antwort.aufnahme_id ? teile.length + 1 : 0} beschaeftigt={loescht}
+                  nebeneinander={!geraet.mobil} onabbrechen={() => (loeschenOffen = false)} onja={loeschenJetzt} />
+  {/if}
   {#if bearbeiten && entwurf}
     <Bearbeitungsleiste mobil={geraet.mobil} aenderungen={ungespeichert} {speichert} bind:anhalten sprecher={entwurf.sprecher}
                         gewaehlt={gewaehlt.length} onzuweisen={zuweisen} onneuerSprecher={neuerSprecherFuerAuswahl}
@@ -734,6 +825,9 @@
     <div class="seiten-kopf"><button class="knopf still" onclick={zurueck}><i class="fa-solid fa-chevron-left"></i> {anfrage ? "Kellerwolke" : "Transkripte"}</button></div>
     <div class="rollfeld"><div class="fehlertext">{fehler}</div></div>
   {:else}<div class="leer">Lädt ...</div>{/if}
+{:else if nimmtAuf}
+  {#if geraet.mobil}<div class="t-ansicht"><Aufnehmen /></div>
+  {:else}<div class="rollfeld rek-flaeche"><Aufnehmen /></div>{/if}
 {:else if geraet.mobil}
   <!-- über die ganze Höhe: der Spieler steht immer unten über den Reitern, auch bei wenig Text -->
   <div class="t-ansicht">
@@ -746,7 +840,9 @@
     <button class="rund" aria-label="Mehr" class:aktiv={mehr} onclick={() => (mehr = !mehr)}><i class="fa-solid fa-ellipsis-vertical"></i></button>
   </div>
   {#if mehr}
-    <div class="karte" style="padding:0; margin-bottom:10px">{@render leiste(antwort)}</div>
+    <div class="karte" style="padding:0; margin-bottom:10px">
+      {#if !anfrage && !bearbeiten}<div class="knopfzeile mehr-aktionen">{@render aktionen()}</div>{/if}
+      {@render leiste(antwort)}</div>
   {/if}
   {@render reiter()}
   {@render oberhalbText()}
@@ -754,7 +850,7 @@
     {#if vergleich}
       <Vergleich {fassungen} bind:links={vergleichLinks} bind:rechts={vergleichRechts} {zeit} mobil {rollfeld} {mitrollen} onspringen={springen} />
     {:else}{@render text()}{/if}</div>
-  <Spieler bind:this={spieler} src={api.tonAdresse(id, anfrage)} dauer={antwort.transkript.dauer_s} wellenform={welle ?? antwort.transkript.wellenform}
+  <Spieler bind:this={spieler} src={api.tonAdresse(id, anfrage, teile.length)} dauer={antwort.transkript.dauer_s} wellenform={welle ?? antwort.transkript.wellenform}
            {spur} marker={(t?.marker ?? []).map((m) => m.zeit)} bind:zeit bind:laeuft {stoppBei} kompakt />
   </div>
 {:else}
@@ -767,11 +863,12 @@
         {#if !bearbeiten}
           <button class="knopf" onclick={bearbeitenBeginnen} title="Text, Sprecher, Zeiten und Marker ändern"><i class="fa-solid fa-pen"></i> Bearbeiten</button>
         {/if}
+        {@render aktionen()}
         <button class="knopf nur-schmal" title="Sprecher, Marker, Export, KI, Versionen" onclick={leisteOeffnen}>
           <i class="fa-solid fa-table-columns"></i> Leiste</button>
       </div>
       {#if anfrage}<div style="padding:0 22px"><AnfrageBand {anfrage} pfad={herkunft(antwort)} /></div>{/if}
-      <Spieler bind:this={spieler} src={api.tonAdresse(id, anfrage)} dauer={antwort.transkript.dauer_s} wellenform={welle ?? antwort.transkript.wellenform}
+      <Spieler bind:this={spieler} src={api.tonAdresse(id, anfrage, teile.length)} dauer={antwort.transkript.dauer_s} wellenform={welle ?? antwort.transkript.wellenform}
                {spur} marker={(t?.marker ?? []).map((m) => m.zeit)} bind:zeit bind:laeuft {stoppBei} />
       <div class="rollfeld" style="padding-top:14px" bind:this={rollfeld} onwheel={selbstGerollt} ontouchmove={selbstGerollt}
            role="region" aria-label="Text">

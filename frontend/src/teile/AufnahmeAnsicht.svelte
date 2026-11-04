@@ -6,13 +6,14 @@
   // Datei kommt; die App darf nur lesen und Begleiter schreiben, darum Marker nur ansehen und kein Papierkorb.
   import { onMount } from "svelte";
   import { AnfrageBand, Auswahl, beiAuftrag, gehe, geraet, groesse, Leiste, leisteOeffnen, marke, navigation,
-           Rueckfrage, Spieler, wann, zurueckZurKellerwolke } from "appkern-oberflaeche";
+           Spieler, wann, zurueckZurKellerwolke } from "appkern-oberflaeche";
   import { sprachOptionen as sprachWahl } from "../lib/sprachen.svelte";
   import { hoerdiensteLaden, hoerdienstOptionen, trenndiensteLaden, trenndienstOptionen, vorgabeHoerdienst,
            vorgabeTrenndienst } from "../lib/hoerdienste.svelte";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
-  import type { Aufnahme } from "../lib/typen";
+  import type { Aufnahme, LoeschenWas } from "../lib/typen";
+  import LoeschenWahl from "./LoeschenWahl.svelte";
   import Mitlesen from "./Mitlesen.svelte";
 
   let { id, anfrage = null }: { id: string; anfrage?: string | null } = $props();
@@ -109,11 +110,12 @@
     markerOffen = false;
   }
 
-  async function loeschen(mitTranskripten: boolean) {
+  async function loeschen(was: LoeschenWas) {
     if (!a) return;
     loescht = true;
     try {
-      await api.aufnahmeLoeschen(a.id, mitTranskripten);
+      await api.inPapierkorb(was, a.id, a.transkripte.map((x) => x.id));
+      if (was === "transkript") { loeschenFrage = false; loescht = false; await laden(); return; }
       gehe("aufnahmen");
     } catch (f) {
       fehler = (f as Error).message;
@@ -171,9 +173,8 @@
 
 {#snippet papierkorb()}
   {#if loeschenFrage && a}
-    <Rueckfrage frage={`${a.name} in den Papierkorb?`} hinweis="Landet im Papierkorb der Kellerwolke und lässt sich dort zurückholen."
-                knopf="In den Papierkorb" schalter={a.transkripte.length ? "das Transkript dazu auch" : ""} beschaeftigt={loescht}
-                onabbrechen={() => (loeschenFrage = false)} onja={(mit) => loeschen(mit && a!.transkripte.length > 0)} />
+    <LoeschenWahl transkript={a.transkripte.length > 0} aufnahme beschaeftigt={loescht}
+                  onabbrechen={() => (loeschenFrage = false)} onja={loeschen} />
   {:else}
     <button class="knopf klein still" onclick={() => (loeschenFrage = true)}><i class="fa-solid fa-trash-can"></i> In den Papierkorb</button>
   {/if}

@@ -36,6 +36,8 @@ class TranskriptAntwort(BaseModel):
     pfad: str
     stand: str
     transkript: Transkript
+    aufnahme_id: UUID | None = Field(None, description="die Aufnahme, neben der das Transkript liegt (Gruppe in der "
+                                     "Kellerwolke); ohne: es steht für sich, etwa nachdem die Aufnahme in den Papierkorb ging")
 
 
 class SprecherAenderung(BaseModel):
@@ -117,7 +119,8 @@ def _ohne_abdruck(t: Transkript) -> Transkript:
 
 
 def _antwort(t: Transkript, knoten: Knoten) -> TranskriptAntwort:
-    return TranskriptAntwort(id=knoten.id, pfad=knoten.pfad, stand=knoten.etag or "", transkript=_ohne_abdruck(t))
+    return TranskriptAntwort(id=knoten.id, pfad=knoten.pfad, stand=knoten.etag or "", transkript=_ohne_abdruck(t),
+                             aufnahme_id=knoten.haupt_id)
 
 
 def _beschreiben(alt: Transkript, a: Aenderungen) -> str:

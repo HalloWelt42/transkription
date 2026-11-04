@@ -32,6 +32,13 @@ Den Hördienst wählt man je Auftrag (Whisper Large V3 in drei Varianten oder MO
 dieselbe Aufnahme lässt sich mit weiteren Hördiensten neu hören, jede Fassung bekommt oben einen Reiter, und der
 Vergleich zeigt zwei davon auf einer Zeitachse nebeneinander.
 
+Ein Gespräch lässt sich fortsetzen: "Weiter aufnehmen" am Transkript (am Ende des Texts, im Kopf, am Telefon unter
+den drei Punkten) nimmt einen weiteren Teil auf. Er liegt als Begleiter neben der ersten Aufnahme, erscheint nicht als
+eigene Aufnahme, wird gleich transkribiert und unten angehängt; die Zeit läuft durch, Sprecher werden wiedererkannt,
+eine Marke zeigt, wo ein Teil beginnt, und der Ton spielt alle Teile hintereinander. "In den Papierkorb" fragt, was
+weg soll: das Gespräch ganz, nur das Transkript oder nur die Aufnahme mit ihren Teilen; alles lässt sich im Papierkorb
+der Kellerwolke zurückholen.
+
 Der Pi rechnet keinen Ton: Hören, Stimmabdrücke und Sprechertrennung kommen aus dem [[Klangwerk]] über die
 [[Leitstelle]], Wandeln, Sprechpausen, Wellenform und Abspielfassung macht der Tondienst. Auf dem Pi läuft sie als
 Compose-Projekt aus `compose.pi.yml` hinter ihrem Vorschaltdienst `vorne`. Adresse: {{adresse}}.

@@ -380,3 +380,97 @@ async def test_ganzer_ablauf(tmp_path: Path):
                     await asyncio.sleep(0.5)
         await g.stoppen()
         await aktionen_zurueckziehen()
+
+
+async def test_gespraech_in_teilen(tmp_path: Path):
+    """HELF-154: An ein fertiges Transkript kommt ein weiterer Teil; nur er wird gehört und unten angehängt, die Zeit
+    läuft weiter, der Ton spielt beide Teile hintereinander, der Teil erscheint nicht als eigene Aufnahme und geht mit
+    der Aufnahme in den Papierkorb."""
+    ton = tmp_path / "probe.mp3"
+    erzeugen = await asyncio.create_subprocess_exec(
+        programm("ffmpeg"), "-nostdin", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+        "aevalsrc='if(lt(mod(t,4),3),0.4*sin(2*PI*330*t),0)':s=16000:d=20", str(ton))
+    assert await erzeugen.wait() == 0
+
+    app = app_bauen(tmp_path / "daten", transport=Weiche(tmp_path / "tondienst"))
+    g = app.state.geruest
+    await g.starten()
+    angelegt: list[str] = []
+    try:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t", timeout=60) as c:
+            r = await c.post("/api/v1/einrichtung", json={"kellerwolke_adresse": W["KELLERWOLKE_ADRESSE"],
+                                                          "kellerwolke_schluessel": W["KELLERWOLKE_SCHLUESSEL"]})
+            assert r.status_code == 200, r.text
+            r = await c.post("/api/v1/anmeldung", json={"kennung": W["KELLERWOLKE_KENNUNG"], "passwort": W["KELLERWOLKE_PASSWORT"]})
+            h = {"X-Kellerwolke-Sitzung": r.json()["token"]}
+            try:
+                r = await c.patch("/api/v1/einstellungen", headers=h, json={"werte": {
+                    "leitstelle_adresse": "http://ls.test", "leitstelle_schluessel": "ls_probe", "abschnitt_min": 2}})
+                assert r.status_code == 200, r.text
+                name = f"Gespräch {secrets.token_hex(3)}"
+                aufnahme = (await c.post("/api/v1/aufnahmen", params={"name": f"{name}.mp3"}, content=ton.read_bytes(),
+                                         headers={**h, "Content-Type": "audio/mpeg"})).json()
+                angelegt.append(aufnahme["id"])
+
+                # ohne Transkript gibt es nichts weiterzuführen
+                r = await c.post(f"/api/v1/aufnahmen/{aufnahme['id']}/teile", params={"name": "weiter.mp3"},
+                                 content=ton.read_bytes(), headers={**h, "Content-Type": "audio/mpeg"})
+                assert r.status_code == 422
+
+                a = (await c.post("/api/v1/transkribieren", headers=h, json={"quelle_id": aufnahme["id"], "name": name,
+                                                                              "sprecher": "stimmen"})).json()
+                a = await warten(c, h, a["id"])
+                assert a["zustand"] == "fertig", a.get("fehler")
+                tid = a["ergebnis"]["transkript_id"]
+                vorher = (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()["transkript"]
+                dauer1 = vorher["dauer_s"]
+
+                # Teil 2 hochladen: Begleiter der Aufnahme, nicht in der Liste
+                r = await c.post(f"/api/v1/aufnahmen/{aufnahme['id']}/teile", params={"name": "weiter.mp3"},
+                                 content=ton.read_bytes(), headers={**h, "Content-Type": "audio/mpeg"})
+                assert r.status_code == 201, r.text
+                teil = r.json()
+                assert teil["name"].endswith(".teil-2.mp3")
+                liste = (await c.get("/api/v1/aufnahmen", headers=h, params={"suche": name})).json()
+                assert [e["id"] for e in liste["eintraege"]] == [aufnahme["id"]]
+                r = await c.put(f"/api/v1/aufnahmen/{teil['id']}/marker", headers=h, json=[{"zeit": 1.5, "titel": "Weiter"}])
+                assert r.status_code == 200, r.text
+
+                a = (await c.post(f"/api/v1/aufnahmen/{aufnahme['id']}/teile/{teil['id']}/anhaengen", headers=h)).json()
+                a = await warten(c, h, a["id"])
+                assert a["zustand"] == "fertig", a.get("fehler")
+                assert a["ergebnis"]["transkript_id"] == tid
+                t = (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()["transkript"]
+                assert [(x["nummer"], x["beginn_s"]) for x in t["teile"]] == [(2, dauer1)]
+                assert t["dauer_s"] == pytest.approx(dauer1 * 2, abs=0.5)
+                alt, neu = t["segmente"][:len(vorher["segmente"])], t["segmente"][len(vorher["segmente"]):]
+                assert [s["text"] for s in alt] == [s["text"] for s in vorher["segmente"]] and neu
+                assert all(s["start"] >= dauer1 for s in neu)
+                assert {s["sprecher"] for s in neu} <= {s["kennung"] for s in t["sprecher"]}
+                assert (dauer1 + 1.5, "Weiter") in [(m["zeit"], m["titel"]) for m in t["marker"]]
+
+                # Ton des Gesprächs: beide Teile hintereinander
+                r = await c.get(f"/api/v1/inhalt/transkripte/{tid}/ton", headers=h)
+                assert r.status_code == 200 and r.content[:4] == b"RIFF"
+                frames = (len(r.content) - 44) // 2
+                assert frames / 44100 == pytest.approx(t["dauer_s"], abs=0.5)
+
+                # nur das Transkript in den Papierkorb: Aufnahme und Teil bleiben
+                assert (await c.delete(f"/api/v1/transkripte/{tid}", headers=h)).status_code == 204
+                assert (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).status_code == 404
+                assert (await g.kellerwolke.knoten(teil["id"])).haupt_id is not None
+                # dann die Aufnahme: der Teil geht mit
+                assert (await c.delete(f"/api/v1/aufnahmen/{aufnahme['id']}", headers=h, params={"mit_transkripten": True})).status_code == 204
+                angelegt.remove(aufnahme["id"])
+                assert (await c.get(f"/api/v1/aufnahmen/{teil['id']}", headers=h)).status_code == 404
+            finally:
+                await c.post("/api/v1/anmeldung/abmelden", headers=h)
+    finally:
+        if g.kellerwolke is not None:
+            for k in list(angelegt):
+                try:
+                    await g.kellerwolke.loeschen(k)
+                except Exception:  # noqa: BLE001 - schon weg
+                    pass
+        await g.stoppen()
+        await aktionen_zurueckziehen()

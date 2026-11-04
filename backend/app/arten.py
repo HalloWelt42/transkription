@@ -38,11 +38,11 @@ from pydantic import BaseModel, Field, model_validator
 
 from appkern.anfragen import AnfrageEingabe, Angebot
 from appkern.auftraege import Art, AuftragAbgebrochen, Kontext, Phase
-from appkern.kellerwolke import Aktion, Kellerwolke, KellerwolkeFehler, StandVeraltet
+from appkern.kellerwolke import Aktion, Kellerwolke, KellerwolkeFehler, Knoten, StandVeraltet
 from appkern.leitstelle import WARTEN_BEI, DienstFehler, DienstWeg, Halt, NichtErreichbar, NichtGefunden
 from appkern.leitstelle import geduldig as leitstelle_geduldig
 
-from . import altbestand, auswertung, export, korrektur, umzug
+from . import altbestand, auswertung, export, gespraech, korrektur, umzug
 from .ablage import orte
 from .ablage.transkripte import aufnahme_id, begleiter_ablegen
 from .dienste import KeineLeitstelle, Wechsel
@@ -142,6 +142,8 @@ class TranskribierenAnfrage(BaseModel):
 class TranskribierenEingabe(TranskribierenAnfrage):
     von: str | None = Field(None, description="wer den Auftrag gab (Konto, bei anderen Apps auch die App)")
     reihe_kennung: str | None = Field(None, description="Stapel der Aufträge einer Reihe (vergibt die App)")
+    teil_von: UUID | None = Field(None, description="die Aufnahme ist ein weiterer Teil dieses Gesprächs (HELF-154): "
+                                  "gehört wird nur sie, ihr Text kommt unten an das Transkript der ersten Aufnahme")
 
     def stelle(self) -> int | None:
         """Platz dieses Auftrags in seiner Reihe (ab 1), ohne Reihe None."""
@@ -429,6 +431,11 @@ def arten(teile: Teile) -> list[Art]:
             await k.fortschritt(None, "Speichern", phase="speichern")
             marker = [Marker(zeit=m["zeit"], titel=m["titel"]) for m in quelle.felder.get(orte.FELD_MARKER) or []
                       if isinstance(m, dict) and "zeit" in m and m.get("titel")]
+            if e.teil_von is not None:
+                knoten = await teil_anhaengen(e, quelle, dauer, wellenform, segmente, sprecher, marker, transkripte)
+                await k.merken(transkript_id=str(knoten.id))
+                return {"transkript_id": str(knoten.id), "ergebnis_id": str(knoten.id), "name": name, "pfad": knoten.pfad,
+                        "segmente": len(segmente), "sprecher": len(sprecher), "dauer_s": round(dauer, 3)}
             t = Transkript(name=name, quelle=Quelle(knoten_id=quelle.id, pfad=quelle.pfad, etag=quelle.etag), marker=marker,
                            sprache=(erkannt if sprache == "auto" and erkannt else sprache), dauer_s=round(dauer, 3),
                            sprecher=sprecher, segmente=segmente, wellenform=wellenform,
@@ -445,6 +452,30 @@ def arten(teile: Teile) -> list[Art]:
                     "segmente": len(segmente), "sprecher": len(sprecher), "dauer_s": t.dauer_s}
         finally:
             shutil.rmtree(ordner, ignore_errors=True)
+
+    async def teil_anhaengen(e: TranskribierenEingabe, quelle, dauer: float, wellenform: list[int] | None,
+                             segmente: list[Segment], sprecher: list, marker: list[Marker], transkripte) -> Knoten:
+        """Ein weiterer Teil (HELF-154): sein Text unten an das Transkript der ersten Aufnahme, als neue Version; ändert
+        jemand das Transkript in der Zwischenzeit, wird neu gelesen und noch einmal angehängt."""
+        for versuch in range(3):
+            vorhanden = await transkripte.zur_quelle(e.teil_von)
+            if vorhanden is None:
+                raise ValueError("Die erste Aufnahme hat kein Transkript mehr; der Teil bleibt neben ihr liegen")
+            bisher, knoten = await transkripte.lesen(vorhanden.id)
+            if any(x.knoten_id == quelle.id for x in bisher.teile):
+                return knoten                                   # schon angehängt (Wiederholung des Auftrags)
+            teil = gespraech.teil_eintrag(quelle.id, dauer, bisher, quelle.erstellt_am)
+            neu = gespraech.anhaengen(bisher, teil, segmente, sprecher, marker, wellenform, teile.schwellen)
+            try:
+                neu, knoten = await transkripte.schreiben(vorhanden.id, neu, knoten.etag,
+                                                          Aenderung(was=f"Teil {teil.nummer} angehängt", wer=e.von))
+            except StandVeraltet:
+                if versuch == 2:
+                    raise
+                continue
+            await teile.geschrieben(neu, knoten, e.anfrage_id)
+            return knoten
+        raise RuntimeError("nicht erreichbar")
 
     async def naechster_in_reihe(k: Kontext) -> None:
         """Nach dem Ende eines Auftrags einer Reihe: den nächsten Hördienst einreihen, genau einmal (auch bei Wiederholung

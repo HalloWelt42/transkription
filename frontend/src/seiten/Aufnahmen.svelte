@@ -5,19 +5,20 @@
   // Entwurf: mockups/transkription.html (1), transkription-mobil.html (1, 2) und verbund.html (6a, 6b, 6e).
   import { onMount } from "svelte";
   import { aufnahme, aufnahmeAlsDatei, aufnahmeVerwerfen, aufnehmen, Auswahl, beiAuftrag, gehe, geraet, geraeteLaden,
-           gespeicherteAufnahmen, groesse, marke, navigation, quelleWechseln, Rueckfrage, uploadEntfernen, uploads,
+           gespeicherteAufnahmen, groesse, marke, navigation, quelleWechseln, uploadEntfernen, uploads,
            wann, type Gespeichert, type WahlSeite } from "appkern-oberflaeche";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
   import { sprachOptionen as sprachWahl } from "../lib/sprachen.svelte";
   import { hoerdiensteLaden, hoerdienstOptionen, trenndiensteLaden, trenndienstOptionen, vorgabeHoerdienst,
            vorgabeTrenndienst } from "../lib/hoerdienste.svelte";
-  import type { Aufnahme, AufnahmenSeite, Ordner } from "../lib/typen";
+  import type { Aufnahme, AufnahmenSeite, LoeschenWas, Ordner } from "../lib/typen";
   import Altbestand from "../teile/Altbestand.svelte";
   import AufnahmeAnsicht from "../teile/AufnahmeAnsicht.svelte";
   import KellerwolkeQuelle from "../teile/KellerwolkeQuelle.svelte";
   import Aufnehmen from "../teile/Aufnehmen.svelte";
   import Zusammenfuehren from "../teile/Zusammenfuehren.svelte";
+  import LoeschenWahl from "../teile/LoeschenWahl.svelte";
 
   type Filter = "alle" | "ohne" | "transkribiert";
   const SEITE = 50;
@@ -165,12 +166,13 @@
     gehe(a.stand === "transkribiert" && !geraet.mobil ? `transkripte/${a.transkripte[0].id}` : `aufnahmen/${a.id}`);
   }
 
-  async function loeschen(a: Aufnahme, mitTranskripten: boolean) {
+  async function loeschen(a: Aufnahme, was: LoeschenWas) {
     loescht = true;
     fehler = "";
     try {
-      await api.aufnahmeLoeschen(a.id, mitTranskripten);
-      meldung = `${a.name} liegt im Papierkorb der Kellerwolke.`;
+      await api.inPapierkorb(was, a.id, a.transkripte.map((x) => x.id));
+      meldung = was === "transkript" ? `Das Transkript zu ${a.name} liegt im Papierkorb der Kellerwolke.`
+        : `${a.name} liegt im Papierkorb der Kellerwolke.`;
       loeschenFuer = null;
       await laden();
     } catch (f) {
@@ -293,10 +295,8 @@
     </span>
   </div>
   {#if loeschenFuer === a.id}
-    <Rueckfrage frage={`${a.name} in den Papierkorb?`} knopf="In den Papierkorb" beschaeftigt={loescht}
-                hinweis={a.transkripte.length ? "" : "Landet im Papierkorb der Kellerwolke und lässt sich dort zurückholen."}
-                schalter={a.transkripte.length ? (a.transkripte.length === 1 ? "das Transkript dazu auch" : `die ${a.transkripte.length} Transkripte dazu auch`) : ""}
-                onabbrechen={() => (loeschenFuer = null)} onja={(mit) => loeschen(a, mit && a.transkripte.length > 0)} />
+    <LoeschenWahl transkript={a.transkripte.length > 0} aufnahme beschaeftigt={loescht} nebeneinander={!geraet.mobil}
+                  onabbrechen={() => (loeschenFuer = null)} onja={(was) => loeschen(a, was)} />
   {/if}
 {/snippet}
 

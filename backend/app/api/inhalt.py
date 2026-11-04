@@ -3,6 +3,7 @@ Aufnahme und eines Transkripts mit Bereichen, Export zum Herunterladen. Dazu kur
 
 from __future__ import annotations
 
+import asyncio
 import shutil
 import uuid
 from pathlib import PurePosixPath
@@ -15,6 +16,7 @@ from pydantic import BaseModel
 from appkern.ton import HOEREN
 from appkern.ton.wav import dauer as wav_dauer
 
+from .. import gespraech
 from ..ablage import orte
 from ..ablage.transkripte import aufnahme_id
 from ..sprachen import Sprache
@@ -55,7 +57,18 @@ def router(teile: Teile) -> APIRouter:
         if quelle is None:
             raise HTTPException(404, "Das Transkript nennt keine Aufnahme")
         kw = teile.zugang(anfrage)
-        datei = await teile.abspielen.holen(await kw.knoten(quelle), kw)
+        haupt = await kw.knoten(quelle)
+        if not t.teile:
+            datei = await teile.abspielen.holen(haupt, kw)
+        else:            # ein Gespräch in Teilen (HELF-154): die Abspielfassungen hintereinander, Zeit wie im Transkript
+            knoten = [haupt, *[await kw.knoten(x.knoten_id) for x in t.teile]]
+            ordner = teile.abspielen.ordner
+            datei = ordner / gespraech.fassung_name(transkript_id, [f"{k.id}-{k.etag}" for k in knoten])
+            if not datei.is_file():
+                fassungen = [await teile.abspielen.holen(k, kw) for k in knoten]
+                for alt in ordner.glob(f"gespraech-{transkript_id}-*.wav"):
+                    alt.unlink(missing_ok=True)
+                await asyncio.to_thread(gespraech.aneinanderhaengen, fassungen, datei)
         return FileResponse(datei, media_type="audio/wav", headers={"Cache-Control": "private, max-age=3600"})
 
     @r.get("/inhalt/aufnahmen/{knoten_id}/ton", dependencies=[g.lesen])

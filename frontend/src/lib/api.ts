@@ -3,7 +3,7 @@ import type { ErkennenWeg, SprecherWeg } from "./sprecherwahl";
 import { hochladen, hole, json, type Auftrag, type Gespeichert } from "appkern-oberflaeche";
 import type {
   AltbestandSeite, Aufnahme, Bisher, AufnahmenSeite, ExportFormat, Ordner, Profil, TranskriptAntwort, Verzeichnis, Version, Vorlage, Vorschlag,
-  Hoerdienst, Marker, Segment, Transkript, Umzugsplan, WoerterbuchStand,
+  Hoerdienst, LoeschenWas, Marker, Segment, Transkript, Umzugsplan, WoerterbuchStand,
 } from "./typen";
 
 function abfrage(werte: Record<string, string | number | null | undefined | string[]>): string {
@@ -105,10 +105,29 @@ export async function aufnahmeAblegen(daten: Blob, info: Gespeichert): Promise<A
   if (info.marker.length) await aufnahmeMarker(datei.id, info.marker);
   return datei;
 }
+// In den Papierkorb (HELF-154): das Gespräch ganz (Aufnahme mit Teilen und Transkript), nur das Transkript oder nur die
+// Aufnahme (mit Teilen; das Transkript bleibt mit seinem Text). Eine Stelle für Liste, Aufnahme und Transkript.
+export async function inPapierkorb(was: LoeschenWas, aufnahmeId: string | null, transkripte: string[], anfrage?: AnfrageId) {
+  if (was === "transkript" || !aufnahmeId) {
+    for (const t of transkripte) await loeschen(t, anfrage);
+  } else {
+    await aufnahmeLoeschen(aufnahmeId, was === "ganz");
+  }
+}
+
+// Ein Gespräch weiterführen (HELF-154): die neue Aufnahme als Teil neben die erste, ihre Marker, dann anhängen lassen
+export async function teilAblegen(hauptId: string, daten: Blob, info: Gespeichert): Promise<{ teil: Aufnahme; auftrag: Auftrag }> {
+  const teil = await hochladen<Aufnahme>(`/api/v1/aufnahmen/${hauptId}/teile?name=${encodeURIComponent(info.name)}`, daten, info.name);
+  if (info.marker.length) await aufnahmeMarker(teil.id, info.marker);
+  const auftrag = await hole<Auftrag>(`/aufnahmen/${hauptId}/teile/${teil.id}/anhaengen`, { method: "POST" });
+  return { teil, auftrag };
+}
 export const aufnahmeTonAdresse = (id: string, anfrage?: AnfrageId) => mit(`/api/v1/inhalt/aufnahmen/${id}/ton`, anfrage);
 export const wellenform = (aufnahmeId: string, anfrage?: AnfrageId) =>
   hole<number[]>(mit(`/inhalt/aufnahmen/${aufnahmeId}/wellenform`, anfrage));
-export const tonAdresse = (id: string, anfrage?: AnfrageId) => mit(`/api/v1/inhalt/transkripte/${id}/ton`, anfrage);
+// `teile`: Zahl der Teile des Gesprächs; kommt einer dazu, ist es eine neue Adresse (der Browser hält den Ton eine Stunde)
+export const tonAdresse = (id: string, anfrage?: AnfrageId, teile = 0) =>
+  mit(`/api/v1/inhalt/transkripte/${id}/ton${teile ? `?teile=${teile}` : ""}`, anfrage);
 export const aufnahmeAdresse = (id: string, anfrage?: AnfrageId) => mit(`/api/v1/inhalt/aufnahmen/${id}`, anfrage);
 
 export const vorschlaege = (id: string) => hole<Vorschlag[]>(`/transkripte/${id}/vorschlaege`);
