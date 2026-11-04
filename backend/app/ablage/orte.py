@@ -19,7 +19,6 @@ WOERTERBUCH = "Fachwörter.json"   # Fachwörter, die dem Hördienst als Hinweis
 ROLLE = "transkript"               # Rolle des Transkripts als Begleiter seiner Aufnahme
 ENDUNG = ".transkript.json"        # zugleich der Zusatz hinter dem Stamm der Aufnahme
 INHALTSTYP = "application/json"
-TEIL = "teil_"                     # Rolle weiterer Teile eines Gesprächs neben der Aufnahme: teil_b, teil_c ... (HELF-154)
 FELD_MARKER = "marker"   # an einer Aufnahme: beim Aufnehmen gesetzte Marker [{zeit, titel}]
 FELD_DAUER = "dauer_s"   # an einer Aufnahme: Dauer in Sekunden, sobald bekannt (beim Transkribieren gemessen)
 
@@ -53,33 +52,6 @@ def art_der_aufnahme_name(name: str) -> str | None:
 
 def ist_transkript(knoten: Knoten) -> bool:
     return not knoten.ist_ordner and (knoten.rolle == ROLLE or knoten.name.endswith(ENDUNG))
-
-
-def teil_rolle(nummer: int) -> str:
-    """Rolle des Teils `nummer` (ab 2). Rollen der Kellerwolke kennen nur Kleinbuchstaben und _, darum zählt die Rolle
-    in Buchstaben wie Spalten einer Tabelle: 2 ist teil_b, 27 ist teil_aa; die Nummer selbst steht im Transkript."""
-    buchstaben = ""
-    while nummer > 0:
-        nummer, rest = divmod(nummer - 1, 26)
-        buchstaben = chr(ord("a") + rest) + buchstaben
-    return f"{TEIL}{buchstaben}"
-
-
-def teil_nummer(rolle: str) -> int:
-    nummer = 0
-    for zeichen in rolle.removeprefix(TEIL):
-        nummer = nummer * 26 + ord(zeichen) - ord("a") + 1
-    return nummer
-
-
-def teil_zusatz(nummer: int, dateiname: str) -> str:
-    """Zusatz hinter dem Stamm der Aufnahme: "Runde.teil-2.webm"."""
-    return f".teil-{nummer}{PurePosixPath(dateiname).suffix.lower()}"
-
-
-def ist_teil(knoten: Knoten) -> bool:
-    """Ein weiterer Teil eines Gesprächs: gehört zur Aufnahme und erscheint nicht als eigene Aufnahme."""
-    return bool(knoten.rolle and knoten.rolle.startswith(TEIL))
 
 
 def anzeigename(dateiname: str) -> str:

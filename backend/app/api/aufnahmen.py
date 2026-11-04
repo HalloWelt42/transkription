@@ -5,7 +5,10 @@ diesen Auftrag). Dazu das Zusammenführen der früheren getrennten Ablage mit Vo
 
 from __future__ import annotations
 
+import json
+import re
 from datetime import datetime
+from pathlib import PurePosixPath
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -17,16 +20,16 @@ from appkern.anmeldung.api import KOPF
 from appkern.auftraege import Auftrag
 from appkern.kellerwolke import Kellerwolke, KellerwolkeFehler, Knoten
 
-from .. import gespraech, umzug
+from .. import umzug
 from ..ablage import orte
-from ..arten import TranskribierenAnfrage, TranskribierenEingabe
+from ..arten import FortsetzenEingabe, MarkerNeu, TranskribierenAnfrage, TranskribierenEingabe
 from ..einstellungen import SprecherWeg
 from ..sprachen import Sprache, SpracheEintrag
 from ..mitlesen import Bisher
 from ..teile import Teile
 from .gemeinsam import von
 
-AUFTRAGSARTEN = ["transkribieren", "aus_anfrage"]
+AUFTRAGSARTEN = ["transkribieren", "aus_anfrage", "fortsetzen"]
 
 Stand = Literal["ohne", "wartet", "laeuft", "transkribiert"]
 Filter = Literal["alle", "ohne", "transkribiert"]
@@ -106,7 +109,7 @@ class Hoerdienst(BaseModel):
 
 def _quelle_von(auftrag) -> str:
     """Die Aufnahme eines laufenden Auftrags (Transkribieren nennt quelle_id, eine Anfrage knoten_id)."""
-    return str(auftrag.eingabe.get("teil_von") or auftrag.eingabe.get("quelle_id") or auftrag.eingabe.get("knoten_id"))
+    return str(auftrag.eingabe.get("aufnahme_id") or auftrag.eingabe.get("quelle_id") or auftrag.eingabe.get("knoten_id"))
 
 
 Aufnahme.model_rebuild()
@@ -134,7 +137,7 @@ async def ordner_lesen(kw: Kellerwolke, ordner_id: UUID) -> tuple[list[Ordner], 
     async for k in kw.alle_kinder(ordner_id):
         if k.ist_ordner:
             unterordner.append(Ordner(id=k.id, name=k.name, pfad=k.pfad, recht=k.recht))
-        elif orte.art_der_aufnahme(k) and not orte.ist_teil(k):
+        elif orte.art_der_aufnahme(k):
             dateien.append(k)
     return unterordner, dateien
 
@@ -241,19 +244,16 @@ def router(teile: Teile) -> APIRouter:
 
     @r.delete("/aufnahmen/{knoten_id}", status_code=204)
     async def aufnahme_loeschen(knoten_id: UUID, mit_transkripten: bool = False, konto: Konto = g.pflicht) -> None:
-        """In den Papierkorb der Kellerwolke (dort zurückholbar), mit ihren Begleitern (Transkript, weitere Teile ...).
+        """In den Papierkorb der Kellerwolke (dort zurückholbar), mit ihren Begleitern (Transkript, Untertitel ...).
         Ohne `mit_transkripten` behält das Transkript seinen Text: es löst sich aus der Gruppe und bleibt im Ordner."""
         kw = teile.zugang()
         k = await kw.knoten(knoten_id)
         if orte.art_der_aufnahme(k) is None:
             raise HTTPException(422, f"{k.name} ist keine Ton- oder Videodatei")
         transkript = await teile.transkripte.zur_quelle(k.id)
-        weitere = [b.id for b in await kw.begleiter(k.id) if orte.ist_teil(b)]     # Teile gehen mit (HELF-154)
         if transkript is not None and not mit_transkripten:
             await kw.begleiter_loesen(transkript.id)
         await kw.loeschen(k.id)
-        for teil_id in weitere:
-            teile.abspielen.vergessen(teil_id)
         if transkript is not None and mit_transkripten:
             await teile.index.entfernen(transkript.id)
             await teile.vorschlaege.entfernen(transkript.id)
@@ -261,46 +261,35 @@ def router(teile: Teile) -> APIRouter:
         await g.protokoll.eintragen("aufnahme.geloescht", f"{k.name} in den Papierkorb", bezug_art="aufnahme",
                                     bezug_name=von(konto))
 
-    @r.post("/aufnahmen/{haupt_id}/teile", status_code=201, response_model=Aufnahme)
-    async def teil_hochladen(haupt_id: UUID, request: Request, name: str = Query(min_length=1, max_length=200)) -> Aufnahme:
-        """Ein weiterer Teil des Gesprächs (HELF-154): Körper ist der Ton (roh, gestreamt); er liegt als Begleiter
-        teil-<n> neben der Aufnahme, wandert mit ihr und erscheint nicht als eigene Aufnahme. Danach /anhaengen."""
+    @r.post("/aufnahmen/{knoten_id}/fortsetzen", status_code=201, response_model=Auftrag)
+    async def fortsetzen(knoten_id: UUID, request: Request, name: str = Query(min_length=1, max_length=200),
+                         marker: str = Query("[]", max_length=20000, description="beim Weiteraufnehmen gesetzte Marker "
+                                             "als JSON [{zeit, titel}], Zeit ab dem neuen Ton"),
+                         konto: Konto = g.pflicht) -> Auftrag:
+        """Weiter aufnehmen (HELF-154): Körper ist der neue Ton (roh, gestreamt). Er kommt hinten an dieselbe Tondatei
+        (neue Fassung des Knotens); hat die Aufnahme ein Transkript, wird nur der neue Bereich gehört und angehängt."""
         kw = teile.zugang()
-        haupt = await kw.knoten(haupt_id)
-        if orte.art_der_aufnahme(haupt) is None or orte.ist_teil(haupt):
-            raise HTTPException(422, f"{haupt.name} ist keine Aufnahme, an die ein Teil kommen kann")
-        vorhanden = await teile.transkripte.zur_quelle(haupt.id)
-        if vorhanden is None:
-            raise HTTPException(422, "Weiter aufnehmen geht nur an einem fertigen Transkript")
-        t, _ = await teile.transkripte.lesen(vorhanden.id)
-        begleiter = await kw.begleiter(haupt.id)
-        nummer = max([gespraech.naechster_teil(t), *[orte.teil_nummer(b.rolle) + 1 for b in begleiter if orte.ist_teil(b)]])
-        typ = request.headers.get("content-type") or None
-        if orte.art_der_aufnahme_name(name) is None and not (typ or "").startswith(("audio/", "video/")):
-            raise HTTPException(422, "Keine Ton- oder Videodatei")
-        k = await kw.begleiter_schreiben(haupt.id, orte.teil_rolle(nummer), orte.teil_zusatz(nummer, name), request.stream(),
-                                         nur_neu=True, inhaltstyp=typ)
-        await g.protokoll.eintragen("aufnahme.teil", f"Teil {nummer} zu {haupt.name}", bezug_art="aufnahme", bezug_name=k.name)
-        return Aufnahme(id=k.id, name=k.name, pfad=k.pfad, art=orte.art_der_aufnahme(k) or "ton", groesse=k.groesse,
-                        inhaltstyp=k.inhaltstyp, geaendert_am=k.geaendert_am, stand="ohne", transkripte=[])
-
-    @r.post("/aufnahmen/{haupt_id}/teile/{teil_id}/anhaengen", status_code=201, response_model=Auftrag)
-    async def teil_anhaengen(haupt_id: UUID, teil_id: UUID, konto: Konto = g.pflicht) -> Auftrag:
-        """Den Teil hören und unten an das Transkript setzen, mit Sprache, Hördienst und Sprecherweg des Gesprächs."""
-        kw = teile.zugang()
-        teil = await kw.knoten(teil_id)
-        if teil.haupt_id != haupt_id or not orte.ist_teil(teil):
-            raise HTTPException(422, "Das ist kein Teil dieser Aufnahme")
-        vorhanden = await teile.transkripte.zur_quelle(haupt_id)
-        if vorhanden is None:
-            raise HTTPException(422, "Die Aufnahme hat kein Transkript, an das der Teil kommen kann")
-        t, _ = await teile.transkripte.lesen(vorhanden.id)
-        weg, trenndienst = gespraech.sprecher_wie_bisher(t)
-        eingabe = TranskribierenEingabe(quelle_id=teil.id, teil_von=haupt_id, name=t.name, sprache=t.sprache,
-                                        hoerdienst=t.erzeugt_mit.dienst if t.erzeugt_mit else None, sprecher=weg,
-                                        trenndienst=trenndienst, von=von(konto))
-        return await g.auftraege.einreihen("transkribieren", eingabe,
-                                           titel=f"{t.name}: Teil {orte.teil_nummer(teil.rolle)} anhängen")
+        quelle = await kw.knoten(knoten_id)
+        if orte.art_der_aufnahme(quelle) != "ton":
+            raise HTTPException(422, f"{quelle.name} ist keine Tonaufnahme; nur Ton lässt sich fortsetzen")
+        try:
+            gesetzt = [MarkerNeu.model_validate(m) for m in json.loads(marker)]
+        except (ValueError, TypeError) as f:
+            raise HTTPException(422, f"Marker: {f}") from None
+        endung = PurePosixPath(name).suffix.lower()
+        if not re.fullmatch(r"\.[a-z0-9]{1,8}", endung):
+            endung = ".bin"
+        ordner = teile.arbeit / "fortsetzen"
+        ordner.mkdir(parents=True, exist_ok=True)
+        datei = ordner / f"{uuid4().hex}{endung}"
+        with open(datei, "wb") as ziel:
+            async for teil in request.stream():
+                ziel.write(teil)
+        if datei.stat().st_size == 0:
+            datei.unlink(missing_ok=True)
+            raise HTTPException(422, "Kein Ton angekommen")
+        eingabe = FortsetzenEingabe(aufnahme_id=quelle.id, stueck=datei.name, marker=gesetzt, von=von(konto))
+        return await g.auftraege.einreihen("fortsetzen", eingabe, titel=f"{orte.anzeigename(quelle.name)}: weiter aufgenommen")
 
     @r.put("/aufnahmen/{knoten_id}/marker", response_model=list[MarkerEingabe])
     async def marker_setzen(knoten_id: UUID, marker: list[MarkerEingabe]) -> list[MarkerEingabe]:

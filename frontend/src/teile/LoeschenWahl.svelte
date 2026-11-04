@@ -1,21 +1,20 @@
 <script lang="ts">
   // Löschen eines Gesprächs mit Wahl (HELF-154, Entwurf mockups/fortsetzen-loeschen.html, 5 und 6): ganz, nur das
-  // Transkript oder nur die Aufnahme (mit allen Teilen). Angeboten wird nur, was es gibt; alles landet im Papierkorb der
+  // Transkript oder nur die Aufnahme. Angeboten wird nur, was es gibt; alles landet im Papierkorb der
   // Kellerwolke. Im Ablauf statt als Fenster, wie die Rückfrage des Appkerns.
   import type { LoeschenWas } from "../lib/typen";
 
-  let { transkript, aufnahme, teile = 0, beschaeftigt = false, nebeneinander = false, onabbrechen, onja }: {
-    transkript: boolean; aufnahme: boolean; teile?: number; beschaeftigt?: boolean; nebeneinander?: boolean;
+  let { transkript, aufnahme, beschaeftigt = false, nebeneinander = false, onabbrechen, onja }: {
+    transkript: boolean; aufnahme: boolean; beschaeftigt?: boolean; nebeneinander?: boolean;
     onabbrechen: () => void; onja: (was: LoeschenWas) => void;
   } = $props();
 
-  const tonTeile = $derived(teile > 1 ? `mit ${teile === 2 ? "beiden" : `allen ${teile}`} Teilen` : "");
   const wahlen = $derived([
-    ...(transkript && aufnahme ? [{ was: "ganz" as const, titel: "Gespräch ganz", unter: `Transkript und Aufnahme${tonTeile ? ` ${tonTeile}` : ""}` }] : []),
+    ...(transkript && aufnahme ? [{ was: "ganz" as const, titel: "Gespräch ganz", unter: "Transkript und Aufnahme" }] : []),
     ...(transkript ? [{ was: "transkript" as const, titel: aufnahme ? "Nur das Transkript" : "Das Transkript",
-                        unter: aufnahme ? (teile > 1 ? "Die Aufnahme bleibt mit allen Teilen" : "Die Aufnahme bleibt und lässt sich neu transkribieren") : "" }] : []),
+                        unter: aufnahme ? "Die Aufnahme bleibt und lässt sich neu transkribieren" : "" }] : []),
     ...(aufnahme ? [{ was: "aufnahme" as const, titel: transkript ? "Nur die Aufnahme" : "Die Aufnahme",
-                      unter: transkript ? `${tonTeile ? `${tonTeile[0].toUpperCase()}${tonTeile.slice(1)}; ` : ""}der Text bleibt ohne Ton stehen` : "" }] : []),
+                      unter: transkript ? "Der Text bleibt ohne Ton stehen" : "" }] : []),
   ]);
   let gewaehlt = $state<LoeschenWas | null>(null);
   const wahl = $derived(gewaehlt && wahlen.some((w) => w.was === gewaehlt) ? gewaehlt : wahlen[0]?.was ?? null);

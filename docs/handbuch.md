@@ -32,12 +32,13 @@ Den Hördienst wählt man je Auftrag (Whisper Large V3 in drei Varianten oder MO
 dieselbe Aufnahme lässt sich mit weiteren Hördiensten neu hören, jede Fassung bekommt oben einen Reiter, und der
 Vergleich zeigt zwei davon auf einer Zeitachse nebeneinander.
 
-Ein Gespräch lässt sich fortsetzen: "Weiter aufnehmen" am Transkript (am Ende des Texts, im Kopf, am Telefon unter
-den drei Punkten) nimmt einen weiteren Teil auf. Er liegt als Begleiter neben der ersten Aufnahme, erscheint nicht als
-eigene Aufnahme, wird gleich transkribiert und unten angehängt; die Zeit läuft durch, Sprecher werden wiedererkannt,
-eine Marke zeigt, wo ein Teil beginnt, und der Ton spielt alle Teile hintereinander. "In den Papierkorb" fragt, was
-weg soll: das Gespräch ganz, nur das Transkript oder nur die Aufnahme mit ihren Teilen; alles lässt sich im Papierkorb
-der Kellerwolke zurückholen.
+Wer weiterspricht, nimmt an dieselbe Aufnahme an: "Weiter aufnehmen" steht gleich nach dem Beenden einer Aufnahme,
+an jeder Aufnahme (auch ohne Transkript) und am Transkript. Der neue Ton kommt hinten an dieselbe Tondatei, im Format
+der Aufnahme; das macht der Tondienst, und die Datei bekommt in der Kellerwolke eine neue Fassung (die alte lässt sich
+dort zurückholen). Gibt es ein Transkript, wird nur der neue Bereich gehört und unten angehängt: die Zeit läuft durch,
+Sprecher werden wiedererkannt, eine Marke "Weiter aufgenommen am ..." zeigt die Stelle. "In den Papierkorb" fragt, was
+weg soll: das Gespräch ganz, nur das Transkript oder nur die Aufnahme; alles lässt sich im Papierkorb der Kellerwolke
+zurückholen.
 
 Der Pi rechnet keinen Ton: Hören, Stimmabdrücke und Sprechertrennung kommen aus dem [[Klangwerk]] über die
 [[Leitstelle]], Wandeln, Sprechpausen, Wellenform und Abspielfassung macht der Tondienst. Auf dem Pi läuft sie als

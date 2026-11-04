@@ -4,6 +4,7 @@ Sprechertrennung fehlt, also Gruppieren), lesen, suchen, ändern mit Stand, Vers
 Auswertung, Ton mit Bereichen, Zugriff einer anderen App. Am Ende liegt alles Angelegte im Papierkorb."""
 
 import asyncio
+import json
 import secrets
 import sys
 from pathlib import Path
@@ -382,15 +383,21 @@ async def test_ganzer_ablauf(tmp_path: Path):
         await aktionen_zurueckziehen()
 
 
-async def test_gespraech_in_teilen(tmp_path: Path):
-    """HELF-154: An ein fertiges Transkript kommt ein weiterer Teil; nur er wird gehört und unten angehängt, die Zeit
-    läuft weiter, der Ton spielt beide Teile hintereinander, der Teil erscheint nicht als eigene Aufnahme und geht mit
-    der Aufnahme in den Papierkorb."""
-    ton = tmp_path / "probe.mp3"
-    erzeugen = await asyncio.create_subprocess_exec(
+
+async def _webm(ziel: Path, sekunden: int, hz: int) -> Path:
+    """Wie eine Aufnahme aus dem Browser: WebM mit Opus, eine Spur."""
+    p = await asyncio.create_subprocess_exec(
         programm("ffmpeg"), "-nostdin", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
-        "aevalsrc='if(lt(mod(t,4),3),0.4*sin(2*PI*330*t),0)':s=16000:d=20", str(ton))
-    assert await erzeugen.wait() == 0
+        f"aevalsrc='if(lt(mod(t,4),3),0.4*sin(2*PI*{hz}*t),0)':s=48000:d={sekunden}", "-c:a", "libopus", str(ziel))
+    assert await p.wait() == 0
+    return ziel
+
+
+async def test_gespraech_fortsetzen(tmp_path: Path):
+    """HELF-154: Weiter aufnehmen hängt den neuen Ton an dieselbe Tondatei (neue Fassung desselben Knotens, WebM bleibt
+    WebM); ohne Transkript bleibt es dabei, mit Transkript wird nur der neue Bereich gehört und unten angehängt."""
+    erste = await _webm(tmp_path / "erste.webm", 20, 330)
+    weiter = await _webm(tmp_path / "weiter.webm", 10, 440)
 
     app = app_bauen(tmp_path / "daten", transport=Weiche(tmp_path / "tondienst"))
     g = app.state.geruest
@@ -407,15 +414,28 @@ async def test_gespraech_in_teilen(tmp_path: Path):
                 r = await c.patch("/api/v1/einstellungen", headers=h, json={"werte": {
                     "leitstelle_adresse": "http://ls.test", "leitstelle_schluessel": "ls_probe", "abschnitt_min": 2}})
                 assert r.status_code == 200, r.text
-                name = f"Gespräch {secrets.token_hex(3)}"
-                aufnahme = (await c.post("/api/v1/aufnahmen", params={"name": f"{name}.mp3"}, content=ton.read_bytes(),
-                                         headers={**h, "Content-Type": "audio/mpeg"})).json()
+                name = f"Notiz {secrets.token_hex(3)}"
+                aufnahme = (await c.post("/api/v1/aufnahmen", params={"name": f"{name}.webm"}, content=erste.read_bytes(),
+                                         headers={**h, "Content-Type": "audio/webm"})).json()
                 angelegt.append(aufnahme["id"])
 
-                # ohne Transkript gibt es nichts weiterzuführen
-                r = await c.post(f"/api/v1/aufnahmen/{aufnahme['id']}/teile", params={"name": "weiter.mp3"},
-                                 content=ton.read_bytes(), headers={**h, "Content-Type": "audio/mpeg"})
-                assert r.status_code == 422
+                async def fortsetzen(marker=()) -> dict:
+                    r = await c.post(f"/api/v1/aufnahmen/{aufnahme['id']}/fortsetzen", content=weiter.read_bytes(),
+                                     params={"name": "weiter.webm", "marker": json.dumps(list(marker))},
+                                     headers={**h, "Content-Type": "audio/webm"})
+                    assert r.status_code == 201, r.text
+                    a = await warten(c, h, r.json()["id"])
+                    assert a["zustand"] == "fertig", a.get("fehler")
+                    return a["ergebnis"]
+
+                # ohne Transkript: nur die Tondatei wird länger, als neue Fassung desselben Knotens
+                erg = await fortsetzen()
+                assert erg["ab_s"] == pytest.approx(20, abs=0.1) and erg["transkribieren"] is None
+                assert erg["dauer_s"] == pytest.approx(30, abs=0.2)
+                k = await g.kellerwolke.knoten(aufnahme["id"])
+                assert k.name == f"{name}.webm" and len(await g.kellerwolke.versionen(k.id)) == 2
+                eine = (await c.get(f"/api/v1/aufnahmen/{aufnahme['id']}", headers=h)).json()
+                assert eine["dauer_s"] == pytest.approx(30, abs=0.2) and eine["transkripte"] == []
 
                 a = (await c.post("/api/v1/transkribieren", headers=h, json={"quelle_id": aufnahme["id"], "name": name,
                                                                               "sprecher": "stimmen"})).json()
@@ -423,46 +443,35 @@ async def test_gespraech_in_teilen(tmp_path: Path):
                 assert a["zustand"] == "fertig", a.get("fehler")
                 tid = a["ergebnis"]["transkript_id"]
                 vorher = (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()["transkript"]
-                dauer1 = vorher["dauer_s"]
+                assert vorher["dauer_s"] == pytest.approx(30, abs=0.3)
 
-                # Teil 2 hochladen: Begleiter der Aufnahme, nicht in der Liste
-                r = await c.post(f"/api/v1/aufnahmen/{aufnahme['id']}/teile", params={"name": "weiter.mp3"},
-                                 content=ton.read_bytes(), headers={**h, "Content-Type": "audio/mpeg"})
-                assert r.status_code == 201, r.text
-                teil = r.json()
-                assert teil["name"].endswith(".teil-2.mp3")
-                liste = (await c.get("/api/v1/aufnahmen", headers=h, params={"suche": name})).json()
-                assert [e["id"] for e in liste["eintraege"]] == [aufnahme["id"]]
-                r = await c.put(f"/api/v1/aufnahmen/{teil['id']}/marker", headers=h, json=[{"zeit": 1.5, "titel": "Weiter"}])
-                assert r.status_code == 200, r.text
-
-                a = (await c.post(f"/api/v1/aufnahmen/{aufnahme['id']}/teile/{teil['id']}/anhaengen", headers=h)).json()
-                a = await warten(c, h, a["id"])
+                # mit Transkript: der neue Bereich wird gehört und unten angehängt
+                erg = await fortsetzen([{"zeit": 1.5, "titel": "Idee"}])
+                ab = erg["ab_s"]
+                assert ab == pytest.approx(30, abs=0.3) and erg["transkribieren"]
+                a = await warten(c, h, erg["transkribieren"])
                 assert a["zustand"] == "fertig", a.get("fehler")
                 assert a["ergebnis"]["transkript_id"] == tid
                 t = (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()["transkript"]
-                assert [(x["nummer"], x["beginn_s"]) for x in t["teile"]] == [(2, dauer1)]
-                assert t["dauer_s"] == pytest.approx(dauer1 * 2, abs=0.5)
                 alt, neu = t["segmente"][:len(vorher["segmente"])], t["segmente"][len(vorher["segmente"]):]
                 assert [s["text"] for s in alt] == [s["text"] for s in vorher["segmente"]] and neu
-                assert all(s["start"] >= dauer1 for s in neu)
+                assert all(s["start"] >= ab - 0.05 for s in neu)
+                assert t["dauer_s"] == pytest.approx(40, abs=0.4)
+                titel = [(round(m["zeit"], 1), m["titel"]) for m in t["marker"]]
+                assert any(z == round(ab, 1) and x.startswith("Weiter aufgenommen am") for z, x in titel)
+                assert (round(ab + 1.5, 1), "Idee") in titel
                 assert {s["sprecher"] for s in neu} <= {s["kennung"] for s in t["sprecher"]}
-                assert (dauer1 + 1.5, "Weiter") in [(m["zeit"], m["titel"]) for m in t["marker"]]
+                assert len(t["wellenform"]) == 800
 
-                # Ton des Gesprächs: beide Teile hintereinander
+                # der Ton spielt die ganze Aufnahme
                 r = await c.get(f"/api/v1/inhalt/transkripte/{tid}/ton", headers=h)
-                assert r.status_code == 200 and r.content[:4] == b"RIFF"
-                frames = (len(r.content) - 44) // 2
-                assert frames / 44100 == pytest.approx(t["dauer_s"], abs=0.5)
+                assert r.status_code == 200 and (len(r.content) - 44) / 2 / 44100 == pytest.approx(40, abs=0.5)
 
-                # nur das Transkript in den Papierkorb: Aufnahme und Teil bleiben
-                assert (await c.delete(f"/api/v1/transkripte/{tid}", headers=h)).status_code == 204
-                assert (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).status_code == 404
-                assert (await g.kellerwolke.knoten(teil["id"])).haupt_id is not None
-                # dann die Aufnahme: der Teil geht mit
-                assert (await c.delete(f"/api/v1/aufnahmen/{aufnahme['id']}", headers=h, params={"mit_transkripten": True})).status_code == 204
+                # nur die Aufnahme in den Papierkorb: das Transkript bleibt mit seinem Text
+                assert (await c.delete(f"/api/v1/aufnahmen/{aufnahme['id']}", headers=h)).status_code == 204
                 angelegt.remove(aufnahme["id"])
-                assert (await c.get(f"/api/v1/aufnahmen/{teil['id']}", headers=h)).status_code == 404
+                angelegt.append(tid)
+                assert (await c.get(f"/api/v1/transkripte/{tid}", headers=h)).json()["aufnahme_id"] is None
             finally:
                 await c.post("/api/v1/anmeldung/abmelden", headers=h)
     finally:

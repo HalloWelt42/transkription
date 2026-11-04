@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from appkern.anmeldung import Konto
 from appkern.auftraege import Auftrag
-from appkern.kellerwolke import Knoten, StandVeraltet
+from appkern.kellerwolke import KellerwolkeFehler, Knoten, StandVeraltet
 
 from .. import auswertung, export
 from ..ablage import orte
@@ -118,9 +118,9 @@ def _ohne_abdruck(t: Transkript) -> Transkript:
                                 "fassungen": [f.model_copy(update={"sprecher": ohne(f.sprecher)}) for f in t.fassungen]})
 
 
-def _antwort(t: Transkript, knoten: Knoten) -> TranskriptAntwort:
+def _antwort(t: Transkript, knoten: Knoten, aufnahme: UUID | None) -> TranskriptAntwort:
     return TranskriptAntwort(id=knoten.id, pfad=knoten.pfad, stand=knoten.etag or "", transkript=_ohne_abdruck(t),
-                             aufnahme_id=knoten.haupt_id)
+                             aufnahme_id=aufnahme)
 
 
 def _beschreiben(alt: Transkript, a: Aenderungen) -> str:
@@ -163,6 +163,17 @@ def router(teile: Teile) -> APIRouter:
     async def lesen(transkript_id: UUID, anfrage: UUID | None = None) -> tuple[Transkript, Knoten]:
         return await teile.transkripte_fuer(anfrage).lesen(transkript_id)
 
+    async def antwort(t: Transkript, knoten: Knoten, anfrage: UUID | None = None) -> TranskriptAntwort:
+        """Mit der Aufnahme, neben der das Transkript liegt; ältere ohne Gruppe finden sie über die Quelle in der Datei,
+        solange es sie noch gibt (HELF-154: daran hängen Weiter aufnehmen und der Papierkorb)."""
+        aufnahme = knoten.haupt_id
+        if aufnahme is None and t.quelle is not None:
+            try:
+                aufnahme = (await teile.zugang(anfrage).knoten(t.quelle.knoten_id)).id
+            except KellerwolkeFehler:
+                aufnahme = None
+        return _antwort(t, knoten, aufnahme)
+
     async def schreiben(transkript_id: UUID, t: Transkript, stand: str, aenderung: Aenderung,
                         anfrage: UUID | None = None) -> TranskriptAntwort:
         try:
@@ -170,7 +181,7 @@ def router(teile: Teile) -> APIRouter:
         except StandVeraltet as f:
             raise Konflikt("Inzwischen geändert: bitte neu laden und dann ändern") from f
         await teile.geschrieben(neu, knoten, anfrage)
-        return _antwort(neu, knoten)
+        return await antwort(neu, knoten, anfrage)
 
     @r.get("", response_model=Seite)
     async def liste(suche: str = "", sprache: str | None = None, sprecher: list[str] = Query(default_factory=list),
@@ -193,7 +204,7 @@ def router(teile: Teile) -> APIRouter:
                        aenderung=Aenderung(was="aus der Live-Mitschrift", wer=konto.name, app=konto.app))
         neu, knoten = await teile.transkripte.speichern(t, quelle, t.aenderung)
         await teile.index.eintragen(neu, knoten)
-        return _antwort(neu, knoten)
+        return await antwort(neu, knoten)
 
     @r.get("/sprecher-namen", response_model=list[str])
     async def sprecher_namen() -> list[str]:
@@ -201,7 +212,7 @@ def router(teile: Teile) -> APIRouter:
 
     @r.get("/{transkript_id}", response_model=TranskriptAntwort)
     async def holen(transkript_id: UUID, anfrage: UUID | None = None) -> TranskriptAntwort:
-        return _antwort(*await lesen(transkript_id, anfrage))
+        return await antwort(*await lesen(transkript_id, anfrage), anfrage)
 
     @r.patch("/{transkript_id}", response_model=TranskriptAntwort)
     async def aendern(transkript_id: UUID, a: Aenderungen, anfrage: UUID | None = None,
@@ -255,7 +266,7 @@ def router(teile: Teile) -> APIRouter:
         except StandVeraltet as f:
             raise Konflikt("Inzwischen geändert: bitte neu laden") from f
         await teile.geschrieben(neu, knoten, anfrage)
-        return _antwort(neu, knoten)
+        return await antwort(neu, knoten, anfrage)
 
     @r.post("/{transkript_id}/hauptfassung", response_model=TranskriptAntwort)
     async def hauptfassung(transkript_id: UUID, eingabe: HauptfassungEingabe, anfrage: UUID | None = None,

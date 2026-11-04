@@ -1,47 +1,44 @@
-"""Gespräch in Teilen (HELF-154): Anhängen mit Versatz, Sprecher des Teils auf die bisherigen, Wellenform,
-Sprecherweg wie bisher, Abspielfassungen aneinanderhängen."""
+"""Gespräch fortsetzen (HELF-154): Anhängen ab der alten Dauer, Sprecher des neuen Bereichs auf die bisherigen, Marken,
+Sprecherweg wie bisher, Kodierer der zusammengefügten Datei."""
 
-import wave
 from datetime import UTC, datetime
-from pathlib import Path
 from uuid import uuid4
 
+import pytest
+
 from app import gespraech
-from app.modell.transkript import ErzeugtMit, Marker, Segment, Sprecher, Transkript, Wort
+from app.modell.transkript import ErzeugtMit, Marker, Quelle, Segment, Sprecher, Transkript, Wort
 from app.sprechererkennung import Schwellen
 
 S = Schwellen()
+WANN = datetime(2026, 11, 4, 18, 15, tzinfo=UTC)
 
 
 def _bisher() -> Transkript:
     return Transkript(name="Runde", dauer_s=60.0, wellenform=[10] * 8,
                       sprecher=[Sprecher(kennung="s1", name="Anna", abdruck=[1.0, 0.0, 0.0]),
                                 Sprecher(kennung="s2", name="Herr Krüger", abdruck=[0.0, 1.0, 0.0])],
-                      segmente=[Segment(start=0, ende=5, sprecher="s1", text="Guten Tag.", woerter=[Wort(wort="Guten", start=0, ende=1)]),
+                      segmente=[Segment(start=0, ende=5, sprecher="s1", text="Guten Tag."),
                                 Segment(start=50, ende=58, sprecher="s2", text="Bis bald.")],
                       marker=[Marker(zeit=3, titel="Anfang")])
 
 
-def test_anhaengen_mit_versatz_und_sprechern():
+def test_anhaengen_ab_der_alten_dauer():
     bisher = _bisher()
-    teil = gespraech.teil_eintrag(uuid4(), 20.0, bisher, datetime(2026, 11, 4, 15, 20, tzinfo=UTC))
-    assert teil.nummer == 2 and teil.beginn_s == 60.0
+    quelle = Quelle(knoten_id=uuid4(), pfad="Apps/Transkription/Aufnahmen/Runde.webm", etag="neu")
     neu_sprecher = [Sprecher(kennung="s1", name="Sprecher 1", abdruck=[0.05, 0.99, 0.0]),     # klingt wie Herr Krüger
                     Sprecher(kennung="s2", name="Sprecher 2", abdruck=[0.0, 0.0, 1.0])]       # neu im Gespräch
-    segmente = [Segment(start=1, ende=4, sprecher="s1", text="Wir sind wieder da.", woerter=[Wort(wort="Wir", start=1, ende=1.4)]),
-                Segment(start=6, ende=9, sprecher="s2", text="Ich bin neu.")]
-    t = gespraech.anhaengen(bisher, teil, segmente, neu_sprecher, [Marker(zeit=2, titel="Weiter")], [90] * 4, S)
-    assert [(s.start, s.sprecher, s.text) for s in t.segmente[2:]] == [(61.0, "s2", "Wir sind wieder da."), (66.0, "s3", "Ich bin neu.")]
-    assert t.segmente[2].woerter[0].start == 61.0
-    assert t.segmente[0].text == "Guten Tag."                  # der bisherige Text bleibt, wie er ist
+    segmente = [Segment(start=61, ende=64, sprecher="s1", text="Wir sind wieder da.", woerter=[Wort(wort="Wir", start=61, ende=61.4)]),
+                Segment(start=66, ende=69, sprecher="s2", text="Ich bin neu.")]
+    marker = [Marker(zeit=3, titel="Anfang"), Marker(zeit=62, titel="Weiter")]
+    t = gespraech.anhaengen(bisher, 60.0, segmente, neu_sprecher, marker, 80.0, [90] * 8, quelle, WANN, S)
+    assert [(s.start, s.sprecher, s.text) for s in t.segmente] == [
+        (0, "s1", "Guten Tag."), (50, "s2", "Bis bald."), (61, "s2", "Wir sind wieder da."), (66, "s3", "Ich bin neu.")]
     assert [s.kennung for s in t.sprecher] == ["s1", "s2", "s3"] and t.sprecher[1].name == "Herr Krüger"
     assert t.sprecher[2].name == "Sprecher 3"
-    assert t.dauer_s == 80.0 and [x.nummer for x in t.teile] == [2]
-    assert [(m.zeit, m.titel) for m in t.marker] == [(3, "Anfang"), (62.0, "Weiter")]
-    assert len(t.wellenform) == 8 and t.wellenform[:6] == [10] * 6 and t.wellenform[-1] == 90
-    assert gespraech.naechster_teil(t) == 3
-    zweiter = gespraech.teil_eintrag(uuid4(), 5.0, t, None)
-    assert zweiter.nummer == 3 and zweiter.beginn_s == 80.0
+    assert [(m.zeit, m.titel) for m in t.marker] == [(3, "Anfang"), (60.0, gespraech.marke(WANN)), (62, "Weiter")]
+    assert t.marker[1].titel.startswith("Weiter aufgenommen am 04.11.2026")
+    assert t.dauer_s == 80.0 and t.wellenform == [90] * 8 and t.quelle == quelle
 
 
 def test_gleiches_profil_geht_vor_dem_abdruck():
@@ -55,14 +52,14 @@ def test_gleiches_profil_geht_vor_dem_abdruck():
 
 def test_ohne_sprecher_bleibt_ohne():
     bisher = Transkript(name="Notiz", dauer_s=10, segmente=[Segment(start=0, ende=3, text="Eins.")])
-    teil = gespraech.teil_eintrag(uuid4(), 4, bisher, None)
-    t = gespraech.anhaengen(bisher, teil, [Segment(start=0.5, ende=2, text="Zwei.")], [], [], None, S)
+    q = Quelle(knoten_id=uuid4(), pfad="x.webm")
+    t = gespraech.anhaengen(bisher, 10.0, [Segment(start=10.5, ende=12, text="Zwei.")], [], [], 14.0, None, q, WANN, S)
     assert [(s.start, s.sprecher) for s in t.segmente] == [(0, None), (10.5, None)] and t.sprecher == []
 
 
 def test_sprecherweg_wie_bisher():
-    def mit(aus, sprecher=()):
-        return Transkript(name="x", sprecher=list(sprecher), erzeugt_mit=ErzeugtMit(dienst="whisper", app="t", sprecher_aus=aus))
+    def mit(aus):
+        return Transkript(name="x", erzeugt_mit=ErzeugtMit(dienst="whisper", app="t", sprecher_aus=aus))
     assert gespraech.sprecher_wie_bisher(mit("ohne")) == ("ohne", None)
     assert gespraech.sprecher_wie_bisher(mit("stimmen")) == ("stimmen", None)
     assert gespraech.sprecher_wie_bisher(mit("pyannote")) == ("trennung", "pyannote")
@@ -70,24 +67,9 @@ def test_sprecherweg_wie_bisher():
     assert gespraech.sprecher_wie_bisher(Transkript(name="x")) == ("ohne", None)
 
 
-def _wav(p: Path, frames: int) -> Path:
-    with wave.open(str(p), "wb") as w:
-        w.setnchannels(1)
-        w.setsampwidth(2)
-        w.setframerate(44100)
-        w.writeframes(b"\x01\x00" * frames)
-    return p
-
-
-def test_abspielfassungen_aneinander(tmp_path: Path):
-    ziel = gespraech.aneinanderhaengen([_wav(tmp_path / "a.wav", 44100), _wav(tmp_path / "b.wav", 22050)], tmp_path / "g.wav")
-    with wave.open(str(ziel)) as w:
-        assert w.getnframes() == 66150 and w.getframerate() == 44100
-    assert gespraech.fassung_name("t", ["a-1", "b-1"]) != gespraech.fassung_name("t", ["a-1", "b-2"])
-
-
-def test_rollen_der_teile():
-    from app.ablage import orte
-    assert [orte.teil_rolle(n) for n in (2, 3, 26, 27)] == ["teil_b", "teil_c", "teil_z", "teil_aa"]
-    assert all(orte.teil_nummer(orte.teil_rolle(n)) == n for n in range(2, 60))
-    assert orte.teil_zusatz(2, "Aufnahme.WEBM") == ".teil-2.webm"
+def test_kodierer_wie_die_aufnahme():
+    assert gespraech.kodierer("opus", ".webm") == "libopus"
+    assert gespraech.kodierer(None, ".m4a") == "aac"
+    assert gespraech.kodierer("mp3", ".mp3") == "libmp3lame"
+    with pytest.raises(ValueError):
+        gespraech.kodierer("wmav2", ".wma")

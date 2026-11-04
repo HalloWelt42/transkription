@@ -5,7 +5,9 @@
   // Aus der Kellerwolke geöffnet (`anfrage`, Entwurf mockups/verbund.html 6c): gleiche Ansicht mit Hinweis, woher die
   // Datei kommt; die App darf nur lesen und Begleiter schreiben, darum Marker nur ansehen und kein Papierkorb.
   import { onMount } from "svelte";
-  import { AnfrageBand, Auswahl, beiAuftrag, gehe, geraet, groesse, Leiste, leisteOeffnen, marke, navigation,
+  import { fortsetzung, weiterAufnehmen } from "../lib/fortsetzung.svelte";
+  import Aufnehmen from "./Aufnehmen.svelte";
+  import { AnfrageBand, aufnahme, Auswahl, beiAuftrag, gehe, geraet, groesse, Leiste, leisteOeffnen, marke, navigation,
            Spieler, wann, zurueckZurKellerwolke } from "appkern-oberflaeche";
   import { sprachOptionen as sprachWahl } from "../lib/sprachen.svelte";
   import { hoerdiensteLaden, hoerdienstOptionen, trenndiensteLaden, trenndienstOptionen, vorgabeHoerdienst,
@@ -40,6 +42,16 @@
   const ordner = $derived(a ? a.pfad.split("/").slice(0, -1).join("/") : "");
   const format = $derived(a ? (a.name.split(".").pop() ?? "").toUpperCase() : "");
   const laufend = $derived(a?.stand === "laeuft" || a?.stand === "wartet");
+  // Weiter aufnehmen (HELF-154): nur Ton, nicht aus der Kellerwolke angefragt; läuft es gerade für diese Aufnahme, steht
+  // hier der Rekorder
+  const fortsetzbar = $derived(!!a && !anfrage && a.art === "ton");
+  const nimmtAuf = $derived(!!a && fortsetzung.ziel?.aufnahmeId === a.id && (aufnahme.laeuft || !!aufnahme.danach));
+
+  async function weiter() {
+    if (!a) return;
+    await weiterAufnehmen({ aufnahmeId: a.id, name: a.name.replace(/\.[^.]+$/, ""), ab_s: a.dauer_s,
+                            transkript: a.transkripte.length > 0, zurueck: `aufnahmen/${a.id}` });
+  }
 
   async function laden() {
     fehler = "";
@@ -67,6 +79,12 @@
       }
     })();
     return beiAuftrag((auftrag) => {
+      if (auftrag.art === "fortsetzen" && String(auftrag.eingabe.aufnahme_id) === id) {
+        void laden();
+        if (auftrag.zustand === "fertig") meldung = "Weiter aufgenommen; die Aufnahme ist jetzt länger.";
+        else if (auftrag.zustand === "fehler") fehler = auftrag.fehler ?? "Weiter aufnehmen ging nicht";
+        return;
+      }
       if (auftrag.art !== "transkribieren" || String(auftrag.eingabe.quelle_id) !== id) return;
       void laden();
       if (auftrag.zustand === "fertig") meldung = "Transkript fertig.";
@@ -185,11 +203,19 @@
     <div class="seiten-kopf"><button class="knopf still" onclick={zurueck}><i class="fa-solid fa-chevron-left"></i> {anfrage ? "Kellerwolke" : "Aufnahmen"}</button></div>
     <div class="rollfeld"><div class="fehlertext">{fehler}</div></div>
   {:else}<div class="leer">Lädt ...</div>{/if}
+{:else if nimmtAuf}
+  {#if geraet.mobil}<div class="t-ansicht"><Aufnehmen /></div>
+  {:else}<div class="rollfeld rek-flaeche"><Aufnehmen /></div>{/if}
 {:else if geraet.mobil}
   <div class="t-ansicht">
     {#if anfrage}<AnfrageBand {anfrage} pfad={a.pfad} />{/if}
     {#if fehler}<div class="fehlertext">{fehler}</div>{/if}
     {#if meldung}<p class="leer" style="padding:6px 4px">{meldung}</p>{/if}
+    {#if fortsetzbar}
+      <button class="knopf weiter-knopf" onclick={weiter} disabled={aufnahme.laeuft}
+              title="Noch mehr sagen: kommt hinten an dieselbe Aufnahme{a.transkripte.length ? ', der neue Text an das Transkript' : ''}">
+        <i class="fa-solid fa-microphone"></i> Weiter aufnehmen</button>
+    {/if}
     {#if !a.transkripte.length && !laufend}
       <div class="t-gruppe">Noch kein Transkript</div>
       <div class="t-liste">
@@ -225,6 +251,11 @@
       <div class="seiten-kopf">
         <button class="knopf still" style="padding:0 6px" onclick={zurueck}><i class="fa-solid fa-chevron-left"></i> {anfrage ? "Kellerwolke" : "Aufnahmen"}</button>
         <h1 class="titel-lang" title={a.name}>{a.name}</h1>
+        {#if fortsetzbar}
+          <button class="knopf weiter-knopf" onclick={weiter} disabled={aufnahme.laeuft}
+                  title="Noch mehr sagen: kommt hinten an dieselbe Aufnahme{a.transkripte.length ? ', der neue Text an das Transkript' : ''}">
+            <i class="fa-solid fa-microphone"></i> Weiter aufnehmen</button>
+        {/if}
         <button class="knopf nur-schmal" title={anfrage ? "Marker, Datei" : "Marker, Datei, Papierkorb"} onclick={leisteOeffnen}><i class="fa-solid fa-table-columns"></i> Leiste</button>
       </div>
       {#if anfrage}<div style="padding:0 22px"><AnfrageBand {anfrage} pfad={a.pfad} /></div>{/if}

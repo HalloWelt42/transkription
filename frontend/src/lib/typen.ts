@@ -55,19 +55,11 @@ export interface Transkript {
   aenderung?: Notiz | null;
   erzeugt_mit?: ErzeugtMit | null;
   fassungen?: Hoerfassung[];
-  teile?: TeilAufnahme[];          // weitere Teile des Gesprächs (Teil 2, 3 ...), HELF-154
 }
 
 // Was beim Löschen eines Gesprächs in den Papierkorb kommt (HELF-154)
 export type LoeschenWas = "ganz" | "transkript" | "aufnahme";
 
-export interface TeilAufnahme {
-  knoten_id: string;
-  nummer: number;
-  beginn_s: number;               // in der durchgehenden Zeit des Transkripts
-  dauer_s: number;
-  aufgenommen_am: string | null;
-}
 
 export interface ErzeugtMit {
   dienst: string;

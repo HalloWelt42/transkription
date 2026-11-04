@@ -55,7 +55,7 @@ from .modell.transkript import (SPRECHER_OHNE, SPRECHER_STIMMEN, Aenderung, Erze
                                Transkript)
 from .sprechererkennung import an_wechseln_teilen, erkennen
 from .teile import Teile
-from appkern.ton import ABSPIELEN, HOEREN, Aufbereiten, Ausgabe, Messen, Pause, PausenWahl
+from appkern.ton import ABSPIELEN, HOEREN, Aufbereiten, Ausgabe, Blenden, Messen, Pause, PausenWahl, Stueck, Tonformat
 from appkern.ton.wav import ausschnitt, dauer as wav_dauer
 
 from .ton import Abschnitt, abschnitte_planen, bereich_einpassen
@@ -142,12 +142,27 @@ class TranskribierenAnfrage(BaseModel):
 class TranskribierenEingabe(TranskribierenAnfrage):
     von: str | None = Field(None, description="wer den Auftrag gab (Konto, bei anderen Apps auch die App)")
     reihe_kennung: str | None = Field(None, description="Stapel der Aufträge einer Reihe (vergibt die App)")
-    teil_von: UUID | None = Field(None, description="die Aufnahme ist ein weiterer Teil dieses Gesprächs (HELF-154): "
-                                  "gehört wird nur sie, ihr Text kommt unten an das Transkript der ersten Aufnahme")
+    anhaengen_ab: float | None = Field(None, ge=0, description="die Aufnahme wurde fortgesetzt (HELF-154): nur ab hier "
+                                       "hören und den Text unten an ihr Transkript hängen")
+
 
     def stelle(self) -> int | None:
         """Platz dieses Auftrags in seiner Reihe (ab 1), ohne Reihe None."""
         return self.reihe.index(self.hoerdienst) + 1 if self.reihe and self.hoerdienst in self.reihe else None
+
+
+class MarkerNeu(BaseModel):
+    zeit: float = Field(ge=0)
+    titel: str = Field(min_length=1, max_length=200)
+
+
+class FortsetzenEingabe(BaseModel):
+    """Eine Aufnahme fortsetzen (HELF-154): der neue Ton liegt bis dahin im Arbeitsordner der App."""
+
+    aufnahme_id: UUID
+    stueck: str = Field(pattern=r"^[0-9a-f]{32}\.[a-z0-9]{1,8}$", description="Datei im Arbeitsordner fortsetzen/")
+    marker: list[MarkerNeu] = Field(default_factory=list, description="beim Weiteraufnehmen gesetzt, Zeit ab dem neuen Ton")
+    von: str | None = None
 
 
 class AnfrageOptionen(BaseModel):
@@ -269,7 +284,10 @@ def arten(teile: Teile) -> list[Art]:
         if "abschnitte" in k.zwischenstand:
             return [Abschnitt(*a) for a in k.zwischenstand["abschnitte"]]
         e: TranskribierenEingabe = k.eingabe
-        von, bis = (bereich_einpassen(*e.bereich, v.pausen, v.dauer) if getattr(e, "bereich", None) else (0.0, None))
+        if getattr(e, "anhaengen_ab", None) is not None:      # fortgesetzt: genau ab dem alten Ende, nichts davor
+            von, bis = min(e.anhaengen_ab, v.dauer), None
+        else:
+            von, bis = (bereich_einpassen(*e.bereich, v.pausen, v.dauer) if getattr(e, "bereich", None) else (0.0, None))
         plan = abschnitte_planen(v.dauer, v.pausen, hoechstens_s=teile.einstellungen.abschnitt_min * 60, von=von, bis=bis)
         await k.merken(abschnitte=[[a.nummer, a.start, a.ende] for a in plan], dauer=v.dauer)
         return plan
@@ -345,6 +363,7 @@ def arten(teile: Teile) -> list[Art]:
         mit_sprechern = weg != "ohne"
         if "transkript_id" in k.zwischenstand:          # schon gespeichert, nur der Abschluss fehlte
             return {"transkript_id": k.zwischenstand["transkript_id"], "ergebnis_id": k.zwischenstand["transkript_id"]}
+        await vorher_abwarten(k, e.quelle_id, ("fortsetzen",))      # nie eine Tondatei, die gerade länger wird
         kw = teile.zugang(e.anfrage_id)
         transkripte = teile.transkripte_fuer(e.anfrage_id)
         quelle = await kw.knoten(e.quelle_id)
@@ -431,8 +450,8 @@ def arten(teile: Teile) -> list[Art]:
             await k.fortschritt(None, "Speichern", phase="speichern")
             marker = [Marker(zeit=m["zeit"], titel=m["titel"]) for m in quelle.felder.get(orte.FELD_MARKER) or []
                       if isinstance(m, dict) and "zeit" in m and m.get("titel")]
-            if e.teil_von is not None:
-                knoten = await teil_anhaengen(e, quelle, dauer, wellenform, segmente, sprecher, marker, transkripte)
+            if e.anhaengen_ab is not None:
+                knoten = await fortsetzung_anhaengen(e, quelle, dauer, wellenform, segmente, sprecher, marker, transkripte)
                 await k.merken(transkript_id=str(knoten.id))
                 return {"transkript_id": str(knoten.id), "ergebnis_id": str(knoten.id), "name": name, "pfad": knoten.pfad,
                         "segmente": len(segmente), "sprecher": len(sprecher), "dauer_s": round(dauer, 3)}
@@ -453,22 +472,37 @@ def arten(teile: Teile) -> list[Art]:
         finally:
             shutil.rmtree(ordner, ignore_errors=True)
 
-    async def teil_anhaengen(e: TranskribierenEingabe, quelle, dauer: float, wellenform: list[int] | None,
-                             segmente: list[Segment], sprecher: list, marker: list[Marker], transkripte) -> Knoten:
-        """Ein weiterer Teil (HELF-154): sein Text unten an das Transkript der ersten Aufnahme, als neue Version; ändert
-        jemand das Transkript in der Zwischenzeit, wird neu gelesen und noch einmal angehängt."""
+    # --- fortsetzen (HELF-154) --------------------------------------------------------------------------------------
+
+    async def vorher_abwarten(k: Kontext, aufnahme_id: UUID, arten: tuple[str, ...]) -> None:
+        """Warten, bis frühere Aufträge dieser Arten an derselben Aufnahme fertig sind (die Reihenfolge der Eingänge gilt,
+        auch wenn zwei Aufträge zugleich laufen dürfen)."""
+        ich = await g.auftraege.holen(k.auftrag_id)
+        while True:
+            vorher = [a for art in arten for a in (await g.auftraege.liste(zustand=["wartet", "laeuft"], art=art, grenze=200)).eintraege
+                      if a.id != k.auftrag_id and a.erstellt_am < ich.erstellt_am
+                      and str(a.eingabe.get("aufnahme_id") or a.eingabe.get("quelle_id")) == str(aufnahme_id)]
+            if not vorher:
+                return
+            await k.fortschritt(None, "Wartet, bis die Aufnahme fertig verlängert ist", phase="warten")
+            await k.pruefen()
+            await asyncio.sleep(2)
+
+    async def fortsetzung_anhaengen(e: TranskribierenEingabe, quelle, dauer: float, wellenform: list[int] | None,
+                                    segmente: list[Segment], sprecher: list, marker: list[Marker], transkripte) -> Knoten:
+        """Der Text des neuen Bereichs unten an das Transkript der Aufnahme, als neue Version; ändert jemand das
+        Transkript in der Zwischenzeit, wird neu gelesen und noch einmal angehängt."""
         for versuch in range(3):
-            vorhanden = await transkripte.zur_quelle(e.teil_von)
+            vorhanden = await transkripte.zur_quelle(quelle.id)
             if vorhanden is None:
-                raise ValueError("Die erste Aufnahme hat kein Transkript mehr; der Teil bleibt neben ihr liegen")
+                raise ValueError("Die Aufnahme hat kein Transkript mehr, an das der neue Text kommen kann")
             bisher, knoten = await transkripte.lesen(vorhanden.id)
-            if any(x.knoten_id == quelle.id for x in bisher.teile):
-                return knoten                                   # schon angehängt (Wiederholung des Auftrags)
-            teil = gespraech.teil_eintrag(quelle.id, dauer, bisher, quelle.erstellt_am)
-            neu = gespraech.anhaengen(bisher, teil, segmente, sprecher, marker, wellenform, teile.schwellen)
+            neu = gespraech.anhaengen(bisher, e.anhaengen_ab, segmente, sprecher, marker, dauer, wellenform,
+                                      Quelle(knoten_id=quelle.id, pfad=quelle.pfad, etag=quelle.etag),
+                                      quelle.geaendert_am, teile.schwellen)
             try:
                 neu, knoten = await transkripte.schreiben(vorhanden.id, neu, knoten.etag,
-                                                          Aenderung(was=f"Teil {teil.nummer} angehängt", wer=e.von))
+                                                          Aenderung(was="weiter aufgenommen, neuer Text angehängt", wer=e.von))
             except StandVeraltet:
                 if versuch == 2:
                     raise
@@ -476,6 +510,79 @@ def arten(teile: Teile) -> list[Art]:
             await teile.geschrieben(neu, knoten, e.anfrage_id)
             return knoten
         raise RuntimeError("nicht erreichbar")
+
+    async def fortsetzen(k: Kontext) -> dict:
+        """Den neuen Ton an die Aufnahme hängen: auf dem Tondienst zusammenfügen (Format der Aufnahme, eine Spur), als
+        neue Fassung desselben Knotens speichern (die alte bleibt zurückholbar), Marker dazu; dann den neuen Bereich
+        transkribieren lassen, wenn es ein Transkript gibt; sonst bleibt es bei der längeren Tondatei."""
+        e: FortsetzenEingabe = k.eingabe
+        stueck = teile.arbeit / "fortsetzen" / e.stueck
+        await vorher_abwarten(k, e.aufnahme_id, ("fortsetzen", "transkribieren"))
+        kw = teile.zugang()
+        if "ab_s" not in k.zwischenstand:
+            if not stueck.is_file():
+                raise ValueError("Der neue Ton ist nicht mehr da; bitte noch einmal aufnehmen")
+            quelle = await kw.knoten(e.aufnahme_id)
+            endung = PurePosixPath(quelle.name).suffix.lower()
+            ordner = teile.arbeit / k.auftrag_id
+            ordner.mkdir(parents=True, exist_ok=True)
+            try:
+                await k.fortschritt(0.1, "Aufnahme holen", phase="zusammenfuegen")
+                roh = ordner / f"bisher{endung or '.bin'}"
+                await kw.herunterladen(quelle.id, roh)
+                eig = (await geduldig(k, lambda: teile.ton.aufbereiten(roh, Aufbereiten(), [], titel=f"{quelle.name}, messen"),
+                                      "Ton messen")).messwerte.eigenschaften
+                if eig is None or eig.hat_video:
+                    raise ValueError("Videos lassen sich nicht fortsetzen, nur Tonaufnahmen")
+                rate = eig.rate or 48000
+                # die alte Dauer genau aus dem Ton (Aufnahmen aus dem Browser nennen oft keine), dort beginnt der neue
+                bisher = await geduldig(k, lambda: teile.ton.blenden(
+                    [roh], Blenden(rate=rate, stuecke=[Stueck(datei=0)], blende_ms=0,
+                                   format=Tonformat(rate=rate, kanaele=1, kodierung="pcm_s16le"), endung=".wav"),
+                    ordner / "bisher.wav", titel=f"{quelle.name}, Dauer"), "Ton messen")
+                await k.fortschritt(0.4, "Zusammenfügen", phase="zusammenfuegen")
+                verlustbehaftet = gespraech.kodierer(eig.kodierung, endung) in ("libopus", "libvorbis", "libmp3lame", "aac")
+                format = Tonformat(rate=rate, kanaele=1, kodierung=gespraech.kodierer(eig.kodierung, endung),
+                                   bitrate=f"{max(32, round(eig.bitrate / 1000))}k" if verlustbehaftet and eig.bitrate else None)
+                ziel = ordner / f"zusammen{endung}"
+                ganz = await geduldig(k, lambda: teile.ton.blenden(
+                    [roh, stueck], Blenden(rate=rate, stuecke=[Stueck(datei=0), Stueck(datei=1)], blende_ms=0, format=format,
+                                           endung=endung), ziel, titel=f"{quelle.name}, fortsetzen"), "Zusammenfügen")
+                await k.pruefen()
+                await k.fortschritt(0.8, "Speichern", phase="speichern")
+                quelle = await kw.neue_version(quelle.id, ziel, stand=quelle.etag, inhaltstyp=quelle.inhaltstyp)
+                ab = round(bisher.dauer_s, 3)
+                alt = [m for m in quelle.felder.get(orte.FELD_MARKER) or [] if isinstance(m, dict)]
+                dazu = [{"zeit": round(ab + m.zeit, 3), "titel": m.titel} for m in e.marker]
+                try:
+                    await kw.felder_setzen(quelle.id, {orte.FELD_DAUER: round(ganz.dauer_s, 1),
+                                                       orte.FELD_MARKER: sorted([*alt, *dazu], key=lambda m: m["zeit"])})
+                except KellerwolkeFehler:
+                    pass
+                teile.abspielen.vergessen(quelle.id)
+                await k.merken(ab_s=ab, dauer_s=round(ganz.dauer_s, 3))
+                await g.protokoll.eintragen("aufnahme.fortgesetzt", f"{quelle.name}: ab {ab:.1f} s weiter aufgenommen",
+                                            bezug_art="aufnahme", bezug_name=e.von)
+            finally:
+                shutil.rmtree(ordner, ignore_errors=True)
+        stueck.unlink(missing_ok=True)
+        ab = k.zwischenstand["ab_s"]
+        if "transkribieren" not in k.zwischenstand:
+            transkript = await teile.transkripte.zur_quelle(e.aufnahme_id)
+            folge = None
+            if transkript is not None:
+                t, _ = await teile.transkripte.lesen(transkript.id)
+                weg, trenndienst = gespraech.sprecher_wie_bisher(t)
+                folge = TranskribierenEingabe(quelle_id=e.aufnahme_id, anhaengen_ab=ab, name=t.name, sprache=t.sprache,
+                                              hoerdienst=t.erzeugt_mit.dienst if t.erzeugt_mit else None, sprecher=weg,
+                                              trenndienst=trenndienst, von=e.von)
+            auftrag = None
+            if folge is not None:
+                auftrag = (await g.auftraege.einreihen("transkribieren", folge, titel=f"{folge.name}: neuer Text",
+                                                       von=e.von or "")).id
+            await k.merken(transkribieren=auftrag)
+        return {"aufnahme_id": str(e.aufnahme_id), "ab_s": ab, "dauer_s": k.zwischenstand.get("dauer_s"),
+                "transkribieren": k.zwischenstand.get("transkribieren")}
 
     async def naechster_in_reihe(k: Kontext) -> None:
         """Nach dem Ende eines Auftrags einer Reihe: den nächsten Hördienst einreihen, genau einmal (auch bei Wiederholung
@@ -732,6 +839,9 @@ def arten(teile: Teile) -> list[Art]:
     return [
         Art("transkribieren", "Transkribieren", transkribieren_in_reihe, eingabe=TranskribierenEingabe, fortsetzbar=True,
             nach_neustart="fortsetzen", phasen=hoeren_phasen),
+        Art("fortsetzen", "Weiter aufgenommen", fortsetzen, eingabe=FortsetzenEingabe, fortsetzbar=True, nach_neustart="fortsetzen",
+            phasen=[Phase(schluessel="warten", titel="Warten", symbol="hourglass-half"),
+                    Phase(schluessel="zusammenfuegen", titel="Zusammenfügen", symbol="link"), speichern]),
         Art("aus_anfrage", "Transkribieren (Kellerwolke)", aus_anfrage, eingabe=AnfrageEingabe, fortsetzbar=True,
             nach_neustart="fortsetzen", phasen=hoeren_phasen),
         Art("sprecher_erkennen", "Sprecher erkennen", sprecher_erkennen, eingabe=SprecherEingabe, fortsetzbar=True,

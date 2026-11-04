@@ -1,19 +1,23 @@
-// Ein Gespräch weiterführen (HELF-154): solange eine Aufnahme als weiterer Teil läuft, steht hier, woran sie hängt.
-// Eine Wahrheit für alle Ansichten: wo auch immer die Aufnahme beendet wird (Transkript, Aufnahmen), legt `Aufnehmen`
-// sie als Teil dieses Gesprächs ab statt als neue Aufnahme.
-import type { Transkript } from "./typen";
+// Weiter aufnehmen (HELF-154): solange eine Aufnahme als Fortsetzung läuft, steht hier, an welche Tondatei sie kommt.
+// Eine Wahrheit für alle Ansichten: wo auch immer die Aufnahme beendet wird (Aufnahmen, Aufnahme, Transkript), legt
+// `Aufnehmen` sie hinten an diese Datei statt als neue Aufnahme ab.
+import { aufnahme, aufnehmen } from "appkern-oberflaeche";
 
 export interface Fortsetzung {
-  hauptId: string;          // die erste Aufnahme des Gesprächs (Teil 1)
-  transkriptId: string;
-  name: string;             // Name des Gesprächs
-  nummer: number;           // der Teil, der gerade entsteht (2, 3 ...)
-  ab_s: number;             // dort schließt er in der Zeit des Transkripts an
+  aufnahmeId: string;
+  name: string;
+  ab_s: number | null;       // so lang ist die Aufnahme bisher (wenn bekannt); dort schließt der neue Ton an
+  transkript: boolean;       // es gibt ein Transkript: der neue Text kommt unten dazu
+  zurueck: string;           // wohin es danach geht (Transkript oder Aufnahme)
 }
 
 export const fortsetzung = $state<{ ziel: Fortsetzung | null }>({ ziel: null });
 
-export function fortsetzungFuer(transkriptId: string, t: Transkript): Fortsetzung | null {
-  const hauptId = t.quelle?.knoten_id;
-  return hauptId ? { hauptId, transkriptId, name: t.name, nummer: (t.teile?.length ?? 0) + 2, ab_s: t.dauer_s } : null;
+// Mikrofon an, die neue Aufnahme kommt an `ziel`; gibt es kein Mikrofon, bleibt alles, wie es war
+export async function weiterAufnehmen(ziel: Fortsetzung): Promise<void> {
+  if (aufnahme.laeuft) return;
+  aufnahme.danach = null;
+  fortsetzung.ziel = ziel;
+  await aufnehmen();
+  if (!aufnahme.laeuft) fortsetzung.ziel = null;
 }

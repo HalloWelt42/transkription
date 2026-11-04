@@ -133,17 +133,6 @@ class Aenderung(_Teil):
     zeit: datetime = Field(default_factory=jetzt)
 
 
-class TeilAufnahme(_Teil):
-    """Ein weiterer Teil des Gesprächs (HELF-154): eigene Aufnahme als Begleiter der ersten (Rolle teil-<nummer>), in
-    der durchgehenden Zeit des Transkripts ab `beginn_s`. Teil 1 ist die Aufnahme selbst (`quelle`)."""
-
-    knoten_id: UUID
-    nummer: int = Field(ge=2)
-    beginn_s: float = Field(ge=0)
-    dauer_s: float = Field(ge=0)
-    aufgenommen_am: datetime | None = None
-
-
 class Transkript(_Teil):
     format: Literal["transkript/1"] = FORMAT
     name: str = Field(min_length=1, max_length=200)
@@ -159,8 +148,6 @@ class Transkript(_Teil):
     aenderung: Aenderung | None = None
     wellenform: list[int] | None = Field(None, description="Lautstärke 0 bis 100 in gleichen Abschnitten (Spieler)")
     fassungen: list[Hoerfassung] = Field(default_factory=list, description="weitere Hördienste zum Vergleich, je einer")
-    teile: list[TeilAufnahme] = Field(default_factory=list, description="weitere Teile des Gesprächs nach der Aufnahme "
-                                      "(Teil 2, 3 ...), in der Reihenfolge, in der sie angehängt wurden")
 
     @model_validator(mode="after")
     def _stimmig(self) -> Transkript:

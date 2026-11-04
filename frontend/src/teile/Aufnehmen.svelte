@@ -1,10 +1,11 @@
 <script lang="ts">
   // Aufnehmen mit dem Rekorder des Appkerns: die Aufnahme kommt nach Aufnahmen; danach entscheidet der Nutzer, ob sie
   // transkribiert wird, der Live-Text das Transkript wird, sie nur liegen bleibt oder in den Papierkorb geht.
-  // Läuft sie als weiterer Teil eines Gesprächs (HELF-154, lib/fortsetzung), kommt sie neben dessen erste Aufnahme und
-  // wird gleich transkribiert und unten angehängt; eine Entscheidung gibt es dann nicht.
+  // "Weiter aufnehmen" (HELF-154, lib/fortsetzung) gibt es gleich nach dem Beenden: der neue Ton kommt hinten an dieselbe
+  // Tondatei; hat sie ein Transkript, wird nur der neue Text gehört und angehängt, sonst bleibt die Wahl wie nach jeder
+  // Aufnahme (die Tondatei ist dann eben länger).
   import { aufnahme, Auswahl, gehe, marke, Rekorder, Rueckfrage, type Gespeichert, type NachDerAufnahme } from "appkern-oberflaeche";
-  import { fortsetzung } from "../lib/fortsetzung.svelte";
+  import { fortsetzung, weiterAufnehmen } from "../lib/fortsetzung.svelte";
   import { sprachOptionen as sprachWahl } from "../lib/sprachen.svelte";
   import * as api from "../lib/api";
   import { ANZAHL_OPTIONEN, SPRECHER_WEGE, type SprecherWeg } from "../lib/sprecherwahl";
@@ -22,7 +23,16 @@
 
   async function ablegen(fertig: { daten: Blob; info: Gespeichert }): Promise<string> {
     if (!ziel) return (await api.aufnahmeAblegen(fertig.daten, fertig.info)).id;
-    return (await api.teilAblegen(ziel.hauptId, fertig.daten, fertig.info)).teil.id;
+    await api.fortsetzen(ziel.aufnahmeId, fertig.daten, fertig.info);
+    return ziel.aufnahmeId;
+  }
+
+  // nach dem Beenden noch mehr sagen: an dieselbe Tondatei, ab ihrem jetzigen Ende
+  async function weiter(d: NachDerAufnahme) {
+    const vorher = fortsetzung.ziel;
+    await weiterAufnehmen({ aufnahmeId: d.id, name: vorher?.name ?? d.name,
+                            ab_s: vorher ? (vorher.ab_s != null ? vorher.ab_s + d.dauer_s : null) : d.dauer_s,
+                            transkript: vorher?.transkript ?? false, zurueck: vorher?.zurueck ?? `aufnahmen/${d.id}` });
   }
 
   // verworfen, solange sie lief: es entsteht kein Teil, die nächste Aufnahme ist wieder eine eigene
@@ -31,11 +41,11 @@
     onfertig?.(meldung);
   }
 
-  function zumGespraech() {
+  function zurueck() {
     const z = fortsetzung.ziel;
     aufnahme.danach = null;
     fortsetzung.ziel = null;
-    if (z) gehe(`transkripte/${z.transkriptId}`);
+    if (z) gehe(z.zurueck);
   }
 
   async function verwerfenJetzt(d: NachDerAufnahme) {
@@ -58,8 +68,9 @@
     fehler = "";
     try {
       if (wie === "genau") {
-        await api.transkribieren({ quelle_id: d.id, name: d.name, sprache, sprecher, anzahl: sprecher !== "ohne" ? anzahl : null });
-        onfertig?.(`${d.name} wird transkribiert; der Stand steht in der Liste und unter Aufträge.`);
+        const name = ziel?.name ?? d.name;
+        await api.transkribieren({ quelle_id: d.id, name, sprache, sprecher, anzahl: sprecher !== "ohne" ? anzahl : null });
+        onfertig?.(`${name} wird transkribiert; der Stand steht in der Liste und unter Aufträge.`);
       } else if (wie === "live") {
         await api.ausMitschrift({ quelle_id: d.id, name: d.name, sprache: sprache === "auto" ? "de" : sprache, stuecke: d.mitschrift });
         onfertig?.(`${d.name}: Transkript aus der Live-Mitschrift angelegt.`);
@@ -67,6 +78,7 @@
         onfertig?.(`${d.name} liegt in Aufnahmen.`);
       }
       aufnahme.danach = null;
+      fortsetzung.ziel = null;
     } catch (f) {
       fehler = (f as Error).message;
     } finally {
@@ -75,18 +87,22 @@
   }
 </script>
 
-{#if ziel}
+{#if ziel && !aufnahme.danach}
   <div class="hinweis-band fortsetzung-band"><i class="fa-solid fa-link"></i>
-    <span><b>Teil {ziel.nummer} zu {ziel.name}</b>, schließt bei {marke(ziel.ab_s)} an</span></div>
+    <span><b>Weiter in {ziel.name}</b>{ziel.ab_s != null ? `, schließt bei ${marke(ziel.ab_s)} an` : ", hinten angehängt"}</span></div>
 {/if}
-<Rekorder {kompakt} onfertig={beendet} ort={ziel ? ziel.name : "Aufnahmen"} {ablegen}
+<Rekorder {kompakt} onfertig={beendet} ort={ziel ? `${ziel.name} (hinten angehängt)` : "Aufnahmen"} {ablegen}
           liveHinweis="Der Text erscheint während der Aufnahme; genauer wird er beim Transkribieren.">
   {#snippet danach(d)}
-    {#if ziel}
+    <div class="weiter-zeile">
+      <button class="knopf weiter-knopf" disabled={sendet} onclick={() => weiter(d)}>
+        <i class="fa-solid fa-microphone"></i> Weiter aufnehmen</button>
+      <span class="unter">{ziel ? `${marke(d.dauer_s)} hängen an ${ziel.name}${ziel.ab_s != null ? `, jetzt ${marke(ziel.ab_s + d.dauer_s)} lang` : ""}.` : "Noch mehr sagen: kommt hinten an dieselbe Aufnahme."}</span>
+    </div>
+    {#if ziel?.transkript}
       <div class="entscheidung">
-        <div>Teil {ziel.nummer} ({marke(d.dauer_s)}) hängt an <b>{ziel.name}</b> und wird jetzt transkribiert; der Text
-          kommt unten an das Transkript.</div>
-        <div class="knopfzeile"><button class="knopf primaer" onclick={zumGespraech}><i class="fa-solid fa-file-lines"></i> Zum Transkript</button></div>
+        <div>Der neue Text wird gehört und unten an das Transkript gehängt.</div>
+        <div class="knopfzeile"><button class="knopf primaer" onclick={zurueck}><i class="fa-solid fa-file-lines"></i> Zum Transkript</button></div>
       </div>
     {:else}
     <div class="entscheidung">
@@ -97,13 +113,15 @@
       </div>
       <div class="knopfzeile">
         <button class="knopf primaer" disabled={sendet} onclick={() => entscheiden(d, "genau")}><i class="fa-solid fa-closed-captioning"></i> Transkribieren</button>
-        {#if d.mitschrift.length}
+        {#if d.mitschrift.length && !ziel}
           <button class="knopf" disabled={sendet} onclick={() => entscheiden(d, "live")} title="Ohne neues Hören, ohne Sprecher">
             <i class="fa-solid fa-file-lines"></i> Live-Text als Transkript speichern</button>
         {/if}
-        <button class="knopf still" disabled={sendet} onclick={() => entscheiden(d, "fertig")}>Nur speichern</button>
-        <button class="knopf still gefahr" style="margin-left:auto" disabled={sendet} onclick={() => (verwerfenFrage = true)}>
-          <i class="fa-solid fa-trash-can"></i> Verwerfen</button>
+        <button class="knopf still" disabled={sendet} onclick={() => { if (ziel) zurueck(); else void entscheiden(d, "fertig"); }}>Nur speichern</button>
+        {#if !ziel}
+          <button class="knopf still gefahr" style="margin-left:auto" disabled={sendet} onclick={() => (verwerfenFrage = true)}>
+            <i class="fa-solid fa-trash-can"></i> Verwerfen</button>
+        {/if}
       </div>
     </div>
     {#if fehler}<div class="fehlertext">{fehler}</div>{/if}
