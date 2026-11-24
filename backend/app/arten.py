@@ -174,6 +174,8 @@ class AnfrageOptionen(BaseModel):
     anzahl: int | None = Field(None, ge=1, le=20)
     hoerdienst: str | None = Field(None, max_length=120)
     trenndienst: str | None = Field(None, max_length=120)
+    hauptfassung: bool | None = Field(None, description="das Ergebnis wird Hauptfassung, auch mit einem anderen Hördienst; die "
+                                                        "bisherige rückt unter die Fassungen")
 
 
 def eingabe_aus_anfrage(e: AnfrageEingabe) -> TranskribierenEingabe:
