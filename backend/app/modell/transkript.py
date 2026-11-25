@@ -86,6 +86,8 @@ class ErzeugtMit(_Teil):
         "woher die Sprecher kommen: ohne, stimmen (gruppierte Stimmabdrücke) oder die Kennung des Dienstes der "
         "Sprechertrennung (auch der Hördienst selbst, wenn er Sprecher nennt); unbekannt bei älteren Fassungen mit "
         "Sprechern"))
+    luecken: list[tuple[float, float]] = Field(default_factory=list, description=(
+        "Strecken mit Sprache, die der Hördienst nicht sicher hört (Sekunden); dort steht kein Text"))
 
     def art(self) -> tuple[str, str | None, bool]:
         """Wofür eine Fassung steht: Hördienst, Herkunft der Sprecher, Ausschnitt. Je Art höchstens eine Fassung; so stehen

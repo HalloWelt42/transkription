@@ -13,7 +13,7 @@ schluessel_orte:
   - "Pi: `{{wurzel}}/.env`: Schlüssel und Adresse der Leitstelle als feste Einstellung (TRANSKRIPTION_FEST_LEITSTELLE_*), vom Ausrollen gesetzt (HELF-77); in der Oberfläche nur angezeigt"
   - "Pi: `{{wurzel}}/zertifikate/`, Blattzertifikat mit Schlüssel aus der Hausstelle (vom Ausrollen)"
 einrichten: einrichten.sh
-stand: b71ca8a
+stand: cd9d7fa
 ---
 
 # Transkription
@@ -127,6 +127,9 @@ transkription`. Probe wie in Schritt 3.
   bietet das gewählte der Anwendung Transkription nicht an (Fähigkeit text).
 - Eine Sprache fehlt zur Wahl: die Sprachen kommen aus dem Steckbrief des Hördienstes (Selbstauskunft in seiner
   Dienstdatei, siehe [[Klangwerk]]); antwortet die Leitstelle nicht, steht nur Erkennen und die eingestellte zur Wahl.
+- In einem Transkript fehlt Gesprochenes: der Hördienst hört ab Klangwerk 0.8.0 Strecken ohne Text von selbst noch einmal
+  (BT-91); was er auch dann nicht sicher hört, steht als `erzeugt_mit.luecken` in der Transkriptdatei. Ältere Transkripte
+  neu transkribieren; der bisherige Stand bleibt als Version.
 - Fachwörter kommen falsch an: unter Wörterbuch fehlt das Wort, oder der Hördienst ist älter als Klangwerk 0.4.0 (kennt
   den Hinweis noch nicht). Schreibt er lange Strecken klein und ohne Satzzeichen, unter Einstellungen, Hören den
   Stilsatz prüfen (in der Sprache der Aufnahme).

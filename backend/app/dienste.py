@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from appkern.leitstelle import Leitstelle
@@ -43,10 +43,16 @@ class HoerErgebnis:
     sprache: str | None
     modell: str | None
     wechsel: list[Wechsel]       # Sprecher, die der Hördienst selbst nennt (etwa MOSS-Transcribe-Diarize), sonst leer
+    luecken: list[tuple[float, float]] = field(default_factory=list)      # hier ist Sprache, die er nicht sicher hört (BT-91)
 
 
 def _typ(datei: Path) -> str:
     return INHALTSTYPEN.get(datei.suffix.lower(), "application/octet-stream")
+
+
+def luecken_aus(roh: list[dict], versatz: float = 0.0) -> list[tuple[float, float]]:
+    """Strecken mit Sprache, die der Hördienst auch beim Nachhören nicht sicher hört; Text gibt es dort keinen."""
+    return [(round(float(l["start"]) + versatz, 3), round(float(l["end"]) + versatz, 3)) for l in roh]
 
 
 def wechsel_aus(roh: list[dict], versatz: float = 0.0, vorsilbe: str = "") -> list[Wechsel]:
@@ -101,7 +107,7 @@ class Klangwerk:
                 files={"file": (datei.name, inhalt, _typ(datei))})
         roh = antwort.get("segments") or []
         return HoerErgebnis(segmente=segmente_aus(roh, versatz), sprache=antwort.get("language"), modell=antwort.get("model"),
-                            wechsel=wechsel_aus(roh, versatz, vorsilbe))
+                            wechsel=wechsel_aus(roh, versatz, vorsilbe), luecken=luecken_aus(antwort.get("luecken") or [], versatz))
 
     async def abdruecke(self, datei: Path, zeiten: list[tuple[float, float]], *, titel: str = "",
                         prioritaet=None) -> list[list[float] | None]:

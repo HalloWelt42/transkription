@@ -66,6 +66,7 @@ export interface ErzeugtMit {
   modell: string | null;
   app: string;
   hoeren_s?: number | null;       // Rechenzeit des Hördienstes für die ganze Aufnahme
+  luecken?: [number, number][];   // Strecken mit Sprache, die der Hördienst nicht sicher hört; dort steht kein Text
   bereich?: [number, number] | null;   // nur dieser Ausschnitt der Aufnahme (Sekunden); ohne: die ganze
   abschnitt_s?: number | null;    // gewünschte Abschnittslänge des Hördienstes; ohne: seine Vorgabe
   // woher die Sprecher kommen: ohne, stimmen (gruppiert), unbekannt (ältere) oder der Dienst der Sprechertrennung

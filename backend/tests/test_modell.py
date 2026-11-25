@@ -175,6 +175,15 @@ def test_zur_hauptfassung_tauscht_und_behaelt_marker():
         Transkript.model_validate({**neu.model_dump(), "fassungen": [neu.fassungen[0].model_dump()] * 2})
 
 
+def test_luecken_des_hoerdienstes_stehen_im_transkript():
+    from app.dienste import luecken_aus
+    from app.modell.transkript import ErzeugtMit
+    assert luecken_aus([{"start": 1.5, "end": 3.25, "sprache_s": 1.2}], 600.0) == [(601.5, 603.25)] and luecken_aus([]) == []
+    e = ErzeugtMit(dienst="klangwerk-hoeren", app="1", luecken=[(601.5, 603.25)])
+    assert ErzeugtMit.model_validate_json(e.model_dump_json()).luecken == [(601.5, 603.25)]
+    assert ErzeugtMit.model_validate({"dienst": "klangwerk-hoeren", "app": "1"}).luecken == []          # ältere Transkripte
+
+
 def test_sprecher_des_hoerdienstes_als_wechsel():
     from app.dienste import wechsel_aus
     roh = [{"start": 0.5, "end": 2, "text": "Hallo", "speaker": "S01"}, {"start": 2.5, "end": 4, "text": "Ja", "speaker": "S02"}]

@@ -422,7 +422,7 @@ def arten(teile: Teile) -> list[Art]:
                 stueck.unlink(missing_ok=True)
                 fertig[str(a.nummer)] = {"segmente": [s.model_dump(mode="json") for s in erg.segmente],
                                          "abdruecke": abdruecke, "sprache": erg.sprache, "modell": erg.modell,
-                                         "wechsel": [[w.start, w.ende, w.sprecher] for w in erg.wechsel],
+                                         "wechsel": [[w.start, w.ende, w.sprecher] for w in erg.wechsel], "luecken": erg.luecken,
                                          "hoeren_s": hoeren_s, "gerechnet_s": round(time.monotonic() - beginn, 1)}
                 await k.merken(hoeren=fertig)
                 await k.fortschritt(len(fertig) / len(plan), f"Abschnitt {a.nummer} von {len(plan)} fertig")
@@ -462,7 +462,8 @@ def arten(teile: Teile) -> list[Art]:
                            sprecher=sprecher, segmente=segmente, wellenform=wellenform,
                            erzeugt_mit=ErzeugtMit(dienst=hoerdienst, modell=modell, app=FASSUNG, hoeren_s=hoeren_s,
                                                   bereich=(plan[0].start, plan[-1].ende) if e.bereich and plan else None,
-                                                  abschnitt_s=e.abschnitt_s, sprecher_aus=sprecher_aus),
+                                                  abschnitt_s=e.abschnitt_s, sprecher_aus=sprecher_aus,
+                                                  luecken=[tuple(l) for a in plan for l in fertig[str(a.nummer)].get("luecken") or []]),
                            aenderung=Aenderung(was="erzeugt", wer=e.von))
             t, knoten = await transkripte.speichern(t, quelle, Aenderung(was="erzeugt", wer=e.von),
                                                     erneut=Aenderung(was="neu transkribiert", wer=e.von),
